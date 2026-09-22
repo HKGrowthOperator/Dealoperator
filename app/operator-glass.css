@@ -510,6 +510,9 @@ body,
 .crew-stats.group-performance {
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
+.ranking-controls .metric-tabs {
+  flex-wrap: wrap;
+}
 .crew-stats.group-performance > div {
   border: 1px solid #cadcf5;
   background: linear-gradient(180deg, #ffffffe6, #eef5ffcc);

@@ -7,7 +7,7 @@ export const metricLabels = {
   closingsBooked: "Closings vereinbart",
   closingsHeld: "Closings durchgeführt",
   dealsWon: "Deals gewonnen",
-  legacyMeetings: "Termine · bisherige Erfassung",
+  legacyMeetings: "Termine ohne Typangabe",
 } as const;
 export type Metric = keyof typeof metricLabels;
 export const metrics = Object.keys(metricLabels) as Metric[];

@@ -49,7 +49,8 @@ export default function RankingBoard({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
-  const [selected, setSelected] = useState<RankingRow | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = rows.find((row) => row.id === selectedId) ?? null;
   const [updated, setUpdated] = useState("");
   const [label, setLabel] = useState("");
   useEffect(() => {
@@ -88,9 +89,14 @@ export default function RankingBoard({
     const interval = setInterval(() => {
       if (!document.hidden) void load();
     }, 20000);
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       controller.abort();
       clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [from, to, retry]);
   const all = useMemo(() => ranked(rows, metric), [rows, metric]);
@@ -229,9 +235,9 @@ export default function RankingBoard({
             {[
               {
                 icon: Users,
-                label: "Personen mit Meldung",
+                label: "Profile mit Meldung",
                 value: all.length,
-                note: `${all.length === 1 ? "Profil" : "Profile"} im Zeitraum`,
+                note: "Einzel- und Teamprofile im Zeitraum",
               },
               {
                 icon: Phone,
@@ -260,6 +266,30 @@ export default function RankingBoard({
                     ? "Noch nicht gemeldet"
                     : `gemeldet von ${reported("dealsWon").length}`,
               },
+              {
+                icon: MessageCircle,
+                label: "Entscheidergespräche",
+                value: total("decisionMakerConversations"),
+                note: `gemeldet von ${reported("decisionMakerConversations").length}`,
+              },
+              {
+                icon: Check,
+                label: "Settings durchgeführt",
+                value: total("settingsHeld"),
+                note: `gemeldet von ${reported("settingsHeld").length}`,
+              },
+              {
+                icon: CalendarCheck,
+                label: "Closings durchgeführt",
+                value: total("closingsHeld"),
+                note: `gemeldet von ${reported("closingsHeld").length}`,
+              },
+              {
+                icon: CalendarCheck,
+                label: "Termine ohne Typangabe",
+                value: total("legacyMeetings"),
+                note: "Zusätzlich · Setting oder Closing noch offen",
+              },
             ].map((s) => (
               <div key={s.label}>
                 <span>
@@ -279,18 +309,11 @@ export default function RankingBoard({
                   role="group"
                   aria-label="Ranking-Kennzahl"
                 >
-                  {(
-                    [
-                      "attempts",
-                      "decisionMakerConversations",
-                      "settingsBooked",
-                      "closingsBooked",
-                      "dealsWon",
-                    ] as Metric[]
-                  ).map((k) => (
+                  {metrics.map((k) => (
                     <button
                       className={metric === k ? "active" : ""}
                       key={k}
+                      aria-pressed={metric === k}
                       onClick={() => setMetric(k)}
                     >
                       {
@@ -299,9 +322,12 @@ export default function RankingBoard({
                             attempts: "Calls",
                             decisionMakerConversations: "Gespräche",
                             settingsBooked: "Settings",
+                            settingsHeld: "Settings durchgeführt",
                             closingsBooked: "Closings",
+                            closingsHeld: "Closings durchgeführt",
                             dealsWon: "Deals",
-                          } as Partial<Record<Metric, string>>
+                            legacyMeetings: "Termine ohne Typangabe",
+                          } satisfies Record<Metric, string>
                         )[k]
                       }
                     </button>
@@ -403,7 +429,7 @@ export default function RankingBoard({
                           <td>
                             <button
                               className="rank-person"
-                              onClick={() => setSelected(r)}
+                              onClick={() => setSelectedId(r.id)}
                             >
                               <span className="rank-avatar">
                                 {r.name
@@ -440,7 +466,7 @@ export default function RankingBoard({
                           <td>
                             <button
                               className="rank-open"
-                              onClick={() => setSelected(r)}
+                              onClick={() => setSelectedId(r.id)}
                               aria-label={`Profil von ${r.name} öffnen`}
                             >
                               <Users size={19} />
@@ -553,7 +579,7 @@ export default function RankingBoard({
       <Dialog
         open={!!selected}
         onOpenChange={(v) => {
-          if (!v) setSelected(null);
+          if (!v) setSelectedId(null);
         }}
       >
         <DialogContent className="operator-dialog">
