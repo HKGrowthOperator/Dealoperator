@@ -7,6 +7,16 @@ export function authReady() {
     process.env.APP_URL
   );
 }
+// @supabase/ssr defaults to httpOnly:false and sets no Secure attribute. No
+// browser client exists here, so the session cookie is only ever read on the
+// server and can carry both flags.
+export function sessionCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: (process.env.APP_URL || "").startsWith("https://"),
+    sameSite: "lax",
+  } as const;
+}
 export async function authClient() {
   if (!authReady()) throw Error("Die Anmeldung wird gerade eingerichtet.");
   const jar = await cookies();
@@ -14,6 +24,7 @@ export async function authClient() {
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_PUBLISHABLE_KEY!,
     {
+      cookieOptions: sessionCookieOptions(),
       cookies: {
         getAll: () => jar.getAll(),
         setAll(values) {

@@ -8,6 +8,13 @@ export async function proxy(request: NextRequest) {
     process.env.SUPABASE_URL,
     process.env.SUPABASE_PUBLISHABLE_KEY,
     {
+      // Kept in step with sessionCookieOptions in server/auth.ts. Declared here
+      // rather than imported so the middleware bundle stays free of next/headers.
+      cookieOptions: {
+        httpOnly: true,
+        secure: (process.env.APP_URL || "").startsWith("https://"),
+        sameSite: "lax",
+      },
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll(values) {
