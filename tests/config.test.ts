@@ -23,6 +23,48 @@ test("production database connection cannot weaken TLS via URL options", () => {
     /lokale Datenbank/,
   );
 });
+test("connection string cannot switch off TLS or reroute the search path", () => {
+  // node-postgres lets a connection-string parameter win over the sibling
+  // configuration, so ?ssl=0 would reach the driver as ssl:false and ?options=
+  // would replace the operator search_path. Both must be refused outright.
+  for (const query of ["ssl=0", "ssl=false", "ssl=true"])
+    assert.throws(
+      () =>
+        connectionOptions({
+          DATABASE_URL: `postgresql://app:example@db.example.invalid:5432/postgres?${query}`,
+        }),
+      /ssl-Parameter/,
+      query,
+    );
+  assert.throws(
+    () =>
+      connectionOptions({
+        DATABASE_URL:
+          "postgresql://app:example@db.example.invalid:5432/postgres?options=-c%20search_path%3Dpublic",
+      }),
+    /options-Parameter/,
+  );
+  // A refused connection string is reported as a configuration issue rather
+  // than surfacing later as a missing-table error.
+  assert.ok(
+    configurationIssues({
+      APP_URL: "https://example.invalid",
+      SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_PUBLISHABLE_KEY: "sb_publishable_example",
+      DATABASE_URL:
+        "postgresql://app:example@db.example.invalid:5432/postgres?ssl=0",
+    }).some((issue) => /ssl-Parameter/.test(issue)),
+  );
+  // The documented shape keeps verified TLS and the operator search path.
+  const healthy = connectionOptions({
+    DATABASE_URL: "postgresql://app:example@db.example.invalid:5432/postgres",
+  });
+  assert.equal(
+    (healthy.ssl as { rejectUnauthorized: boolean }).rejectUnauthorized,
+    true,
+  );
+  assert.match(String(healthy.options), /search_path=operator,pg_catalog/);
+});
 test("session-dependent queries reject transaction pooler and allow local test TLS override", () => {
   assert.throws(
     () =>
