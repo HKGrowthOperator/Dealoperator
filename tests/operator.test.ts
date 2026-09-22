@@ -5,7 +5,6 @@ import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { Database, placeholders } from "../server/database";
 import {
-  claim,
   commitImport,
   issueClaim,
   ownState,
@@ -15,6 +14,13 @@ import {
   updateAccount,
 } from "../server/operator";
 import { loadOwnRecords } from "../server/records";
+import {
+  bindConfirmedRequest,
+  decideRequest,
+  reviewQueue,
+  searchProfiles,
+  startRequest,
+} from "../server/onboarding";
 import {
   aggregate,
   berlinDate,
@@ -41,7 +47,7 @@ before(async () => {
 });
 beforeEach(async () => {
   await pg.exec(
-    "TRUNCATE participants,profiles,records,requests,account_private,rate_limits,posts,buddies,relationships,preferences,entitlements,sessions CASCADE",
+    "TRUNCATE participants,profiles,records,requests,account_private,rate_limits,posts,buddies,relationships,preferences,entitlements,sessions,onboarding_requests,onboarding_events CASCADE",
   );
 });
 after(async () => {
@@ -73,6 +79,40 @@ async function imported(rows = [row()]) {
   await commitImport(db, admin, { rows, expected, key: randomUUID() });
   return (await db.query("SELECT id FROM participants ORDER BY import_key"))[0]
     .id as string;
+}
+/** Vollständiger neuer Ablauf: Anfrage, E-Mail-Bestätigung, Teamfreigabe. */
+async function request(
+  participantId: string,
+  actor: typeof alice,
+  extra: Record<string, unknown> = {},
+) {
+  await startRequest(db, {
+    kind: "claim",
+    participantId,
+    fullName: "Test Person",
+    email: actor.email,
+    phone: "+4917012345678",
+    hint: "",
+    ...extra,
+  });
+  const bound = await bindConfirmedRequest(db, actor);
+  return bound!.id;
+}
+async function takeOver(participantId: string, actor: typeof alice) {
+  // startRequest legt für dieselbe Person und dasselbe Profil bewusst keine
+  // zweite offene Anfrage an, deshalb hier nur anfragen, wenn noch keine läuft.
+  const [open] = await db.query(
+    `SELECT id FROM onboarding_requests
+     WHERE owner=$1 AND participant=$2 AND status IN ('pending','info_needed')`,
+    [actor.userId, participantId],
+  );
+  const id = open ? (open.id as string) : await request(participantId, actor);
+  return decideRequest(db, admin, {
+    id,
+    decision: "approve",
+    internalNote: "Abgeglichen",
+    applicantMessage: "",
+  });
 }
 function checkin(extra: any = {}) {
   return {
@@ -185,10 +225,21 @@ test("non-admin cannot import or create claim invitations", async () => {
   const id = await imported();
   await assert.rejects(issueClaim(db, alice, id), /Verwaltung/);
 });
-test("same name cannot claim a profile; confirmed matching email can", async () => {
+test("a confirmed email alone never hands over a prepared profile", async () => {
   const id = await imported();
-  await assert.rejects(claim(db, bob, { participantId: id }), /Zuordnung/);
-  await claim(db, alice, { participantId: id });
+  // Passende E-Mail, bestätigte Sitzung — und trotzdem kein Zugriff, solange
+  // das Team nicht freigegeben hat.
+  await request(id, alice);
+  const waiting = await ownState(db, alice);
+  assert.equal(waiting.participant, null);
+  assert.equal(waiting.records.length, 0);
+  assert.equal(waiting.request.status, "pending");
+  assert.equal(
+    (await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0]
+      .owner,
+    null,
+  );
+  await takeOver(id, alice);
   const state = await ownState(db, alice);
   assert.equal(state.participant.id, id);
   assert.equal(state.records[0].counts.attempts, 100);
@@ -201,47 +252,114 @@ test("same name cannot claim a profile; confirmed matching email can", async () 
     5,
   );
 });
-test("claim code is stored hashed, can only be used once and preserves history", async () => {
+test("only the team can decide, and members cannot decide for themselves", async () => {
+  const id = await imported();
+  const requestId = await request(id, alice);
+  await assert.rejects(
+    decideRequest(db, alice, { id: requestId, decision: "approve" }),
+    /Verwaltung/,
+  );
+  await assert.rejects(reviewQueue(db, alice), /Verwaltung/);
+  assert.equal(
+    (await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0]
+      .owner,
+    null,
+  );
+});
+test("two competing requests stay visible and exactly one wins the profile", async () => {
+  const id = await imported();
+  const first = await request(id, alice);
+  const second = await request(id, bob);
+  const queue = await reviewQueue(db, admin);
+  assert.equal(queue.filter((r: any) => r.participant === id).length, 2);
+  assert.equal(Number(queue[0].competing), 1);
+  await decideRequest(db, admin, { id: first, decision: "approve" });
+  // Die zweite Anfrage verliert jeden Zugriff, ohne dass jemand sie anfassen muss.
+  await assert.rejects(
+    decideRequest(db, admin, { id: second, decision: "approve" }),
+    /bereits abschließend entschieden/,
+  );
+  const rows = await db.query(
+    "SELECT id,status FROM onboarding_requests ORDER BY created_at",
+  );
+  assert.deepEqual(
+    rows.map((r: any) => r.status).sort(),
+    ["approved", "superseded"],
+  );
+  assert.equal((await ownState(db, alice)).participant.id, id);
+  assert.equal((await ownState(db, bob)).participant, null);
+});
+test("an approved profile is protected against later requests and stale links", async () => {
+  const id = await imported();
+  await takeOver(id, alice);
+  // Direktlink oder veraltete Ansicht: die Auswahl selbst wird abgewiesen.
+  await assert.rejects(
+    startRequest(db, {
+      kind: "claim",
+      participantId: id,
+      fullName: "Fremde Person",
+      email: bob.email,
+      phone: "+4917012345678",
+      hint: "",
+    }),
+    /bereits einem Konto zugeordnet/,
+  );
+  assert.equal((await searchProfiles(db, "Alice")).length, 0);
+});
+test("an invitation only unlocks selection and still needs the team", async () => {
   const id = await imported([row({ email: "" })]);
+  await db.query("UPDATE participants SET searchable=false WHERE id=$1", [id]);
+  assert.equal((await searchProfiles(db, "Alice")).length, 0);
+  // Ohne Einladung ist ein nicht auffindbares Profil nicht wählbar.
+  await assert.rejects(
+    startRequest(db, {
+      kind: "claim",
+      participantId: id,
+      fullName: "Bob Caller",
+      email: bob.email,
+      phone: "+4917012345678",
+      hint: "",
+    }),
+    /persönliche Einladung/,
+  );
   const invite = await issueClaim(db, admin, id);
   const stored = await db.query("SELECT * FROM claim_tokens");
   assert.notEqual(stored[0].hash, invite.token);
-  await claim(db, bob, { participantId: id, token: invite.token });
+  await startRequest(db, {
+    kind: "claim",
+    participantId: id,
+    invite: invite.token,
+    fullName: "Bob Caller",
+    email: bob.email,
+    phone: "+4917012345678",
+    hint: "",
+  });
+  // Die Einladung allein überträgt nichts.
+  await bindConfirmedRequest(db, bob);
+  assert.equal((await ownState(db, bob)).participant, null);
+  const [open] = await db.query(
+    "SELECT id FROM onboarding_requests WHERE owner=$1",
+    [bob.userId],
+  );
+  await decideRequest(db, admin, { id: open.id, decision: "approve" });
   assert.equal((await ownState(db, bob)).records[0].counts.attempts, 100);
-  await assert.rejects(
-    claim(db, alice, { participantId: id, token: invite.token }),
-    /nicht verfügbar/,
+  // Nach der Freigabe ist der Code verbraucht.
+  assert.equal(
+    (await db.query("SELECT used_at FROM claim_tokens WHERE participant=$1", [id]))[0]
+      .used_at !== null,
+    true,
   );
 });
-test("expired, wrong and replaced claim codes fail", async () => {
-  const id = await imported([row({ email: "" })]);
-  const first = await issueClaim(db, admin, id);
-  const second = await issueClaim(db, admin, id);
-  await assert.rejects(
-    claim(db, bob, { participantId: id, token: first.token }),
-    /Zuordnung/,
-  );
-  await assert.rejects(
-    claim(db, bob, { participantId: id, token: "invalid" }),
-    /Zuordnung/,
-  );
-  await db.query(
-    "UPDATE claim_tokens SET expires_at=now()-interval '1 second'",
-  );
-  await assert.rejects(
-    claim(db, bob, { participantId: id, token: second.token }),
-    /Zuordnung/,
-  );
-});
-test("claim never replaces another existing account profile", async () => {
+test("approval refuses when the account already owns a profile", async () => {
   const id = await imported();
+  const requestId = await request(id, alice);
   await db.query("INSERT INTO participants(id,name,owner) VALUES($1,$2,$3)", [
     "other",
     "Existing",
     alice.userId,
   ]);
   await assert.rejects(
-    claim(db, alice, { participantId: id }),
+    decideRequest(db, admin, { id: requestId, decision: "approve" }),
     /bereits ein Profil/,
   );
   assert.equal(
@@ -250,9 +368,63 @@ test("claim never replaces another existing account profile", async () => {
     null,
   );
 });
+test("rejection and a follow-up question keep the numbers untouched", async () => {
+  const id = await imported();
+  const requestId = await request(id, alice);
+  await decideRequest(db, admin, {
+    id: requestId,
+    decision: "info",
+    internalNote: "Nummer passt nicht zum WhatsApp-Kontakt",
+    applicantMessage: "Bitte nenne uns deinen Namen im Gruppenchat.",
+  });
+  let [r] = await db.query("SELECT * FROM onboarding_requests WHERE id=$1", [
+    requestId,
+  ]);
+  assert.equal(r.status, "info_needed");
+  await decideRequest(db, admin, {
+    id: requestId,
+    decision: "reject",
+    internalNote: "Keine Rückmeldung",
+    applicantMessage: "Wir konnten die Zuordnung nicht bestätigen.",
+  });
+  [r] = await db.query("SELECT * FROM onboarding_requests WHERE id=$1", [
+    requestId,
+  ]);
+  assert.equal(r.status, "rejected");
+  assert.equal(r.decided_by, admin.userId);
+  assert.ok(r.decided_at);
+  assert.equal((await ownState(db, alice)).participant, null);
+  assert.equal(
+    (await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0]
+      .owner,
+    null,
+  );
+  // Jede Entscheidung ist mit Bearbeiter und Zeitpunkt protokolliert.
+  const events = await db.query(
+    "SELECT action,actor FROM onboarding_events WHERE request=$1 ORDER BY id",
+    [requestId],
+  );
+  assert.deepEqual(
+    events.map((e: any) => e.action),
+    ["submitted", "email_confirmed", "info_requested", "rejected"],
+  );
+});
+test("the public search never exposes contact data or claimed profiles", async () => {
+  const id = await imported();
+  const [found] = await searchProfiles(db, "Alice");
+  assert.deepEqual(Object.keys(found).sort(), [
+    "company",
+    "id",
+    "name",
+    "role",
+  ]);
+  assert.equal(found.id, id);
+  // Zu kurze Eingaben liefern nichts, damit die Liste nicht abgegrast wird.
+  assert.deepEqual(await searchProfiles(db, "A"), []);
+});
 test("corrected checkin replaces totals, changes only relevant rank and queues sync", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   const r = await saveCheckin(
     db,
     alice,
@@ -273,7 +445,7 @@ test("corrected checkin replaces totals, changes only relevant rank and queues s
 });
 test("request retry is idempotent, conflicting reuse and stale revisions fail", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   const v = checkin({ counts: { ...counts(), attempts: 500 } });
   const first = await saveCheckin(db, alice, v);
   assert.deepEqual(await saveCheckin(db, alice, v), first);
@@ -289,7 +461,7 @@ test("request retry is idempotent, conflicting reuse and stale revisions fail", 
 });
 test("checkin supports previous-day sourced appointments and rejects future dates", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   await saveCheckin(
     db,
     alice,
@@ -312,7 +484,7 @@ test("stale import preview rolls back whole import including newly introduced pa
     row(),
   ];
   const expected = await previewImport(db, rows);
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   await saveCheckin(
     db,
     alice,
@@ -326,7 +498,7 @@ test("stale import preview rolls back whole import including newly introduced pa
 });
 test("withdrawal hides public data and a subsequent owner import cannot override member consent", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   await updateAccount(db, alice, {
     name: "Alice",
     company: "Firma",
@@ -389,7 +561,7 @@ test("private buddy messages and partner register remain restricted", async () =
 
 test("same daily content with a new request key does not increase revisions or sync work", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   const first = await saveCheckin(db, alice, checkin());
   const queue = (
     await db.query("SELECT revision FROM sync_outbox WHERE participant=$1", [
@@ -441,7 +613,7 @@ test("new member creates a private profile and existing legacy records remain re
 });
 test("failed outbox write rolls back checkin, audit and idempotency receipt together", async () => {
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   const before = await db.query("SELECT counts,revision FROM checkins");
   await db.query(
     "ALTER TABLE sync_outbox ADD CONSTRAINT forced_test_failure CHECK(revision<100) NOT VALID",
@@ -468,7 +640,7 @@ test("failed outbox write rolls back checkin, audit and idempotency receipt toge
 test("private contact inventory is restricted to admins", async () => {
   const { adminContacts } = await import("../server/operator");
   const id = await imported();
-  await claim(db, alice, { participantId: id });
+  await takeOver(id, alice);
   await updateAccount(db, alice, {
     name: "Alice",
     company: "Firma",
@@ -533,9 +705,11 @@ test("onboarding creates a private member who can immediately save and retain ow
   assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 0);
   assert.equal((await ownState(db, alice)).records.length, 0);
 });
-test("onboarding directs matching imports to claims and never silently drops prior numbers", async () => {
+test("an open takeover request blocks a second empty profile", async () => {
   const { createMember } = await import("../server/operator");
   const id = await imported();
+  await request(id, alice);
+  // Während die Prüfung läuft, entsteht kein zweites Profil mit leeren Zahlen.
   await assert.rejects(
     createMember(db, alice, {
       name: "Alice",
@@ -543,35 +717,27 @@ test("onboarding directs matching imports to claims and never silently drops pri
       role: "",
       publicConsent: true,
     }),
-    /bereits Zahlen/,
+    /wird gerade geprüft/,
   );
+  await assert.rejects(saveCheckin(db, alice, checkin()), /wird gerade geprüft/);
   assert.equal(
-    (await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0]
-      .owner,
-    null,
+    (await db.query("SELECT count(*)::int AS n FROM participants"))[0].n,
+    1,
   );
-  await claim(db, alice, { participantId: id });
-  const result = await createMember(db, alice, {
-    name: "Ignored retry",
-    company: "",
-    role: "",
-    publicConsent: false,
-  });
-  assert.equal(result.id, id);
-  assert.equal((await ownState(db, alice)).records[0].counts.attempts, 100);
-  assert.equal((await ownState(db, alice)).participant.name, "Alice Beispiel");
 });
-test("a new profile starts a distinct history only after an explicit choice", async () => {
+test("a rejected applicant can still start a separate new profile", async () => {
   const { createMember } = await import("../server/operator");
   const id = await imported();
+  const requestId = await request(id, alice);
+  await decideRequest(db, admin, { id: requestId, decision: "reject" });
   const result = await createMember(db, alice, {
     name: "Alice neu",
     company: "",
     role: "",
     publicConsent: false,
-    confirmNew: true,
   });
   assert.notEqual(result.id, id);
+  // Die vorbereiteten Zahlen bleiben unangetastet beim alten Profil.
   assert.equal((await ownState(db, alice)).records.length, 0);
   assert.equal(
     (await db.query("SELECT counts FROM checkins WHERE participant=$1", [id]))

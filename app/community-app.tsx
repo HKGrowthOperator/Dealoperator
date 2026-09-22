@@ -416,11 +416,11 @@ export default function CommunityApp({
       setProfile(emptyProfile);
       if (signedIn) void refresh();
     } else {
-      setMode("demo");
-      const d = demoMemory || demoData();
-      setData(d);
-      setProfile(d.profile);
-      setRecord(d.records.find((r) => r.date === dateKey()) || blankRecord());
+      // Keine fiktiven Daten mehr: ohne ?modus=eigen bleibt der Bereich leer,
+      // die Routenwache führt ohnehin zur Anmeldung.
+      setMode("own");
+      setData(blankData);
+      setProfile(emptyProfile);
     }
   }, [signedIn, refresh, modeQuery]);
   useEffect(() => {
@@ -1052,40 +1052,16 @@ export default function CommunityApp({
             </Link>
           </div>
         </header>
-        <div className={`mode-bar ${demo ? "" : "own-mode"}`}>
+        <div className="mode-bar own-mode">
           <span>
             <span className="mode-dot" />
-            {demo ? (
-              <>
-                <strong>Entdecke die Community</strong>
-                <span className="mode-description">
-                  {" "}
-                  – mit fiktiven Personen und Beispieldaten.
-                </span>
-              </>
-            ) : (
-              <>
-                <strong>Dein persönlicher Bereich</strong>
-                <span className="mode-description">
-                  {" "}
-                  – deine Einträge bleiben privat.
-                </span>
-              </>
-            )}
+            <strong>Dein persönlicher Bereich</strong>
+            <span className="mode-description">
+              {" "}
+              – deine Einträge bleiben privat.
+            </span>
           </span>
-          {demo ? (
-            <button onClick={own}>Mit eigenen Daten starten</button>
-          ) : (
-            <Link
-              href="/heute?modus=demo"
-              onClick={() => {
-                setMode("demo");
-                setData(demoMemory || demoData());
-              }}
-            >
-              Vorschau ansehen
-            </Link>
-          )}
+          <Link href="/ranking">Zum Community-Ranking</Link>
         </div>
         <main className="main-content">
           <div className="signup-inline">

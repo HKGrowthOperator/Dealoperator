@@ -55,6 +55,22 @@ export const checkinSchema = z
   })
   .strict();
 export type CheckinInput = z.infer<typeof checkinSchema>;
+/**
+ * Solange eine Übernahmeanfrage läuft, darf kein zweites Profil mit leeren
+ * Zahlen entstehen. Sonst hätte die Person nach der Freigabe zwei Historien.
+ */
+async function refuseDuringOpenClaim(tx: Database, actor: Actor) {
+  const [open] = await tx.query(
+    `SELECT id FROM onboarding_requests
+     WHERE owner=$1 AND kind='claim' AND status IN ('pending','info_needed') LIMIT 1`,
+    [actor.userId],
+  );
+  if (open)
+    throw new AppError(
+      "Deine Profilübernahme wird gerade geprüft. Bis zur Entscheidung legen wir kein zweites Profil an.",
+      409,
+    );
+}
 async function outbox(tx: Database, participant: string) {
   await tx.query(
     "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
@@ -132,15 +148,19 @@ export async function ownState(db: Database, actor: Actor) {
     "SELECT phone,contact_opt_in FROM account_private WHERE owner=$1",
     [actor.userId],
   );
-  const candidates = await db.query(
-    "SELECT id,name,company FROM participants WHERE owner IS NULL AND lower(email)=$1",
-    [actor.email],
+  // Eine zur E-Mail passende Importzeile ist ausdrücklich KEIN Anspruch mehr.
+  // Die Zuordnung entsteht nur über eine Anfrage und die Freigabe durch das Team.
+  const [request] = await db.query(
+    `SELECT r.id,r.kind,r.status,r.applicant_message,r.created_at,r.decided_at,p.name AS participant_name
+     FROM onboarding_requests r LEFT JOIN participants p ON p.id=r.participant
+     WHERE r.owner=$1 ORDER BY r.created_at DESC LIMIT 1`,
+    [actor.userId],
   );
   return {
     participant: participant || null,
     records,
     progress: progress(aggregate(records.map((r) => r.counts))),
-    candidates,
+    request: request || null,
     contact: contact || { phone: "", contact_opt_in: false },
     email: actor.email,
     admin: actor.admin,
@@ -158,6 +178,7 @@ export async function saveCheckin(db: Database, actor: Actor, raw: unknown) {
       [actor.userId],
     );
     if (!p) {
+      await refuseDuringOpenClaim(tx, actor);
       const [profile] = await tx.query(
         "SELECT data FROM profiles WHERE id=$1",
         [actor.userId],
@@ -222,7 +243,6 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       company: z.string().trim().max(120),
       role: z.string().trim().max(80),
       publicConsent: z.boolean(),
-      confirmNew: z.boolean().default(false),
     })
     .strict()
     .parse(raw);
@@ -235,15 +255,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       [actor.userId],
     );
     if (existing) return { ok: true, id: existing.id };
-    const candidates = await tx.query(
-      "SELECT id FROM participants WHERE owner IS NULL AND lower(email)=$1",
-      [actor.email],
-    );
-    if (candidates.length && !value.confirmNew)
-      throw new AppError(
-        "Zu deiner E-Mail gibt es bereits Zahlen. Übernimm dein Profil oder bestätige, dass du neu starten möchtest.",
-        409,
-      );
+    await refuseDuringOpenClaim(tx, actor);
     const id = randomUUID();
     await tx.query(
       "INSERT INTO participants(id,name,company,role,email,owner,public_consent,claimed_at) VALUES($1,$2,$3,$4,$5,$6,$7,now())",
@@ -409,6 +421,11 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
     return { ok: true, count: v.rows.length };
   });
 }
+/**
+ * Persönliche Einladung für ein Profil, das nicht öffentlich auffindbar ist.
+ * Der Code macht das Profil in der Auswahl sichtbar — er überträgt kein
+ * Eigentum und überspringt die Teamfreigabe nicht.
+ */
 export async function issueClaim(db: Database, actor: Actor, id: string) {
   if (!actor.admin)
     throw new AppError("Nur die Verwaltung kann Einladungen erstellen.", 403);
@@ -431,80 +448,10 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
     return { token, expiresInDays: 7 };
   });
 }
-export async function claim(db: Database, actor: Actor, raw: unknown) {
-  const v = z
-    .object({
-      participantId: z.string().min(1).max(100),
-      token: z.string().max(200).optional(),
-    })
-    .parse(raw);
-  return db.transaction(async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `owner:${actor.userId}`,
-    ]);
-    const [existing] = await tx.query(
-      "SELECT id FROM participants WHERE owner=$1",
-      [actor.userId],
-    );
-    if (existing)
-      throw new AppError(
-        existing.id === v.participantId
-          ? "Dieses Profil gehört bereits zu deinem Konto."
-          : "Dein Konto hat bereits ein Profil. Bitte die Verwaltung um eine geprüfte Zusammenführung bitten.",
-        409,
-      );
-    const [p] = await tx.query(
-      "SELECT * FROM participants WHERE id=$1 AND owner IS NULL FOR UPDATE",
-      [v.participantId],
-    );
-    if (!p) throw new AppError("Die Profilübernahme ist nicht verfügbar.", 409);
-    let tokenRow;
-    if (v.token) {
-      [tokenRow] = await tx.query(
-        "SELECT hash FROM claim_tokens WHERE hash=$1 AND participant=$2 AND used_at IS NULL AND expires_at>now() FOR UPDATE",
-        [hash(v.token), p.id],
-      );
-    }
-    if (!tokenRow && (!p.email || p.email.toLowerCase() !== actor.email))
-      throw new AppError(
-        "Die Zuordnung konnte nicht bestätigt werden. Verwende die hinterlegte E-Mail oder deinen gültigen persönlichen Code.",
-        403,
-      );
-    if (tokenRow)
-      await tx.query("UPDATE claim_tokens SET used_at=now() WHERE hash=$1", [
-        tokenRow.hash,
-      ]);
-    await tx.query(
-      "UPDATE participants SET owner=$2,claimed_at=now() WHERE id=$1",
-      [p.id, actor.userId],
-    );
-    const [oldProfile] = await tx.query(
-      "SELECT data FROM profiles WHERE id=$1",
-      [actor.userId],
-    );
-    const base = oldProfile
-      ? JSON.parse(oldProfile.data)
-      : {
-          niche: "B2B-Dienstleistungen",
-          time: "Vormittags",
-          bio: "",
-          goal: 200,
-          days: [1, 2, 3, 4, 5],
-          listed: false,
-          channel: "Discord",
-        };
-    await tx.query(
-      "INSERT INTO profiles(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
-      [
-        actor.userId,
-        JSON.stringify({ ...base, name: p.name, role: p.role || "Sales" }),
-      ],
-    );
-    await rememberVerifiedEmail(tx, actor);
-    await outbox(tx, p.id);
-    return { ok: true, name: p.name };
-  });
-}
+// Die frühere direkte Übernahme über passende E-Mail oder Einmalcode ist
+// entfallen. Ein vorbereitetes Profil wird ausschließlich über eine Anfrage in
+// server/onboarding.ts und die anschließende Freigabe durch das
+// Deal-Operator-Team mit einem Konto verbunden.
 export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   const v = z
     .object({
@@ -555,9 +502,29 @@ export async function rateLimit(
     );
 }
 
+/**
+ * Ein vorbereitetes Profil aus der öffentlichen Suche nehmen oder wieder
+ * aufnehmen. Ein nicht auffindbares Profil bleibt über eine persönliche
+ * Einladung erreichbar.
+ */
+export async function setSearchable(db: Database, actor: Actor, raw: unknown) {
+  if (!actor.admin)
+    throw new AppError("Nur die Verwaltung kann die Auffindbarkeit ändern.", 403);
+  const v = z
+    .object({ id: z.string().trim().min(1).max(100), searchable: z.boolean() })
+    .strict()
+    .parse(raw);
+  const [p] = await db.query(
+    "UPDATE participants SET searchable=$2 WHERE id=$1 RETURNING id,searchable",
+    [v.id, v.searchable],
+  );
+  if (!p) throw new AppError("Dieses Profil gibt es nicht.", 404);
+  return { ok: true, searchable: p.searchable };
+}
+
 export async function adminContacts(db: Database, actor: Actor) {
   if (!actor.admin) throw new AppError("Nur für die Verwaltung.", 403);
   return db.query(
-    "SELECT p.id,p.name,p.company,p.role,p.email AS imported_email,a.email AS verified_email,a.phone,a.contact_opt_in,p.owner IS NOT NULL AS registered FROM participants p LEFT JOIN account_private a ON a.owner=p.owner ORDER BY p.name",
+    "SELECT p.id,p.name,p.company,p.role,p.email AS imported_email,a.email AS verified_email,a.phone,a.contact_opt_in,p.searchable,p.owner IS NOT NULL AS registered FROM participants p LEFT JOIN account_private a ON a.owner=p.owner ORDER BY p.name",
   );
 }

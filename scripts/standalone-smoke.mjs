@@ -44,7 +44,7 @@ try {
     "/",
     "/ranking",
     "/beitreten",
-    "/profil-uebernehmen",
+    "/anmelden",
     "/verwaltung",
     "/heute?modus=demo",
     "/crew?modus=demo",
@@ -60,21 +60,62 @@ try {
     const response = await fetch(base + path);
     assert.equal(response.status, 200, path);
   }
-  for (const path of ["/heute", "/zahlen?modus=eigen", "/start"]) {
+  // Mitgliederbereiche führen zur Anmeldung, nicht durch die Profilauswahl.
+  for (const path of ["/heute", "/zahlen?modus=eigen", "/start", "/status"]) {
     const response = await fetch(base + path, { redirect: "manual" });
     assert.equal(response.status, 307, path);
-    assert.ok(response.headers.get("location")?.includes("/beitreten"));
+    assert.ok(
+      response.headers.get("location")?.includes("/anmelden"),
+      `${path} -> ${response.headers.get("location")}`,
+    );
   }
+  // Die frühere Direktübernahme führt in den geprüften Ablauf.
+  const retired = await fetch(base + "/profil-uebernehmen?profil=abc", {
+    redirect: "manual",
+  });
+  assert.equal(retired.status, 307);
+  assert.ok(retired.headers.get("location")?.includes("/beitreten?profil=abc"));
+  // Öffentliche Profilsuche ohne Konfiguration: ehrlich leer statt Fehler.
+  const search = await (await fetch(base + "/api/onboarding?q=test")).json();
+  assert.equal(search.ready, false);
+  assert.deepEqual(search.profiles, []);
   for (const path of ["/api/operator", "/api/community"])
     assert.equal((await fetch(base + path)).status, 401, path);
+  assert.equal(
+    (await fetch(base + "/api/onboarding?status=eigen")).status,
+    401,
+  );
   const ready = await fetch(base + "/api/ready");
   assert.equal(ready.status, 503);
   assert.equal((await ready.json()).ready, false);
+  // Ohne Datenbank trägt die freigegebene Momentaufnahme die öffentliche
+  // Ansicht: echte gemeldete Zahlen, klar gekennzeichnet, ohne private Felder.
   const ranking = await (await fetch(base + "/api/ranking")).json();
-  assert.equal(ranking.ready, false);
-  assert.deepEqual(ranking.rows, []);
+  assert.equal(ranking.ready, true);
+  assert.equal(ranking.snapshot, true);
+  assert.match(ranking.label, /Gemeldeter Stand/);
+  assert.equal(ranking.rows.length, 23);
+  const totals = (key) =>
+    ranking.rows
+      .map((r) => r.counts[key])
+      .filter((v) => v !== null)
+      .reduce((a, b) => a + b, 0);
+  assert.equal(totals("attempts"), 1416);
+  assert.equal(totals("settingsBooked"), 34);
+  assert.equal(totals("closingsBooked"), 2);
+  assert.equal(totals("legacyMeetings"), 4);
+  assert.ok(ranking.rows.every((r) => r.counts.dealsWon === null));
+  assert.ok(ranking.rows.every((r) => r.claimed === false));
+  for (const field of ["email", "phone", "import_key", "source_url", "note"])
+    assert.ok(
+      !JSON.stringify(ranking.rows).includes(field),
+      `Rangliste darf ${field} nicht ausliefern`,
+    );
   const html = await (await fetch(base + "/")).text();
-  assert.ok(!/kostenlos|dealuno/i.test(html), "Unexpected public copy");
+  assert.ok(
+    !/kostenlos|dealuno|Beispieldaten|fiktiv/i.test(html),
+    "Unexpected public copy",
+  );
   console.log(
     "Standalone smoke passed: routes, assets, login gates, private API protection and honest readiness. No external services were contacted.",
   );

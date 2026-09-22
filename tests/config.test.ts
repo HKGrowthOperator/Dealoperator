@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configurationIssues, connectionOptions } from "../server/config";
 import { safeNext } from "../lib/navigation";
+import { normalisePhone } from "../lib/phone";
 import { readiness } from "../server/readiness";
 
 test("production database connection cannot weaken TLS via URL options", () => {
@@ -147,4 +148,31 @@ test("post-login targets prevent external redirects and authentication loops", (
     "/profil-uebernehmen?profil=abc-123",
   );
   assert.equal(safeNext("/zahlen?modus=eigen"), "/zahlen?modus=eigen");
+});
+
+test("phone numbers are normalised to E.164 and require a country code", () => {
+  // Übliche Schreibweisen führen zum selben gespeicherten Wert.
+  for (const input of [
+    "+49 170 1234567",
+    "+49 (0)170 1234567".replace("(0)", ""),
+    "0049 170 1234567",
+    "+49-170-1234567",
+    "+49/170/1234567",
+  ]) {
+    const result = normalisePhone(input);
+    assert.equal(result.ok, true, input);
+    assert.equal((result as { value: string }).value, "+491701234567", input);
+  }
+  // Ohne Ländervorwahl ist die Nummer mehrdeutig und wird abgelehnt.
+  for (const input of ["0170 1234567", "1701234567"]) {
+    const result = normalisePhone(input);
+    assert.equal(result.ok, false, input);
+    assert.match((result as { reason: string }).reason, /Ländervorwahl/);
+  }
+  // Offensichtlich unbrauchbare Eingaben.
+  assert.equal(normalisePhone("").ok, false);
+  assert.equal(normalisePhone("+49").ok, false);
+  assert.equal(normalisePhone("+4917012345678901234").ok, false);
+  assert.equal(normalisePhone("+49 170 abc").ok, false);
+  assert.equal(normalisePhone("+0170123456").ok, false);
 });

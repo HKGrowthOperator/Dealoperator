@@ -55,8 +55,8 @@ export default function AuthForm({
         <div className="notice">
           <strong>Die Anmeldung öffnet in Kürze.</strong>
           <p>
-            Wir bereiten die sichere Speicherung vor. Du kannst alle
-            Community-Bereiche schon mit Beispieldaten erkunden.
+            Wir bereiten die sichere Speicherung vor. Das öffentliche Ranking
+            zeigt schon jetzt den gemeldeten Stand der Community.
           </p>
         </div>
       )}
@@ -95,15 +95,13 @@ export default function AuthForm({
       <div className="auth-note">
         <ShieldCheck size={20} />
         <span>
-          Schon Zahlen eingereicht?
+          Noch kein Konto?
           <br />
-          <Link href="/profil-uebernehmen">
-            Übernimm dein bestehendes Profil.
-          </Link>
+          <Link href="/beitreten">Kostenfrei mitmachen.</Link>
         </span>
       </div>
-      <Link className="text-link" href="/heute?modus=demo">
-        Erst einmal umsehen
+      <Link className="text-link" href="/ranking">
+        Zum öffentlichen Ranking
       </Link>
     </section>
   );

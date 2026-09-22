@@ -22,15 +22,27 @@ export default async function Page({
   if (!views.includes(view as View)) notFound();
   const user = await getCurrentUser();
   const query = await searchParams;
-  if (query.modus !== "demo") {
+  // Kein Demo-Modus mehr: echte Daten oder ehrlicher Anmelde-/Leerzustand.
+  {
     const next = `/${view}?modus=eigen`;
-    if (!user) redirect(`/beitreten?next=${encodeURIComponent(next)}`);
+    if (!user) redirect(`/anmelden?next=${encodeURIComponent(next)}`);
     if (databaseReady()) {
-      const [member] = await database().query(
+      const db = database();
+      const [member] = await db.query(
         "SELECT id FROM participants WHERE owner=$1",
         [user.userId],
       );
-      if (!member) redirect(`/start?next=${encodeURIComponent(next)}`);
+      if (!member) {
+        // Laufende Übernahmeanfrage: Prüfstatus statt Profilformular, damit
+        // kein zweites Profil mit leeren Zahlen entsteht.
+        const [open] = await db.query(
+          `SELECT id FROM onboarding_requests
+           WHERE owner=$1 AND kind='claim'
+             AND status IN ('pending','info_needed') LIMIT 1`,
+          [user.userId],
+        );
+        redirect(open ? "/status" : `/start?next=${encodeURIComponent(next)}`);
+      }
     }
     if (query.modus !== "eigen") redirect(next);
   }

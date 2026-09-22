@@ -1,23 +1,25 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserRound, LoaderCircle } from "lucide-react";
 
+/**
+ * Profileinrichtung nach bestätigter E-Mail für den Weg „Ich bin neu".
+ * Eine Profilübernahme läuft nicht hierüber, sondern über die Teamfreigabe.
+ */
 export default function MemberOnboarding({
   next,
-  candidates,
+  presetName,
 }: {
   next: string;
-  candidates: { id: string; name: string; company: string }[];
+  presetName: string;
 }) {
   const router = useRouter();
   const [value, setValue] = useState({
-    name: "",
+    name: presetName,
     company: "",
     role: "",
     publicConsent: false,
-    confirmNew: false,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -47,35 +49,10 @@ export default function MemberOnboarding({
       </span>
       <h1>Willkommen in der Crew.</h1>
       <p>
-        Deine E-Mail ist bestätigt. Verbinde jetzt deine bisherigen Zahlen oder
-        richte dein Profil ein.
+        Deine E-Mail ist bestätigt. Richte jetzt dein Profil ein und starte mit
+        deinen eigenen Zahlen.
       </p>
-      {candidates.length > 0 && (
-        <div className="onboarding-candidates">
-          <strong>Diese Profile passen zu deiner E-Mail</strong>
-          {candidates.map((p) => (
-            <Link
-              key={p.id}
-              href={`/profil-uebernehmen?profil=${encodeURIComponent(p.id)}`}
-            >
-              <strong>{p.name}</strong>
-              <small>
-                {p.company || "Vorbereitetes Community-Profil"} · Bisherige
-                Zahlen übernehmen
-              </small>
-            </Link>
-          ))}
-        </div>
-      )}
-      <Link className="text-link" href="/profil-uebernehmen">
-        Ich habe einen persönlichen Übernahmecode
-      </Link>
-      <form className="form-stack onboarding-divider" onSubmit={submit}>
-        <h2>
-          {candidates.length
-            ? "Oder ein neues Profil anlegen"
-            : "Dein Profil einrichten"}
-        </h2>
+      <form className="form-stack" onSubmit={submit}>
         <label>
           Dein Anzeigename
           <input
@@ -86,6 +63,9 @@ export default function MemberOnboarding({
             value={value.name}
             onChange={(e) => setValue({ ...value, name: e.target.value })}
           />
+          <small>
+            So erscheinst du in der Community. Dein voller Name bleibt beim Team.
+          </small>
         </label>
         <label>
           Unternehmen (optional)
@@ -116,26 +96,10 @@ export default function MemberOnboarding({
           />
           <span>
             Meine selbst gemeldeten Zahlen mit Anzeigename, Unternehmen und
-            Rolle im öffentlichen Ranking zeigen. Meine E-Mail und Reflexionen
-            bleiben privat.
+            Rolle im öffentlichen Ranking zeigen. Meine E-Mail, Telefonnummer
+            und Reflexionen bleiben privat.
           </span>
         </label>
-        {candidates.length > 0 && (
-          <label className="checkbox-line">
-            <input
-              type="checkbox"
-              required
-              checked={value.confirmNew}
-              onChange={(e) =>
-                setValue({ ...value, confirmNew: e.target.checked })
-              }
-            />
-            <span>
-              Ich möchte neu starten. Die vorhandenen Zahlen werden dabei nicht
-              übernommen.
-            </span>
-          </label>
-        )}
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -152,7 +116,8 @@ export default function MemberOnboarding({
           )}
         </button>
         <small>
-          Deine Sichtbarkeit kannst du später in deinem Profil ändern.
+          Deine Sichtbarkeit kannst du später in deinem Profil ändern. Alles
+          bleibt kostenfrei.
         </small>
       </form>
     </section>

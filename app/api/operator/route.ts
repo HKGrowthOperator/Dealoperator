@@ -4,7 +4,6 @@ import { database } from "@/server/database";
 import {
   AppError,
   adminContacts,
-  claim,
   commitImport,
   createMember,
   issueClaim,
@@ -12,8 +11,10 @@ import {
   previewImport,
   rateLimit,
   saveCheckin,
+  setSearchable,
   updateAccount,
 } from "@/server/operator";
+import { decideRequest, reviewQueue } from "@/server/onboarding";
 import { parseImport } from "@/lib/kpis";
 import { body, errorResponse, json } from "@/server/http";
 export async function GET() {
@@ -31,8 +32,9 @@ export async function GET() {
       ...(actor.admin
         ? {
             contacts: await adminContacts(db, actor),
+            requests: await reviewQueue(db, actor),
             participants: await db.query(
-              "SELECT id,import_key,name,company,owner IS NOT NULL AS claimed,public_consent FROM participants ORDER BY created_at DESC",
+              "SELECT id,import_key,name,company,owner IS NOT NULL AS claimed,public_consent,searchable FROM participants ORDER BY created_at DESC",
             ),
           }
         : {}),
@@ -56,8 +58,6 @@ export async function POST(request: Request) {
       return json(await createMember(db, actor, value.value));
     if (value.action === "checkin")
       return json(await saveCheckin(db, actor, value.value));
-    if (value.action === "claim")
-      return json(await claim(db, actor, value.value));
     if (value.action === "account")
       return json(await updateAccount(db, actor, value.value));
     if (!actor.admin)
@@ -71,6 +71,10 @@ export async function POST(request: Request) {
     }
     if (value.action === "commitImport")
       return json(await commitImport(db, actor, value.value));
+    if (value.action === "decideRequest")
+      return json(await decideRequest(db, actor, value.value));
+    if (value.action === "setSearchable")
+      return json(await setSearchable(db, actor, value.value));
     if (value.action === "issueClaim")
       return json(
         await issueClaim(db, actor, z.string().max(100).parse(value.id)),

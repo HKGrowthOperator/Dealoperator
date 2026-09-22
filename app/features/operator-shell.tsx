@@ -13,7 +13,7 @@ export function OperatorHeader() {
       </Link>
       <nav aria-label="Hauptnavigation">
         <Link href="/ranking">Ranking</Link>
-        <Link href="/heute?modus=demo">Community entdecken</Link>
+        <Link href="/heute?modus=eigen">Community entdecken</Link>
         <Link className="btn primary" href="/beitreten">
           Kostenfrei mitmachen
         </Link>
@@ -33,7 +33,7 @@ export function OperatorFooter() {
       </Link>
       <p>Gemeinsam callen. Ehrlich reflektieren. Weiterkommen.</p>
       <div>
-        <Link href="/community?modus=demo">So funktioniert’s</Link>
+        <Link href="/community?modus=eigen">So funktioniert’s</Link>
         <Link href="/verwaltung">Verwaltung</Link>
       </div>
     </footer>
@@ -64,7 +64,7 @@ export function DiscordCard({ url }: { url?: string }) {
           Discord öffnen
         </a>
       ) : (
-        <Link className="btn lime" href="/crew?modus=demo">
+        <Link className="btn lime" href="/crew?modus=eigen">
           Buddys & Community entdecken
         </Link>
       )}

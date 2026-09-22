@@ -6,6 +6,7 @@ import {
   Users,
   Target,
   Trophy,
+  CalendarCheck,
   Search,
   RefreshCw,
   Check,
@@ -18,7 +19,6 @@ import {
   metricLabels,
   metrics,
   ranked,
-  sampleRows,
   type Metric,
   type RankingRow,
 } from "@/lib/kpis";
@@ -40,7 +40,6 @@ export default function RankingBoard({
   onlyRanking?: boolean;
 }) {
   const today = berlinDate();
-  const [sample, setSample] = useState(false);
   const [metric, setMetric] = useState<Metric>("attempts");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -52,6 +51,7 @@ export default function RankingBoard({
   const [retry, setRetry] = useState(0);
   const [selected, setSelected] = useState<RankingRow | null>(null);
   const [updated, setUpdated] = useState("");
+  const [label, setLabel] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     let busy = false;
@@ -67,6 +67,7 @@ export default function RankingBoard({
         if (!r.ok) throw Error(d.error);
         setRows(d.rows);
         setReady(d.ready);
+        setLabel(d.label || "");
         setError("");
         setUpdated(
           new Date().toLocaleTimeString("de-DE", {
@@ -92,19 +93,22 @@ export default function RankingBoard({
       clearInterval(interval);
     };
   }, [from, to, retry]);
-  const all = useMemo(
-    () => ranked(sample ? sampleRows(to) : rows, metric),
-    [sample, rows, metric, to],
+  const all = useMemo(() => ranked(rows, metric), [rows, metric]);
+  const best = Math.max(
+    0,
+    ...all.map((r) => r.counts[metric]).filter((v): v is number => v !== null),
   );
   const filtered = all.filter((r) =>
     `${r.name} ${r.company} ${r.role}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
+  // Gruppensummen entstehen aus denselben angezeigten Datensätzen wie die
+  // Rangliste — kein zweiter, fest eingetragener Zahlenstand.
+  const reported = (k: Metric) =>
+    all.map((r) => r.counts[k]).filter((v): v is number => v !== null);
   const total = (k: Metric) => {
-    const values = all
-      .map((r) => r.counts[k])
-      .filter((v): v is number => v !== null);
+    const values = reported(k);
     return values.length ? values.reduce((a, b) => a + b, 0) : null;
   };
   function period(type: string) {
@@ -184,7 +188,7 @@ export default function RankingBoard({
                   <small>{r.n}</small>
                 </div>
               ))}
-              <Link href="/heute?modus=demo">
+              <Link href="/heute?modus=eigen">
                 So sieht dein persönlicher Bereich aus{" "}
               </Link>
             </div>
@@ -219,53 +223,42 @@ export default function RankingBoard({
                 du weiterkommst.
               </p>
             </div>
-            <div className="ranking-mode">
-              <button
-                className={!sample ? "active" : ""}
-                onClick={() => {
-                  setSample(false);
-                  setSelected(null);
-                }}
-              >
-                Community
-              </button>
-              <button
-                className={sample ? "active" : ""}
-                onClick={() => {
-                  setSample(true);
-                  setSelected(null);
-                }}
-              >
-                Beispiel ansehen
-              </button>
-            </div>
+            {label && <span className="reported-badge">{label}</span>}
           </div>
-          {sample && (
-            <div className="sample-notice">
-              <ShieldCheck size={17} />
-              <span>
-                <strong>Beispielansicht.</strong> Alle Personen und Zahlen sind
-                fiktiv. Hier kannst du Ranking und Profile ausprobieren.
-              </span>
-            </div>
-          )}
-          <div className="crew-stats">
+          <div className="crew-stats group-performance">
             {[
-              { icon: Users, label: "Caller mit Meldung", value: all.length },
+              {
+                icon: Users,
+                label: "Personen mit Meldung",
+                value: all.length,
+                note: `${all.length === 1 ? "Profil" : "Profile"} im Zeitraum`,
+              },
               {
                 icon: Phone,
-                label: "Anwahlversuche",
+                label: "Calls / Anwahlen",
                 value: total("attempts"),
+                note: `gemeldet von ${reported("attempts").length}`,
               },
               {
                 icon: Target,
                 label: "Settings vereinbart",
                 value: total("settingsBooked"),
+                note: `gemeldet von ${reported("settingsBooked").length}`,
+              },
+              {
+                icon: CalendarCheck,
+                label: "Closing-Termine",
+                value: total("closingsBooked"),
+                note: `gemeldet von ${reported("closingsBooked").length}`,
               },
               {
                 icon: Trophy,
                 label: "Deals gewonnen",
                 value: total("dealsWon"),
+                note:
+                  total("dealsWon") === null
+                    ? "Noch nicht gemeldet"
+                    : `gemeldet von ${reported("dealsWon").length}`,
               },
             ].map((s) => (
               <div key={s.label}>
@@ -274,9 +267,7 @@ export default function RankingBoard({
                   <s.icon size={18} />
                 </span>
                 <strong>{fmt(s.value)}</strong>
-                <small>
-                  {sample ? "Beispielwerte" : "Im gewählten Zeitraum"}
-                </small>
+                <small>{s.note}</small>
               </div>
             ))}
           </div>
@@ -366,7 +357,7 @@ export default function RankingBoard({
                   </button>
                 </div>
               </div>
-              {error && !sample ? (
+              {error ? (
                 <div className="ranking-empty" role="alert">
                   <h3>Die Zahlen konnten nicht geladen werden.</h3>
                   <p>{error}</p>
@@ -377,7 +368,7 @@ export default function RankingBoard({
                     Erneut versuchen
                   </button>
                 </div>
-              ) : loading && !sample ? (
+              ) : loading ? (
                 <div className="ranking-empty">
                   <RefreshCw className="spin" />
                   <p>Aktueller Stand wird geladen …</p>
@@ -397,7 +388,7 @@ export default function RankingBoard({
                     </thead>
                     <tbody>
                       {filtered.map((r) => (
-                        <tr key={r.id}>
+                        <tr key={r.id} data-rank={r.rank ?? undefined}>
                           <td>
                             <span
                               className={`rank-place ${r.rank && r.rank <= 3 ? "top" : ""}`}
@@ -434,6 +425,17 @@ export default function RankingBoard({
                             <strong className="rank-value">
                               {fmt(r.counts[metric])}
                             </strong>
+                            {r.counts[metric] !== null && best > 0 && (
+                              <span
+                                className="rank-bar"
+                                aria-hidden="true"
+                                style={
+                                  {
+                                    "--p": `${Math.max(4, Math.round(((r.counts[metric] as number) / best) * 100))}%`,
+                                  } as React.CSSProperties
+                                }
+                              />
+                            )}
                           </td>
                           <td>
                             <button
@@ -466,22 +468,17 @@ export default function RankingBoard({
                         ? "Wir bereiten die ersten Profile und die Anmeldung vor. Hier erscheinen die freigegebenen Tageszahlen der Community."
                         : "Für diesen Zeitraum wurden noch keine Zahlen für das Ranking freigegeben."}
                   </p>
-                  <button
-                    className="btn primary"
-                    onClick={() => {
-                      setSearch("");
-                      setSample(true);
-                    }}
-                  >
-                    Ranking mit Beispielen ansehen
-                  </button>
+                  {search && (
+                    <button className="btn primary" onClick={() => setSearch("")}>
+                      Suche zurücksetzen
+                    </button>
+                  )}
                 </div>
               )}
               <div className="ranking-caption">
                 <span>
-                  {sample
-                    ? "Fiktive Beispieldaten"
-                    : `Selbst gemeldete Zahlen${updated ? ` · Abgerufen ${updated} Uhr` : ""}`}
+                  {label || "Gemeldete Zahlen"}
+                  {updated ? ` · Abgerufen ${updated} Uhr` : ""}
                 </span>
                 <span>Gleiche Werte = gleicher Rang · — = nicht gemeldet</span>
               </div>
@@ -521,25 +518,25 @@ export default function RankingBoard({
                 n: "01",
                 title: "Dein Fortschritt",
                 text: "Tageszahlen, persönliche Ziele und vier nachvollziehbare KPI-Ränge.",
-                url: "/zahlen?modus=demo",
+                url: "/zahlen?modus=eigen",
               },
               {
                 n: "02",
                 title: "Dein Call-Buddy",
                 text: "Finde Menschen mit passender Zielgruppe, Zeit und Motivation.",
-                url: "/crew?modus=demo",
+                url: "/crew?modus=eigen",
               },
               {
                 n: "03",
                 title: "Echter Austausch",
                 text: "Reflexionen, Einwandtraining und Feedback aus der Praxis.",
-                url: "/wissen?modus=demo",
+                url: "/wissen?modus=eigen",
               },
               {
                 n: "04",
                 title: "Gemeinsame Sessions",
                 text: "Fokusblöcke, Roleplays und Rückblicke mit deiner Crew.",
-                url: "/sessions?modus=demo",
+                url: "/sessions?modus=eigen",
               },
             ].map((b) => (
               <Link href={b.url} key={b.n}>
@@ -568,8 +565,8 @@ export default function RankingBoard({
           </DialogHeader>
           {selected && (
             <>
-              <div className="sample-notice">
-                {sample ? "Fiktives Beispielprofil" : "Selbst gemeldete Zahlen"}{" "}
+              <div className="reported-notice">
+                {label || "Gemeldete Zahlen"}{" "}
                 · {from} bis {to}
               </div>
               <div className="profile-kpis">
@@ -592,12 +589,12 @@ export default function RankingBoard({
               {!selected.claimed && (
                 <Link
                   className="btn primary"
-                  href={`/profil-uebernehmen?profil=${sample ? "beispiel" : selected.id}`}
+                  href={`/beitreten?profil=${encodeURIComponent(selected.id)}`}
                 >
-                  Das ist mein Profil
+                  Das sind meine Zahlen
                 </Link>
               )}
-              <Link className="text-link" href="/crew?modus=demo">
+              <Link className="text-link" href="/crew?modus=eigen">
                 Buddys in der Community finden
               </Link>
             </>
