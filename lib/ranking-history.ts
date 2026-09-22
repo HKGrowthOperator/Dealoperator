@@ -3,6 +3,7 @@ import {
   aggregate,
   berlinDate,
   ranked,
+  soloRows,
   visibleMetrics,
   type Counts,
   type RankingRow,
@@ -53,11 +54,15 @@ export function bookedAppointments(counts: Counts): number | null {
 }
 export type DailyLeader = {
   value: number;
-  people: { id: string; name: string; team: boolean }[];
+  /** Nur Einzelpersonen. Gemeinsame Meldungen gewinnen keinen Tag. */
+  people: { id: string; name: string }[];
 };
 export type RankingDay = {
   day: string;
+  /** Einzelpersonen mit Meldung an diesem Tag. */
   profiles: number;
+  /** Gemeinsame Meldungen an diesem Tag. Keine zusätzlichen Personen. */
+  joint: number;
   counts: Counts;
   leaders: Record<VisibleMetric, DailyLeader | null>;
 };
@@ -102,10 +107,15 @@ export function summarizeRankingMonth(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, rows]) => ({
       day: date,
-      profiles: rows.length,
+      profiles: soloRows(rows).length,
+      joint: rows.length - soloRows(rows).length,
+      // Gesamtleistung: jede gültige Meldung genau einmal, gemeinsame
+      // eingeschlossen. Das ist die einzige Stelle, an der sie mitzählen.
       counts: aggregate(rows.map((row) => row.counts)),
       leaders: Object.fromEntries(
         visibleMetrics.map((metric) => {
+          // ranked() lässt gemeinsame Meldungen nicht antreten, deshalb kann
+          // hier keine Teamleistung einen Tagessieg auslösen.
           const leaders = ranked(rows, metric).filter(
             (row) => row.rank === 1 && (row.counts[metric] ?? 0) > 0,
           );
@@ -114,11 +124,7 @@ export function summarizeRankingMonth(
             leaders.length
               ? {
                   value: leaders[0].counts[metric]!,
-                  people: leaders.map(({ id, name, role }) => ({
-                    id,
-                    name,
-                    team: role.startsWith("Team"),
-                  })),
+                  people: leaders.map(({ id, name }) => ({ id, name })),
                 }
               : null,
           ];

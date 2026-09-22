@@ -119,20 +119,50 @@ export function progress(values: Counts) {
     };
   });
 }
+/**
+ * Art eines Datensatzes. Der frei bearbeitbare Rollentext („Team · …") war
+ * als Merkmal nicht haltbar, deshalb steht die Art in einer eigenen Spalte.
+ *
+ * person — genau eine Person mit ihren eigenen belegten Zahlen.
+ * joint  — eine gemeinsam gemeldete Leistung mehrerer Personen.
+ */
+export const participantKinds = ["person", "joint"] as const;
+export type ParticipantKind = (typeof participantKinds)[number];
+/** Unbekannte oder fehlende Werte gelten als Person, nie als gemeinsam. */
+export function participantKind(value: unknown): ParticipantKind {
+  return value === "joint" ? "joint" : "person";
+}
 export type RankingRow = {
   id: string;
   name: string;
   company: string;
   role: string;
+  kind: ParticipantKind;
   claimed: boolean;
   counts: Counts;
   source: string;
   updatedAt: string;
 };
+export const isJoint = (row: { kind?: unknown }) =>
+  participantKind(row.kind) === "joint";
+/** Nur Personen. Grundlage jeder persönlichen Platzierung. */
+export const soloRows = <T extends { kind: ParticipantKind }>(rows: T[]) =>
+  rows.filter((row) => !isJoint(row));
+/**
+ * Persönliche Platzierung nach einer Kennzahl.
+ *
+ * Gemeinsame Meldungen treten hier nicht an. Eine von zwei Personen
+ * zusammen erbrachte Leistung gegen die einer einzelnen Person zu stellen,
+ * wäre unfair, und halbieren wäre erfunden. Sie zählen weiterhin genau
+ * einmal zur Gesamtleistung der Crew — dafür ist aggregate() zuständig.
+ *
+ * Der Ausschluss sitzt bewusst hier und nicht in der Oberfläche: Podium,
+ * Tabelle, Tagesgewinner und Monatsplätze gehen alle durch diese Funktion.
+ */
 export function ranked(rows: RankingRow[], metric: Metric) {
   let place = 0,
     last: number | null = null;
-  return [...rows]
+  return soloRows(rows)
     .sort(
       (a, b) =>
         (b.counts[metric] ?? -1) - (a.counts[metric] ?? -1) ||
@@ -172,6 +202,7 @@ export const importRowSchema = z
     date: daySchema,
     counts: countsSchema,
     publicConsent: z.boolean().default(false),
+    kind: z.enum(participantKinds).default("person"),
   })
   .strict();
 export type ImportRow = z.infer<typeof importRowSchema>;
@@ -221,6 +252,7 @@ export function parseImport(text: string): ImportRow[] {
       "role",
       "email",
       "publicConsent",
+      "kind",
       ...metrics,
     ]);
     if (header.some((h) => !allowed.has(h)))
@@ -231,6 +263,10 @@ export function parseImport(text: string): ImportRow[] {
       const o = Object.fromEntries(header.map((h, j) => [h, values[j]]));
       if (o.publicConsent && !["true", "false"].includes(o.publicConsent))
         throw Error(`Zeile ${i + 2}: publicConsent muss true oder false sein.`);
+      if (o.kind && !participantKinds.includes(o.kind as ParticipantKind))
+        throw Error(
+          `Zeile ${i + 2}: kind muss person oder joint sein. joint ist eine gemeinsam gemeldete Leistung mehrerer Personen.`,
+        );
       return {
         participantKey: o.participantKey,
         name: o.name,
@@ -239,6 +275,7 @@ export function parseImport(text: string): ImportRow[] {
         role: o.role || "",
         email: o.email || "",
         publicConsent: o.publicConsent === "true",
+        kind: o.kind || "person",
         counts: Object.fromEntries(
           metrics.map((k) => [
             k,
@@ -317,6 +354,7 @@ export function sampleRows(date = berlinDate()): RankingRow[] {
     name: r.name,
     company: r.company,
     role: r.role,
+    kind: "person" as ParticipantKind,
     claimed: i < 3,
     source: "Fiktive Beispieldaten",
     updatedAt: date,

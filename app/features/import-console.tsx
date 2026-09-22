@@ -19,6 +19,7 @@ type Participant = {
   id: string;
   name: string;
   company: string;
+  kind: "person" | "joint";
   claimed: boolean;
   public_consent: boolean;
 };
@@ -34,8 +35,9 @@ function template() {
   return [
     "participantKey;name;company;role;email;date;" +
       metrics.join(";") +
-      ";publicConsent",
-    `beispiel-alex;Alex · Beispiel;Beispielfirma;Sales;;${berlinDate()};100;5;3;3;2;1;false`,
+      ";publicConsent;kind",
+    `beispiel-alex;Alex · Beispiel;Beispielfirma;Sales;;${berlinDate()};100;5;3;3;2;1;false;person`,
+    `beispiel-team;Alex & Kim · Beispiel;;Gemeinsam gemeldet;;${berlinDate()};80;3;2;1;1;0;false;joint`,
   ].join("\n");
 }
 export default function ImportConsole({
@@ -180,7 +182,11 @@ export default function ImportConsole({
           Die feste participantKey ordnet spätere Meldungen derselben Person zu.
           Leere Kennzahlen bleiben unbekannt. Allgemeine alte Termine gehören in
           legacyMeetings. publicConsent bleibt false, bis die Veröffentlichung
-          mit der Person geklärt ist.
+          mit der Person geklärt ist. kind steht auf <code>person</code> für
+          genau eine Person und auf <code>joint</code> für eine gemeinsam
+          gemeldete Leistung mehrerer Personen. Eine gemeinsame Meldung zählt
+          einmal zur Gesamtleistung, tritt aber in keiner persönlichen
+          Rangliste an und lässt sich nicht als Konto übernehmen.
         </p>
         <div className="admin-actions">
           <button className="btn secondary" onClick={download}>
@@ -332,12 +338,15 @@ export default function ImportConsole({
                 <div>
                   <strong>{p.name}</strong>
                   <small>
-                    {p.company} ·{" "}
+                    {p.kind === "joint"
+                      ? "Gemeinsame Meldung · kein Einzelrang"
+                      : p.company || "Einzelprofil"}{" "}
+                    ·{" "}
                     {p.claimed ? "Profil übernommen" : "Noch nicht übernommen"}{" "}
                     · {p.public_consent ? "Ranking sichtbar" : "Privat"}
                   </small>
                 </div>
-                {!p.claimed && (
+                {!p.claimed && p.kind !== "joint" && (
                   <button
                     className="btn secondary"
                     disabled={busy}

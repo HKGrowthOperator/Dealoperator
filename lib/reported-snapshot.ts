@@ -1,4 +1,10 @@
-import { emptyCounts, type Counts, type RankingRow } from "./kpis";
+import {
+  emptyCounts,
+  participantKind,
+  type Counts,
+  type ParticipantKind,
+  type RankingRow,
+} from "./kpis";
 
 /**
  * Echter gemeldeter Zwischenstand vom 22.09.2026, freigegeben zur
@@ -18,7 +24,13 @@ import { emptyCounts, type Counts, type RankingRow } from "./kpis";
 export const REPORTED_DAY = "2026-09-22";
 export const REPORTED_LABEL = "Gemeldeter Stand · 22. September";
 
-type Row = { key: string; name: string; counts: Partial<Counts> };
+type Row = {
+  key: string;
+  name: string;
+  /** Ohne Angabe eine Person. "joint" = gemeinsame Meldung. */
+  kind?: ParticipantKind;
+  counts: Partial<Counts>;
+};
 
 const ROWS: Row[] = [
   { key: "akq-2026-joshua-brinker", name: "Joshua Brinker", counts: { settingsBooked: 1 } },
@@ -38,7 +50,9 @@ const ROWS: Row[] = [
   { key: "akq-2026-marlon-moschner", name: "Marlon Moschner", counts: { legacyMeetings: 4 } },
   { key: "akq-2026-ennio", name: "Ennio", counts: { settingsBooked: 2 } },
   { key: "akq-2026-musa", name: "Musa", counts: { settingsBooked: 3 } },
-  { key: "akq-2026-myran-omo", name: "Myran Omo", counts: { attempts: 150, settingsBooked: 1 } },
+  // Gemeinsame Meldung: zählt zur Gesamtleistung, tritt aber nicht im
+  // Einzelranking an. Siehe participants.kind.
+  { key: "akq-2026-myran-omo", name: "Myran und Baris", kind: "joint" as const, counts: { attempts: 150, settingsBooked: 1 } },
   { key: "akq-2026-phil-mohan", name: "Phil Mohan", counts: { attempts: 151, settingsBooked: 1 } },
   { key: "akq-2026-jonathan-balzer", name: "Jonathan Balzer", counts: { attempts: 123, settingsBooked: 1 } },
   { key: "akq-2026-max-rohde", name: "Max Rohde", counts: { attempts: 100 } },
@@ -58,6 +72,7 @@ export function reportedSnapshot(): RankingRow[] {
     name: r.name,
     company: "",
     role: "",
+    kind: participantKind(r.kind),
     claimed: false,
     counts: { ...emptyCounts(), ...r.counts } as Counts,
     source: REPORTED_LABEL,
@@ -76,5 +91,6 @@ export function reportedImportRows() {
     date: REPORTED_DAY,
     counts: { ...emptyCounts(), ...r.counts } as Counts,
     publicConsent: true,
+    kind: participantKind(r.kind),
   }));
 }

@@ -7,10 +7,30 @@ import {
   countsSchema,
   daySchema,
   importRowSchema,
+  isJoint,
+  participantKind,
   progress,
   type ImportRow,
   type RankingRow,
 } from "../lib/kpis";
+/**
+ * Wache für alle Wege, die aus einem Datensatz ein persönliches Konto machen.
+ *
+ * Fehlt die Spalte in der Abfrage, ist das ein Programmfehler und kein Grund,
+ * die Prüfung stillschweigend zu bestehen: dann bricht der Aufruf ab, statt
+ * eine gemeinsame Meldung durchzulassen.
+ */
+export function refusePersonalUse(
+  row: { kind?: unknown },
+  message: string,
+): void {
+  if (row.kind === undefined)
+    throw new AppError(
+      "Die Art des Profils konnte nicht geprüft werden. Bitte später erneut versuchen.",
+      500,
+    );
+  if (isJoint(row)) throw new AppError(message, 409);
+}
 export class AppError extends Error {
   constructor(
     message: string,
@@ -111,7 +131,7 @@ async function once<T>(
 }
 export async function publicRanking(db: Database, from: string, to: string) {
   const rows = await db.query(
-    `SELECT p.id,p.name,p.company,p.role,p.owner IS NOT NULL AS claimed,c.counts,c.source,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
+    `SELECT p.id,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.source,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
     [from, to],
   );
   const grouped = new Map<string, RankingRow>();
@@ -125,6 +145,7 @@ export async function publicRanking(db: Database, from: string, to: string) {
         name: r.name,
         company: r.company,
         role: r.role,
+        kind: participantKind(r.kind),
         claimed: r.claimed,
         counts: countsSchema.parse(r.counts),
         source: "Selbst gemeldet",
@@ -366,7 +387,7 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
       );
       if (!p) {
         [p] = await tx.query(
-          "INSERT INTO participants(id,import_key,name,company,role,email,public_consent) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id,owner",
+          "INSERT INTO participants(id,import_key,name,company,role,email,public_consent,kind,searchable) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id,owner",
           [
             randomUUID(),
             r.participantKey,
@@ -375,11 +396,13 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
             r.role,
             r.email.toLowerCase() || null,
             r.publicConsent,
+            r.kind,
+            r.kind === "person",
           ],
         );
       } else if (!p.owner)
         await tx.query(
-          "UPDATE participants SET name=$2,company=$3,role=$4,email=$5,public_consent=$6 WHERE id=$1",
+          "UPDATE participants SET name=$2,company=$3,role=$4,email=$5,public_consent=$6,kind=$7,searchable=(searchable AND $8) WHERE id=$1",
           [
             p.id,
             r.name,
@@ -387,6 +410,8 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
             r.role,
             r.email.toLowerCase() || null,
             r.publicConsent,
+            r.kind,
+            r.kind === "person",
           ],
         );
       const expected = v.expected.find(
@@ -431,7 +456,7 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
     throw new AppError("Nur die Verwaltung kann Einladungen erstellen.", 403);
   return db.transaction(async (tx) => {
     const [p] = await tx.query(
-      "SELECT id FROM participants WHERE id=$1 AND owner IS NULL FOR UPDATE",
+      "SELECT id,kind FROM participants WHERE id=$1 AND owner IS NULL FOR UPDATE",
       [id],
     );
     if (!p)
@@ -439,6 +464,11 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
         "Dieses Profil ist nicht mehr zur Übernahme verfügbar.",
         409,
       );
+    // Eine Einladung darf die Sperre für gemeinsame Meldungen nicht umgehen.
+    refusePersonalUse(
+      p,
+      "Für eine gemeinsam gemeldete Leistung gibt es keine persönliche Einladung. Sie gehört mehreren Personen.",
+    );
     const token = randomBytes(32).toString("base64url");
     await tx.query("DELETE FROM claim_tokens WHERE participant=$1", [id]);
     await tx.query(
@@ -525,6 +555,6 @@ export async function setSearchable(db: Database, actor: Actor, raw: unknown) {
 export async function adminContacts(db: Database, actor: Actor) {
   if (!actor.admin) throw new AppError("Nur für die Verwaltung.", 403);
   return db.query(
-    "SELECT p.id,p.name,p.company,p.role,p.email AS imported_email,a.email AS verified_email,a.phone,a.contact_opt_in,p.searchable,p.owner IS NOT NULL AS registered FROM participants p LEFT JOIN account_private a ON a.owner=p.owner ORDER BY p.name",
+    "SELECT p.id,p.name,p.company,p.role,p.kind,p.email AS imported_email,a.email AS verified_email,a.phone,a.contact_opt_in,p.searchable,p.owner IS NOT NULL AS registered FROM participants p LEFT JOIN account_private a ON a.owner=p.owner ORDER BY p.name",
   );
 }

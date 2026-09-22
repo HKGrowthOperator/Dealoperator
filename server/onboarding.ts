@@ -2,8 +2,16 @@ import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import type { Actor } from "./auth";
-import { AppError, rateLimit } from "./operator";
+import { AppError, rateLimit, refusePersonalUse } from "./operator";
 import { normalisePhone } from "../lib/phone";
+
+/**
+ * Gemeinsame Meldungen sind keine persönlichen Konten. Der Text steht an
+ * einer Stelle, damit Auswahl, Anfrage und Teamfreigabe dieselbe Auskunft
+ * geben.
+ */
+const JOINT_NOT_CLAIMABLE =
+  "Das ist eine gemeinsam gemeldete Leistung von mehreren Personen und kein persönliches Profil. Melde dich bitte mit deinen eigenen Zahlen an; das Team ordnet den gemeinsamen Eintrag anschließend zu.";
 
 // Ein vorbereitetes Profil wird nicht mehr direkt übernommen. Die Person wählt
 // das Profil, bestätigt ihre E-Mail und das Deal-Operator-Team gibt die
@@ -44,7 +52,7 @@ export async function searchProfiles(db: Database, rawQuery: string) {
   if (query.length < 2) return [];
   return db.query(
     `SELECT id,name,company,role FROM participants
-     WHERE owner IS NULL AND searchable=true
+     WHERE owner IS NULL AND searchable=true AND kind='person'
        AND (name ILIKE $1 OR company ILIKE $1)
      ORDER BY name LIMIT 25`,
     [`%${query.replace(/[%_\\]/g, (c) => `\\${c}`)}%`],
@@ -62,7 +70,7 @@ export async function profileForSelection(
   invite?: string,
 ) {
   const [p] = await db.query(
-    "SELECT id,name,company,role,searchable,owner FROM participants WHERE id=$1",
+    "SELECT id,name,company,role,kind,searchable,owner FROM participants WHERE id=$1",
     [id],
   );
   if (!p || p.owner)
@@ -70,6 +78,9 @@ export async function profileForSelection(
       "Dieses Profil steht nicht mehr zur Übernahme bereit. Es wurde bereits einem Konto zugeordnet.",
       409,
     );
+  // Eine gemeinsame Meldung gehört mehreren Personen. Sie ist kein
+  // persönliches Konto und lässt sich auch mit Einladung nicht übernehmen.
+  refusePersonalUse(p, JOINT_NOT_CLAIMABLE);
   if (!p.searchable) {
     const [token] = invite
       ? await db.query(
@@ -318,10 +329,13 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       );
     // Sperre auf dem Zielprofil: zwei gleichzeitige Freigaben werden serialisiert.
     const [p] = await tx.query(
-      "SELECT id,name,role,owner FROM participants WHERE id=$1 FOR UPDATE",
+      "SELECT id,name,role,kind,owner FROM participants WHERE id=$1 FOR UPDATE",
       [request.participant],
     );
     if (!p) throw new AppError("Dieses Profil gibt es nicht mehr.", 409);
+    // Zweite Sperre unter der Zeilensperre: auch eine Freigabe durch das Team
+    // darf eine gemeinsame Meldung nicht in ein persönliches Konto verwandeln.
+    refusePersonalUse(p, JOINT_NOT_CLAIMABLE);
     if (p.owner)
       throw new AppError(
         "Dieses Profil ist bereits einem anderen Konto zugeordnet.",

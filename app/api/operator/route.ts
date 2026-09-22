@@ -34,7 +34,7 @@ export async function GET() {
             contacts: await adminContacts(db, actor),
             requests: await reviewQueue(db, actor),
             participants: await db.query(
-              "SELECT id,import_key,name,company,owner IS NOT NULL AS claimed,public_consent,searchable FROM participants ORDER BY created_at DESC",
+              "SELECT id,import_key,name,company,kind,owner IS NOT NULL AS claimed,public_consent,searchable FROM participants ORDER BY created_at DESC",
             ),
           }
         : {}),

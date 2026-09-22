@@ -73,6 +73,7 @@ const row = (extra: Partial<ImportRow> = {}): ImportRow => ({
   date: berlinDate(),
   counts: counts(),
   publicConsent: true,
+  kind: "person",
   ...extra,
 });
 async function imported(rows = [row()]) {
@@ -137,6 +138,7 @@ test("ranking uses competition ties and does not treat missing as zero", () => {
     name: id,
     company: "",
     role: "",
+    kind: "person" as const,
     claimed: false,
     counts: { ...emptyCounts(), attempts: n },
     source: "",
@@ -206,6 +208,7 @@ test("import preview and import commit keep contact data off public API", async 
     "company",
     "counts",
     "id",
+    "kind",
     "name",
     "role",
     "source",
@@ -894,7 +897,9 @@ test("a private profile never becomes public on its own", async () => {
   assert.equal((await publicRanking(db, today, today)).length, 1);
 });
 
-test("the selection step exposes the team marker but never contact data", async () => {
+test("the selection step exposes the role text but never contact data", async () => {
+  // Rollentext allein macht noch keine gemeinsame Meldung: darüber
+  // entscheidet kind. Dieses Profil gehört einer Person und bleibt wählbar.
   const id = await imported([row({ role: "Team · A und B", email: "" })]);
   const profile = await profileForSelection(db, id);
   assert.deepEqual(Object.keys(profile).sort(), [
@@ -903,7 +908,6 @@ test("the selection step exposes the team marker but never contact data", async 
     "name",
     "role",
   ]);
-  // Das Teamprofil bleibt bei der Übernahme als solches erkennbar.
   assert.match(String(profile.role), /^Team/);
 });
 
@@ -984,30 +988,84 @@ test("month history separates daily winners from monthly totals and excludes oth
   );
 });
 
-test("daily corrections replace prior values, team totals count once and ties retain all winners", async () => {
+test("daily corrections replace prior values and joint reports count once for the crew without winning a day", async () => {
   const { publicRankingMonth } = await import("../server/ranking-history");
-  const team = row({
+  const joint = row({
     participantKey: "team-a",
     name: "Myran und Baris",
     role: "Team · Myran und Baris",
+    kind: "joint",
     email: "",
     date: "2026-08-30",
     counts: { ...emptyCounts(), attempts: 150 },
   });
   await imported([
-    team,
+    joint,
     row({ date: "2026-08-30", counts: { ...emptyCounts(), attempts: 300 } }),
   ]);
-  await imported([{ ...team, counts: { ...emptyCounts(), attempts: 300 } }]);
+  // Korrektur: der gemeinsame Tagesstand wird ersetzt, nicht addiert.
+  await imported([{ ...joint, counts: { ...emptyCounts(), attempts: 300 } }]);
   const month = await publicRankingMonth(db, "2026-08");
   assert.equal(month.days.length, 1);
+  // Gesamtleistung: 300 der Person + 300 der gemeinsamen Meldung, einmal.
   assert.equal(month.days[0].counts.attempts, 600);
-  assert.equal(month.days[0].profiles, 2);
-  assert.equal(month.days[0].leaders.attempts?.people.length, 2);
-  assert.equal(
-    month.days[0].leaders.attempts?.people.filter((p) => p.team).length,
-    1,
-  );
+  // Eine Person, eine gemeinsame Meldung. Nicht zwei Personen.
+  assert.equal(month.days[0].profiles, 1);
+  assert.equal(month.days[0].joint, 1);
+  // Gleicher Wert, aber die gemeinsame Meldung tritt nicht an: kein
+  // geteilter erster Platz, nur die Einzelperson.
+  assert.equal(month.days[0].leaders.attempts?.people.length, 1);
+  assert.equal(month.days[0].leaders.attempts?.people[0].name, "Alice Beispiel");
+  assert.equal(month.days[0].leaders.attempts?.value, 300);
+  // Beide Zeilen bleiben erhalten; nur die Rangliste filtert.
   assert.equal(month.rows.length, 2);
+  assert.deepEqual(
+    ranked(month.rows, "attempts").map((r) => r.name),
+    ["Alice Beispiel"],
+  );
   assert.deepEqual((await publicRankingMonth(db, "2026-06")).days, []);
+});
+
+test("a joint report is not a personal profile anywhere in the claim flow", async () => {
+  const jointId = await imported([
+    row({
+      participantKey: "team-b",
+      name: "David & Jannik",
+      role: "Team · David Pixner & Jannik Alber",
+      kind: "joint",
+      email: "",
+    }),
+  ]);
+  // Profilsuche: taucht gar nicht erst auf. searchable wird absichtlich
+  // wieder gesetzt, damit die Prüfung an kind hängt und nicht am Flag.
+  await db.query("UPDATE participants SET searchable=true WHERE id=$1", [
+    jointId,
+  ]);
+  assert.deepEqual(await searchProfiles(db, "David"), []);
+  // Direkte Auswahl über die ID.
+  await assert.rejects(
+    () => profileForSelection(db, jointId),
+    /gemeinsam gemeldete Leistung/,
+  );
+  // Einladung durch die Verwaltung.
+  await assert.rejects(
+    () => issueClaim(db, admin, jointId),
+    /keine persönliche Einladung/,
+  );
+  // Anfrage über den regulären Weg.
+  await assert.rejects(
+    () =>
+      startRequest(db, {
+        kind: "claim",
+        participantId: jointId,
+        fullName: "Neue Person",
+        email: "neu@example.com",
+        phone: "+4917012345678",
+        hint: "",
+      }),
+    /gemeinsam gemeldete Leistung/,
+  );
+  // Eine Einzelperson bleibt unberührt.
+  const soloId = await imported([row()]);
+  assert.equal((await profileForSelection(db, soloId)).id, soloId);
 });

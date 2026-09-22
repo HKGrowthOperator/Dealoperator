@@ -16,7 +16,7 @@ CREATE TABLE posts(id text PRIMARY KEY,owner text NOT NULL,created text NOT NULL
 CREATE TABLE comments(id text PRIMARY KEY,post text REFERENCES posts(id),owner text NOT NULL,created text NOT NULL,data text NOT NULL);
 CREATE TABLE relationships(id text PRIMARY KEY,owner text NOT NULL,data text NOT NULL);
 CREATE TABLE intro_requests(id text PRIMARY KEY,relationship text REFERENCES relationships(id),sender text NOT NULL,recipient text NOT NULL,data text NOT NULL);
-CREATE TABLE participants(id text PRIMARY KEY,import_key text UNIQUE,name text NOT NULL,company text NOT NULL DEFAULT '',role text NOT NULL DEFAULT '',email text,owner text UNIQUE,public_consent boolean NOT NULL DEFAULT false,searchable boolean NOT NULL DEFAULT true,claimed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE participants(id text PRIMARY KEY,import_key text UNIQUE,name text NOT NULL,company text NOT NULL DEFAULT '',role text NOT NULL DEFAULT '',email text,owner text UNIQUE,public_consent boolean NOT NULL DEFAULT false,searchable boolean NOT NULL DEFAULT true,kind text NOT NULL DEFAULT 'person' CHECK(kind IN ('person','joint')),claimed_at timestamptz,created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX participants_email ON participants(lower(email));
 CREATE TABLE checkins(participant text REFERENCES participants(id),day text NOT NULL,counts jsonb NOT NULL,reflection jsonb NOT NULL DEFAULT '{}',revision integer NOT NULL DEFAULT 1,source text NOT NULL,updated_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(participant,day));
 CREATE TABLE checkin_revisions(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,participant text REFERENCES participants(id),day text NOT NULL,revision integer NOT NULL,counts jsonb NOT NULL,actor text NOT NULL,source text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
@@ -34,6 +34,7 @@ CREATE INDEX onboarding_email ON onboarding_requests(lower(email));
 CREATE TABLE onboarding_events(id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,request text NOT NULL REFERENCES onboarding_requests(id),actor text NOT NULL,action text NOT NULL,note text NOT NULL DEFAULT '',created_at timestamptz NOT NULL DEFAULT now());
 CREATE INDEX onboarding_events_request ON onboarding_events(request,created_at);
 CREATE INDEX participants_searchable ON participants(searchable) WHERE owner IS NULL;
+CREATE INDEX participants_kind ON participants(kind);
 CREATE INDEX checkins_day ON checkins(day);
 CREATE INDEX buddy_sender ON buddies(sender);
 CREATE INDEX buddy_recipient ON buddies(recipient);
