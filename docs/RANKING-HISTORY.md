@@ -61,3 +61,39 @@ Die Zahlenansicht kommt ohne seitliches Schieben aus; `overflow-x: hidden` als N
 - Die Check-in-Historie im Mitgliedsbereich besteht aus Tageskarten (`.checkin-cards`): oben Datum und Bearbeiten, darunter die Kennzahlen im Raster, Energie und Reflexion in der Karte aufklappbar.
 
 Geprüft mit Playwright auf 280, 320, 360, 390, 430 und 1280 Pixeln — je Element auf eigenes horizontales Scrollen, Hinausragen und abgeschnittenen Text, auch in Monatsansicht, geöffnetem Archiv, Profil-Dialog und Suche sowie mit einem 48 Zeichen langen Namen und siebenstelligen Werten. Die Prüfung bricht ab, wenn das CSS nicht geladen ist, damit eine ungestylte Seite nicht als sauber durchgeht.
+
+## Aufteilung der beiden gemeinsamen Meldungen (50/50)
+
+Am 22.09.2026 haben zwei Duos abends einen gemeinsamen Tagesstand gemeldet:
+
+| Quelle                                   | Zeit  | Meldung                                 |
+| ---------------------------------------- | ----- | --------------------------------------- |
+| `akq-2026-myran-omo` — Myran und Baris   | 18:01 | 300 Anwahlen, 2 vereinbarte Settings    |
+| `akq-2026-david-jannik` — David & Jannik | 18:02 | 222 Anwahlen, 13 Termine ohne Typangabe |
+
+Auf ausdrücklichen Wunsch werden diese Zahlen **50/50** auf die beteiligten Personen gerechnet, damit jede Person im Einzelranking antritt:
+
+| Profil       | Schlüssel                   | Zugeteilt               |
+| ------------ | --------------------------- | ----------------------- |
+| David Pixner | `akq-2026-david-pixner`     | 111 Anwahlen            |
+| Jannik Alber | `akq-2026-jannik-alber`     | 111 Anwahlen            |
+| Myran Omo    | `akq-2026-myran-omo-person` | 150 Anwahlen, 1 Setting |
+| Baris        | `akq-2026-baris`            | 150 Anwahlen, 1 Setting |
+
+Das sind **rechnerisch zugeteilte Werte**, keine einzeln gemeldeten. `lib/joint-reports.ts` hält Originalmeldung und Aufteilung nebeneinander fest; die Profildetails schreiben an jedes betroffene Profil „50/50 aus gemeinsamer Meldung aufgeteilt" und nennen die Quelle samt Uhrzeit.
+
+**Die Gruppenleistung bleibt identisch.** Die Quelldatensätze bleiben als Beleg erhalten, ihre verteilten Werte stehen dort aber auf null — sonst zählte dieselbe Leistung zweimal. `splitProblems()` prüft für jede Kennzahl, dass die Summe der Anteile genau der Meldung entspricht und keine Kennzahl der Meldung stillschweigend verschwindet; `tests/ranking-history.test.ts` rechnet das zusätzlich über `aggregate()` gegen. Die SQL-Migration hat dieselbe Prüfung im selben Schritt ausgeführt und wäre bei einer Abweichung abgebrochen.
+
+**Die 13 Termine ohne Typangabe bleiben ungeteilt.** 13 durch 2 ergibt 6,5. Halbe Termine gibt es nicht, gerundet wird nicht, und aus einem Termin ohne Typangabe wird weder ein Setting noch ein Closing. Die Kennzahl ist öffentlich ausgeblendet, deshalb stehen die 13 weiterhin im Quelldatensatz und zählen dort genau einmal. Die ganzzahlige Eingabe echter Termine bleibt davon unberührt.
+
+**Verwechslungsschutz:** David Pixner ist nicht David Erharter (`akq-2026-david-erharter`), Jannik Alber ist nicht Yannick de Groot (`akq-2026-yannick-de-groot`). Alle vier Schlüssel sind neu und eigenständig; ein Test hält das fest. Der Schlüssel `akq-2026-myran-omo` gehört historisch dem gemeinsamen Datensatz, deshalb trägt die Person `akq-2026-myran-omo-person`.
+
+## Leere Zeilen im Ranking
+
+Eine Rangliste zeigt nur Personen mit einer Meldung **für genau diese Kennzahl**. `ranked()` filtert über `reportedIn()`; wer bei Anwahlen nichts gemeldet hat, fehlt dort und kann trotzdem im Setting-Ranking stehen. Eine ausdrücklich gemeldete **0 bleibt drin** — sie ist eine Aussage, kein fehlender Wert. Wer in keiner öffentlichen Kennzahl etwas gemeldet hat, erscheint in keiner Rangliste. Gelöscht wird dabei nichts: Profile und gespeicherte Werte bleiben, und die Profilauswahl zur späteren Übernahme ist davon unberührt. Die Zahl neben der Liste ist die Zahl der Zeilen darin.
+
+## Discord-Einstieg
+
+Der erste sichtbare Bereich trägt „Zusammen callen. Gemeinsam dranbleiben.", einen Satz dazu und zwei Wege: „Auf Discord weitercallen" (direkt auf den bestehenden Server) und „Meine Zahlen & mein Profil". Der Block steht bewusst **außerhalb** der Lade- und Fehlerzweige, damit der Weg in den Server nie davon abhängt, ob die Zahlen gerade abrufbar sind. In der Hauptnavigation steht „Austausch auf Discord" statt eines zweiten Community-Angebots.
+
+Geprüft auf 320×568, 360×640, 390×844, 430×932 und Desktop, jeweils mit ladenden und mit fehlschlagenden Zahlen: der Knopf liegt vollständig im ersten Bildschirm, ohne Scrollen und ohne Anmeldung.

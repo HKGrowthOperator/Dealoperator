@@ -36,6 +36,8 @@ import {
   monthSchema,
   type RankingMonth,
 } from "@/lib/ranking-history";
+import { DISCORD_INVITE } from "@/lib/discord";
+import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +78,9 @@ export default function RankingBoard({
   onlyRanking?: boolean;
 }) {
   const params = useSearchParams();
+  // Der Einstieg in den Server muss immer ein Ziel haben, auch wenn die Seite
+  // ohne übergebene Adresse gerendert wird.
+  const discord = discordUrl || DISCORD_INVITE;
   const today = berlinDate();
   const parsedDay = daySchema.safeParse(params.get("day"));
   const parsedMonth = monthSchema.safeParse(params.get("month"));
@@ -199,24 +204,42 @@ export default function RankingBoard({
   }
   return (
     <div className="operator-site rr-site">
-      <OperatorHeader />
+      <OperatorHeader discordUrl={discord} />
       <main className="rr-main">
+        {/* Steht bewusst außerhalb der Lade- und Fehlerzweige: der Weg zurück
+            in den Server darf nie davon abhängen, ob die Zahlen gerade
+            abrufbar sind oder ob jemand angemeldet ist. */}
         <section className="rr-intro">
-          <div>
+          <div className="rr-intro-copy">
             <span className="rr-eyebrow">
               <span className="rr-live-dot" /> DIE CREW. DIE ZAHLEN.
             </span>
             <h1>
-              Gemeinsam <em>abliefern.</em>
+              Zusammen callen.
+              <br />
+              Gemeinsam <em>dranbleiben.</em>
             </h1>
+            <p>
+              Hier halten wir fest, was wir gemeinsam erreichen. Auf Discord
+              verabreden wir die nächsten Call-Blöcke, teilen Learnings und
+              pushen uns gegenseitig.
+            </p>
+            <div className="rr-intro-actions">
+              <a
+                className="rr-discord-cta"
+                href={discord}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Headphones size={19} />
+                Auf Discord weitercallen
+              </a>
+              <Link href="/beitreten" className="rr-intro-secondary">
+                <ShieldCheck size={17} />
+                Meine Zahlen &amp; mein Profil
+              </Link>
+            </div>
           </div>
-          <Link href="/beitreten" className="rr-profile-link">
-            <ShieldCheck size={18} />
-            <span>
-              Deine Zahlen sind schon dabei?
-              <strong>Profil auswählen & weitermachen</strong>
-            </span>
-          </Link>
         </section>
 
         <section className="rr-toolbar" aria-label="Ranking-Zeitraum">
@@ -508,7 +531,12 @@ export default function RankingBoard({
                   <div className="rr-leaderboard rr-glass">
                     <div className="rr-list-top">
                       <h3>
-                        Die ganze Crew <span>{people.length}</span>
+                        Gemeldet: {metricShortLabels[metric]}{" "}
+                        <span>
+                          {search
+                            ? `${filtered.length} von ${all.length}`
+                            : all.length}
+                        </span>
                       </h3>
                       <label className="rr-search">
                         <Search size={17} />
@@ -547,11 +575,9 @@ export default function RankingBoard({
                             <button
                               className="rr-rank-row"
                               onClick={() => setSelectedId(row.id)}
-                              aria-label={`${row.name}, Platz ${row.rank ?? "offen"}, ${fmt(row.counts[metric])} ${metricShortLabels[metric]}`}
+                              aria-label={`${row.name}, Platz ${row.rank}, ${fmt(row.counts[metric])} ${metricShortLabels[metric]}`}
                             >
-                              <span className="rr-place">
-                                {row.rank ?? "—"}
-                              </span>
+                              <span className="rr-place">{row.rank}</span>
                               <span className="rr-rank-name">
                                 <strong>
                                   {row.name}
@@ -593,12 +619,16 @@ export default function RankingBoard({
                         <h3>
                           {search
                             ? "Kein Profil gefunden."
-                            : "Dieser Tag gehört noch euch."}
+                            : people.length > 0
+                              ? `Noch keine Meldung für ${metricShortLabels[metric]}.`
+                              : "Dieser Tag gehört noch euch."}
                         </h3>
                         <p>
                           {search
                             ? "Versuche einen anderen Namen."
-                            : `Für ${monthly ? "diesen Monat" : "diesen Tag"} sind noch keine öffentlichen Zahlen gemeldet. Wähle einen Tag im Archiv oder halte deinen nächsten Call-Block fest.`}
+                            : people.length > 0
+                              ? "Für andere Kennzahlen gibt es Meldungen — wechsle oben die Auswahl."
+                              : `Für ${monthly ? "diesen Monat" : "diesen Tag"} sind noch keine öffentlichen Zahlen gemeldet. Wähle einen Tag im Archiv oder halte deinen nächsten Call-Block fest.`}
                         </p>
                         {!search && (
                           <Link href="/beitreten" className="btn primary">
@@ -610,29 +640,49 @@ export default function RankingBoard({
                     {joint.length > 0 && (
                       <div className="rr-joint">
                         <div className="rr-joint-head">
-                          <h4>Gemeinsam gemeldet</h4>
-                          <span>Zählt zur Crew, nicht zum Einzelrang</span>
+                          <h4>Gemeinsame Meldungen</h4>
+                          <span>Quelle, kein eigener Rang</span>
                         </div>
                         <ul>
-                          {joint.map((row) => (
-                            <li key={row.id}>
-                              <button onClick={() => setSelectedId(row.id)}>
-                                <Users size={15} />
-                                <span>{row.name}</span>
-                                <strong>{fmt(row.counts[metric])}</strong>
-                              </button>
-                            </li>
-                          ))}
+                          {joint.map((row) => {
+                            const origin = jointReport(row.key);
+                            const reported = origin?.report[metric];
+                            return (
+                              <li key={row.id}>
+                                <button onClick={() => setSelectedId(row.id)}>
+                                  <Users size={15} />
+                                  <span>
+                                    {row.name}
+                                    {origin && (
+                                      <small>
+                                        {origin.reportedAt} Uhr · 50/50
+                                        aufgeteilt
+                                      </small>
+                                    )}
+                                  </span>
+                                  <strong>
+                                    {fmt(
+                                      reported ?? row.counts[metric] ?? null,
+                                    )}
+                                  </strong>
+                                </button>
+                              </li>
+                            );
+                          })}
                         </ul>
                         <p>
                           Eine gemeinsam erbrachte Leistung tritt nicht gegen
-                          einzelne Personen an. Sie zählt genau einmal zur
-                          Gesamtleistung der Crew.
+                          einzelne Personen an. Die gezeigten Werte sind die
+                          Originalmeldung; sie stecken bereits in den
+                          Einzelzahlen und werden nicht zusätzlich gezählt.
                         </p>
                       </div>
                     )}
                     <div className="rr-table-caption">
-                      <span>— = nicht gemeldet · 0 = ausdrücklich keine</span>
+                      <span>
+                        Nur Personen mit einer Meldung für diese Kennzahl. 0 ist
+                        eine Meldung.
+                      </span>
                       <span>Gleiche Werte teilen sich einen Rang.</span>
                     </div>
                     {newest && (
@@ -661,9 +711,9 @@ export default function RankingBoard({
                           ? "Archiv schließen"
                           : "Verlauf & Tagesarchiv"}
                       </button>
-                      {discordUrl && (
+                      {discord && (
                         <a
-                          href={discordUrl}
+                          href={discord}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -699,10 +749,10 @@ export default function RankingBoard({
                           Zusammen callen, Wins teilen und morgen wieder
                           antreten. Deine Crew wartet.
                         </p>
-                        {discordUrl ? (
+                        {discord ? (
                           <a
                             className="btn primary"
-                            href={discordUrl}
+                            href={discord}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -775,12 +825,54 @@ export default function RankingBoard({
                   </div>
                 ))}
               </div>
-              <p className="hint">
-                Die Werte gelten für{" "}
-                {monthly ? "den ausgewählten Monat" : "diesen Tag"}. Gleiche
-                Werte teilen sich einen Rang. Nicht gemeldete Kennzahlen bleiben
-                offen.
-              </p>
+              {(() => {
+                const origin = splitOrigin(selected.key);
+                const own = jointReport(selected.key);
+                if (origin)
+                  return (
+                    <p className="rr-split-note">
+                      <strong>{SPLIT_NOTE}</strong>
+                      Die gemeinsame Meldung von {origin.name} um{" "}
+                      {origin.reportedAt} Uhr wurde je zur Hälfte auf die
+                      beteiligten Personen gerechnet. Es sind zugeteilte, keine
+                      einzeln gemeldeten Werte.
+                      {origin.kept.map((k) => (
+                        <span key={k.metric}>{k.why}</span>
+                      ))}
+                    </p>
+                  );
+                if (own)
+                  return (
+                    <p className="rr-split-note">
+                      <strong>
+                        Gemeinsame Meldung um {own.reportedAt} Uhr
+                      </strong>
+                      Ursprünglich gemeldet:{" "}
+                      {visibleMetrics
+                        .filter((m) => own.report[m] != null)
+                        .map((m) => `${own.report[m]} ${metricLabels[m]}`)
+                        .join(", ") || "keine öffentliche Kennzahl"}
+                      {own.report.legacyMeetings != null
+                        ? `, ${own.report.legacyMeetings} Termine ohne Typangabe`
+                        : ""}
+                      . Diese Werte sind 50/50 auf{" "}
+                      {own.parts.map((p) => p.name).join(" und ")} verteilt und
+                      stecken dort in den Einzelzahlen. Sie werden hier nicht
+                      noch einmal mitgezählt.
+                      {own.kept.map((k) => (
+                        <span key={k.metric}>{k.why}</span>
+                      ))}
+                    </p>
+                  );
+                return (
+                  <p className="hint">
+                    Die Werte gelten für{" "}
+                    {monthly ? "den ausgewählten Monat" : "diesen Tag"}. Gleiche
+                    Werte teilen sich einen Rang. Nicht gemeldete Kennzahlen
+                    bleiben offen.
+                  </p>
+                );
+              })()}
               {isJoint(selected) ? (
                 <p className="hint">
                   Diese Meldung gehört mehreren Personen und lässt sich nicht
