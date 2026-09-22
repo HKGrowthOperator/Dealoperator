@@ -131,7 +131,7 @@ async function once<T>(
 }
 export async function publicRanking(db: Database, from: string, to: string) {
   const rows = await db.query(
-    `SELECT p.id,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.source,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
+    `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.source,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
     [from, to],
   );
   const grouped = new Map<string, RankingRow>();
@@ -142,6 +142,7 @@ export async function publicRanking(db: Database, from: string, to: string) {
     } else
       grouped.set(r.id, {
         id: r.id,
+        key: r.import_key || "",
         name: r.name,
         company: r.company,
         role: r.role,

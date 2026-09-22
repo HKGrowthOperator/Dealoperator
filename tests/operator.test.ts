@@ -29,6 +29,8 @@ import {
   parseImport,
   progress,
   ranked,
+  visibleMetrics,
+  type Counts,
   type ImportRow,
 } from "../lib/kpis";
 import { handleWorkflow, loadWorkflows } from "../app/api/community/workflows";
@@ -132,29 +134,48 @@ function checkin(extra: any = {}) {
   };
 }
 
-test("ranking uses competition ties and does not treat missing as zero", () => {
-  const r = (id: string, n: number | null) => ({
+test("ranking uses competition ties, keeps a reported zero and drops unreported rows", () => {
+  const r = (id: string, counts: Partial<Counts>) => ({
     id,
+    key: id,
     name: id,
     company: "",
     role: "",
     kind: "person" as const,
     claimed: false,
-    counts: { ...emptyCounts(), attempts: n },
+    counts: { ...emptyCounts(), ...counts },
     source: "",
     updatedAt: "",
   });
+  const rows = [
+    r("a", {}), // gar nichts gemeldet
+    r("b", { attempts: 0 }), // ausdrücklich keine Anwahlen
+    r("c", { attempts: 10 }),
+    r("d", { attempts: 10 }),
+    r("e", { settingsBooked: 2 }), // nur Settings gemeldet
+  ];
+  // Anwahlranking: "a" und "e" haben dazu nichts gemeldet und fehlen. Die
+  // ausdrückliche 0 von "b" bleibt und ist nicht dasselbe wie keine Meldung.
   assert.deepEqual(
-    ranked([r("a", null), r("b", 0), r("c", 10), r("d", 10)], "attempts").map(
-      (x) => [x.id, x.rank],
-    ),
+    ranked(rows, "attempts").map((x) => [x.id, x.rank]),
     [
       ["c", 1],
       ["d", 1],
       ["b", 3],
-      ["a", null],
     ],
   );
+  // Dieselbe Person kann in einer anderen Kennzahl sehr wohl antreten.
+  assert.deepEqual(
+    ranked(rows, "settingsBooked").map((x) => [x.id, x.rank]),
+    [["e", 1]],
+  );
+  // Wer in keiner öffentlichen Kennzahl etwas gemeldet hat, taucht nirgends auf.
+  for (const metric of visibleMetrics)
+    assert.equal(
+      ranked(rows, metric).some((x) => x.id === "a"),
+      false,
+      metric,
+    );
 });
 test("four independent pilot rank thresholds and corrections", () => {
   const p = progress(counts());
@@ -208,6 +229,7 @@ test("import preview and import commit keep contact data off public API", async 
     "company",
     "counts",
     "id",
+    "key",
     "kind",
     "name",
     "role",

@@ -134,6 +134,13 @@ export function participantKind(value: unknown): ParticipantKind {
 }
 export type RankingRow = {
   id: string;
+  /**
+   * Stabiler Importschlüssel. Öffentlich unbedenklich — er ist ein Kürzel des
+   * ohnehin angezeigten Namens — und die einzige verlässliche Möglichkeit,
+   * einem Profil eine dokumentierte Herkunft zuzuordnen, ohne dafür Namen
+   * oder freien Rollentext abzugleichen.
+   */
+  key: string;
   name: string;
   company: string;
   role: string;
@@ -149,6 +156,20 @@ export const isJoint = (row: { kind?: unknown }) =>
 export const soloRows = <T extends { kind: ParticipantKind }>(rows: T[]) =>
   rows.filter((row) => !isJoint(row));
 /**
+ * Zeilen mit einer Meldung für genau diese Kennzahl.
+ *
+ * null heißt „nicht gemeldet" und gehört in keine Rangliste dieser Kennzahl —
+ * eine Zeile voller Striche sagt nichts aus. Eine ausdrücklich gemeldete 0
+ * ist etwas anderes: sie ist eine Aussage und bleibt drin.
+ *
+ * Die Kennzahlen sind voneinander unabhängig: wer keine Anwahlen, aber
+ * Settings gemeldet hat, fehlt im Anwahlranking und steht im Setting-Ranking.
+ */
+export const reportedIn = <T extends { counts: Counts }>(
+  rows: T[],
+  metric: Metric,
+) => rows.filter((row) => row.counts[metric] !== null);
+/**
  * Persönliche Platzierung nach einer Kennzahl.
  *
  * Gemeinsame Meldungen treten hier nicht an. Eine von zwei Personen
@@ -162,7 +183,7 @@ export const soloRows = <T extends { kind: ParticipantKind }>(rows: T[]) =>
 export function ranked(rows: RankingRow[], metric: Metric) {
   let place = 0,
     last: number | null = null;
-  return soloRows(rows)
+  return reportedIn(soloRows(rows), metric)
     .sort(
       (a, b) =>
         (b.counts[metric] ?? -1) - (a.counts[metric] ?? -1) ||
@@ -173,7 +194,7 @@ export function ranked(rows: RankingRow[], metric: Metric) {
       const v = r.counts[metric];
       if (v !== last) place = i + 1;
       last = v;
-      return { ...r, rank: v === null ? null : place };
+      return { ...r, rank: place };
     });
 }
 export function aggregate(values: Counts[]): Counts {
@@ -351,6 +372,7 @@ export function sampleRows(date = berlinDate()): RankingRow[] {
     },
   ].map((r, i) => ({
     id: `sample-${i}`,
+    key: `sample-${i}`,
     name: r.name,
     company: r.company,
     role: r.role,

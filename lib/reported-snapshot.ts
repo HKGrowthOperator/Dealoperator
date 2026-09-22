@@ -50,9 +50,10 @@ const ROWS: Row[] = [
   { key: "akq-2026-marlon-moschner", name: "Marlon Moschner", counts: { legacyMeetings: 4 } },
   { key: "akq-2026-ennio", name: "Ennio", counts: { settingsBooked: 2 } },
   { key: "akq-2026-musa", name: "Musa", counts: { settingsBooked: 3 } },
-  // Gemeinsame Meldung: zählt zur Gesamtleistung, tritt aber nicht im
-  // Einzelranking an. Siehe participants.kind.
-  { key: "akq-2026-myran-omo", name: "Myran und Baris", kind: "joint" as const, counts: { attempts: 150, settingsBooked: 1 } },
+  // Persönlicher Zwischenstand aus dem Zoom-Chat. Der gemeinsame
+  // Abschlussstand von Myran und Baris ist inzwischen 50/50 aufgeteilt und
+  // steht in lib/joint-reports.ts; hier zählt nur diese eine Person.
+  { key: "akq-2026-myran-omo-person", name: "Myran Omo", counts: { attempts: 150, settingsBooked: 1 } },
   { key: "akq-2026-phil-mohan", name: "Phil Mohan", counts: { attempts: 151, settingsBooked: 1 } },
   { key: "akq-2026-jonathan-balzer", name: "Jonathan Balzer", counts: { attempts: 123, settingsBooked: 1 } },
   { key: "akq-2026-max-rohde", name: "Max Rohde", counts: { attempts: 100 } },
@@ -69,6 +70,7 @@ const ROWS: Row[] = [
 export function reportedSnapshot(): RankingRow[] {
   return ROWS.map((r) => ({
     id: r.key,
+    key: r.key,
     name: r.name,
     company: "",
     role: "",
