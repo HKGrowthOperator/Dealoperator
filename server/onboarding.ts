@@ -105,7 +105,11 @@ export async function startRequest(db: Database, raw: unknown) {
 
   // Kein einzelner globaler Zähler: ein Missbrauchsversuch darf nicht den
   // Einstieg für alle anderen sperren.
-  await rateLimit(db, `onboarding:${v.email}`, 3, 900);
+  //
+  // Fünf Anforderungen je Viertelstunde und Adresse: eng genug, um Mailversand
+  // zu begrenzen, aber weit genug für den realen Fall, dass jemand den Link
+  // zuerst im falschen Browser geöffnet hat und ihn neu anfordern muss.
+  await rateLimit(db, `onboarding:${v.email}`, 5, 900);
   if (v.participantId)
     await rateLimit(db, `onboarding-profile:${v.participantId}`, 12, 3600);
 
@@ -232,7 +236,7 @@ export async function reviewQueue(db: Database, actor: Actor) {
     `SELECT r.id,r.kind,r.status,r.participant,r.full_name,r.email,r.phone,r.phone_input,
             r.hint,r.internal_note,r.applicant_message,r.owner,r.created_at,r.updated_at,
             r.decided_by,r.decided_at,
-            p.name AS participant_name,p.company AS participant_company,
+            p.name AS participant_name,p.company AS participant_company,p.role AS participant_role,
             p.email AS participant_known_email,p.import_key,
             a.phone AS known_phone,
             (SELECT count(*) FROM onboarding_requests o

@@ -497,7 +497,7 @@ export async function rateLimit(
   );
   if (r.hits > max)
     throw new AppError(
-      "Zu viele Versuche. Bitte warte kurz und probiere es erneut.",
+      "Zu viele Versuche in kurzer Zeit. Bitte warte etwa 15 Minuten und probiere es dann erneut. Deine Angaben bleiben gespeichert.",
       429,
     );
 }

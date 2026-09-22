@@ -27,6 +27,7 @@ type Request = {
   decided_at: string | null;
   participant_name: string | null;
   participant_company: string | null;
+  participant_role: string | null;
   participant_known_email: string | null;
   import_key: string | null;
   known_phone: string | null;
@@ -170,6 +171,9 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                     "ein neues Profil"
                   )}
                   {r.participant_company ? ` · ${r.participant_company}` : ""}
+                  {/^team\b/i.test(r.participant_role || "") && (
+                    <b className="team-flag"> · Gemeinsames Teamprofil</b>
+                  )}
                 </small>
               </div>
               <span className={`review-status ${r.status}`}>

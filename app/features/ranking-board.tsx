@@ -231,6 +231,25 @@ export default function RankingBoard({
             </div>
             {label && <span className="reported-badge">{label}</span>}
           </div>
+          {/* Bei einem Fehler wird der zuletzt geladene Stand NICHT als aktuelle
+              Gruppenleistung weitergezeigt — sonst stünden dort stillschweigend
+              veraltete Zahlen. */}
+          {error ? (
+            <div className="crew-stats-error" role="alert">
+              <strong>Die aktuellen Zahlen sind gerade nicht abrufbar.</strong>
+              <p>
+                Damit hier kein veralteter Stand als aktuelle Gruppenleistung
+                erscheint, blenden wir die Summen aus, bis der Abruf wieder
+                funktioniert.
+              </p>
+              <button
+                className="btn secondary"
+                onClick={() => setRetry((v) => v + 1)}
+              >
+                Erneut laden
+              </button>
+            </div>
+          ) : (
           <div className="crew-stats group-performance">
             {[
               {
@@ -301,6 +320,7 @@ export default function RankingBoard({
               </div>
             ))}
           </div>
+          )}
           <div className="ranking-layout">
             <div className="ranking-card card">
               <div className="ranking-controls">

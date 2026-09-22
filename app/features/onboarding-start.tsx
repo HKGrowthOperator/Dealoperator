@@ -16,6 +16,24 @@ type Step = "choice" | "search" | "confirm" | "contact" | "sent";
 
 const EMPTY = { fullName: "", email: "", phone: "", hint: "" };
 
+// Gemeinsame Teamprofile tragen ihre Kennzeichnung in der Rolle. Bei einer
+// Übernahme muss sichtbar bleiben, dass es sich um ein gemeinsames Ergebnis
+// handelt und nicht um die Einzelleistung einer Person.
+const isTeam = (p: Profile | null) => /^team\b/i.test(p?.role || "");
+
+// Der Rücksprung aus der Mail kann aus vier Gründen scheitern. Eine
+// Sammelmeldung „abgelaufen oder bereits verwendet" beschreibt den häufigsten
+// Fall — Link in einem anderen Browser geöffnet — schlicht falsch.
+const LINK_ERROR: Record<string, string> = {
+  browser:
+    "Dieser Link gehört zu dem Browser, in dem du ihn angefordert hast. In einem anderen Browser lässt er sich aus Sicherheitsgründen nicht öffnen. Fordere hier einfach einen neuen Link an und öffne ihn dann in genau diesem Browser.",
+  abgelaufen:
+    "Dieser Bestätigungslink ist abgelaufen. Fordere einen neuen an — deine Angaben sind gespeichert.",
+  verwendet:
+    "Dieser Bestätigungslink wurde bereits verwendet. Fordere einen neuen an, wenn du dich erneut anmelden möchtest.",
+  link: "Dieser Bestätigungslink ist unvollständig. Fordere sicherheitshalber einen neuen an.",
+};
+
 export default function OnboardingStart({
   ready,
   preselected,
@@ -25,9 +43,15 @@ export default function OnboardingStart({
   ready: boolean;
   preselected: Profile | null;
   invite: string;
-  linkError: boolean;
+  linkError: string;
 }) {
-  const [step, setStep] = useState<Step>(preselected ? "confirm" : "choice");
+  // Mit vorausgewähltem Profil kann direkt erneut angefordert werden. Ohne
+  // Auswahl bleibt es bei der Wegwahl: die Anfrage liegt serverseitig zur
+  // E-Mail, aber hier ist nicht bekannt, welches Profil gemeint war — ein
+  // stiller Wechsel auf „Ich bin neu" würde ein falsches Profil anlegen.
+  const [step, setStep] = useState<Step>(
+    preselected ? (linkError ? "contact" : "confirm") : "choice",
+  );
   const [mode, setMode] = useState<"new" | "claim">(
     preselected ? "claim" : "new",
   );
@@ -39,9 +63,7 @@ export default function OnboardingStart({
   const [value, setValue] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
-    linkError
-      ? "Dieser Link ist abgelaufen oder wurde bereits verwendet. Deine Auswahl ist gespeichert — fordere einfach einen neuen Link an."
-      : "",
+    linkError ? LINK_ERROR[linkError] || LINK_ERROR.link : "",
   );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -291,7 +313,11 @@ export default function OnboardingStart({
       {step === "confirm" && selected && (
         <>
           <div className="onboarding-selected">
-            <span>Du möchtest das Profil von</span>
+            <span>
+              {isTeam(selected)
+                ? "Du möchtest das gemeinsame Teamprofil"
+                : "Du möchtest das Profil von"}
+            </span>
             <strong>{selected.name}</strong>
             {[selected.company, selected.role].filter(Boolean).length > 0 && (
               <small>
@@ -300,6 +326,16 @@ export default function OnboardingStart({
             )}
             <span>übernehmen.</span>
           </div>
+          {isTeam(selected) && (
+            <div className="notice">
+              <strong>Das ist ein gemeinsames Teamprofil.</strong>
+              <p>
+                Die Zahlen darin sind ein gemeinsames Ergebnis und werden nicht
+                auf einzelne Personen aufgeteilt. Wer es übernimmt, verwaltet
+                den gemeinsamen Stand. Bitte klärt vorher im Team, wer das tut.
+              </p>
+            </div>
+          )}
           <div className="notice">
             <strong>Das Team prüft deine Übernahme.</strong>
             <p>
@@ -331,7 +367,7 @@ export default function OnboardingStart({
         <form className="form-stack" onSubmit={submit}>
           {mode === "claim" && selected && (
             <div className="onboarding-selected compact">
-              <span>Ausgewähltes Profil</span>
+              <span>{isTeam(selected) ? "Ausgewähltes Teamprofil" : "Ausgewähltes Profil"}</span>
               <strong>{selected.name}</strong>
               <button
                 type="button"

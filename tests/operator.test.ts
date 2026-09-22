@@ -17,6 +17,7 @@ import { loadOwnRecords } from "../server/records";
 import {
   bindConfirmedRequest,
   decideRequest,
+  profileForSelection,
   reviewQueue,
   searchProfiles,
   startRequest,
@@ -790,4 +791,112 @@ test("restricted runtime role can serve the app without owning tables or changin
   } finally {
     await pg.exec("RESET ROLE");
   }
+});
+
+test("repeated submissions never create a second request or a second profile", async () => {
+  const id = await imported();
+  const send = () =>
+    startRequest(db, {
+      kind: "claim",
+      participantId: id,
+      fullName: "Alice Beispiel",
+      email: alice.email,
+      phone: "+4917012345678",
+      hint: "",
+    });
+  // Wiederholte Klicks oder ein erneut angeforderter Link aktualisieren
+  // dieselbe Anfrage, statt eine zweite offene anzulegen.
+  for (let i = 0; i < 3; i++) await send();
+  assert.equal(
+    (await db.query("SELECT count(*)::int AS n FROM onboarding_requests"))[0].n,
+    1,
+  );
+  await bindConfirmedRequest(db, alice);
+  // Auch nach der Bestätigung entsteht nichts Zweites: die laufende Anfrage
+  // wird weiter aktualisiert, nicht dupliziert.
+  const again = await send();
+  assert.equal(again.resubmitted, true);
+  const rows = await db.query("SELECT status FROM onboarding_requests");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].status, "pending");
+  assert.equal(
+    (await db.query("SELECT count(*)::int AS n FROM participants"))[0].n,
+    1,
+  );
+  // Die Missbrauchsgrenze bleibt bestehen: nach fünf Anforderungen ist Schluss.
+  await send();
+  await assert.rejects(send(), /Zu viele Versuche/);
+});
+
+test("a new member's released numbers reach the public ranking and replace the day", async () => {
+  const { createMember } = await import("../server/operator");
+  await createMember(db, bob, {
+    name: "Bob Caller",
+    company: "Studio",
+    role: "Closer",
+    publicConsent: true,
+  });
+  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  const today = berlinDate();
+  let ranking = await publicRanking(db, today, today);
+  assert.equal(ranking.length, 1);
+  assert.equal(ranking[0].counts.attempts, 100);
+
+  // Korrektur ersetzt den Tagesstand, sie addiert nicht.
+  await saveCheckin(
+    db,
+    bob,
+    checkin({
+      expectedRevision: 1,
+      counts: { ...counts(), attempts: 140 },
+    }),
+  );
+  ranking = await publicRanking(db, today, today);
+  assert.equal(ranking.length, 1);
+  assert.equal(ranking[0].counts.attempts, 140);
+
+  // Gruppensumme und Rangliste stammen aus derselben Zeilenmenge.
+  const totals = aggregate(ranking.map((r) => r.counts));
+  assert.equal(totals.attempts, ranking[0].counts.attempts);
+
+  // Außerhalb des Zeitraums erscheint nichts.
+  assert.equal((await publicRanking(db, "2026-01-01", "2026-01-02")).length, 0);
+});
+
+test("a private profile never becomes public on its own", async () => {
+  const { createMember } = await import("../server/operator");
+  await createMember(db, bob, {
+    name: "Bob Privat",
+    company: "",
+    role: "",
+    publicConsent: false,
+  });
+  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  const today = berlinDate();
+  assert.equal((await publicRanking(db, today, today)).length, 0);
+  // Die eigenen Zahlen sind trotzdem für das eigene Konto da.
+  assert.equal((await ownState(db, bob)).records[0].counts.attempts, 100);
+  // Erst die ausdrückliche Freigabe veröffentlicht.
+  await updateAccount(db, bob, {
+    name: "Bob Privat",
+    company: "",
+    role: "",
+    publicConsent: true,
+    phone: "",
+    contactOptIn: false,
+  });
+  assert.equal((await publicRanking(db, today, today)).length, 1);
+});
+
+test("the selection step exposes the team marker but never contact data", async () => {
+  const id = await imported([row({ role: "Team · A und B", email: "" })]);
+  const profile = await profileForSelection(db, id);
+  assert.deepEqual(Object.keys(profile).sort(), [
+    "company",
+    "id",
+    "name",
+    "role",
+  ]);
+  // Das Teamprofil bleibt bei der Übernahme als solches erkennbar.
+  assert.match(String(profile.role), /^Team/);
 });

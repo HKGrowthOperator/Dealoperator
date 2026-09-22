@@ -25,7 +25,7 @@ export default async function Page({
         <AuthForm
           ready={authReady() && databaseReady()}
           next={next}
-          error={search.fehler === "link"}
+          error={(search.fehler || "").slice(0, 20)}
         />
       </main>
       <OperatorFooter />

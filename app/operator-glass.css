@@ -617,3 +617,20 @@ tbody tr[data-rank="3"] .rank-place {
     transition: width 0.45s cubic-bezier(0.22, 0.68, 0.36, 1);
   }
 }
+
+/* Ehrlicher Fehlerzustand statt veralteter Gruppensummen. */
+.crew-stats-error {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  border: 1px solid #f0c9cc;
+  background: #fdeced99;
+  color: #97282f;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-block: 24px;
+}
+.crew-stats-error p {
+  margin: 0;
+  color: #7c3b40;
+}

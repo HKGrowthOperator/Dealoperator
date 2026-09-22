@@ -2,6 +2,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Mail, ShieldCheck, Check, LoaderCircle } from "lucide-react";
+const LINK_ERROR: Record<string, string> = {
+  browser:
+    "Dieser Link gehört zu dem Browser, in dem du ihn angefordert hast. Fordere hier einen neuen an und öffne ihn in genau diesem Browser.",
+  abgelaufen: "Dieser Anmeldelink ist abgelaufen. Fordere einen neuen an.",
+  verwendet:
+    "Dieser Anmeldelink wurde bereits verwendet. Fordere einen neuen an.",
+  link: "Dieser Anmeldelink ist unvollständig. Fordere sicherheitshalber einen neuen an.",
+};
+
 export default function AuthForm({
   ready,
   next,
@@ -9,15 +18,13 @@ export default function AuthForm({
 }: {
   ready: boolean;
   next: string;
-  error: boolean;
+  error: string;
 }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
-    error
-      ? "Dieser Link ist abgelaufen oder wurde bereits verwendet. Fordere einen neuen an."
-      : "",
+    error ? LINK_ERROR[error] || LINK_ERROR.link : "",
   );
   async function submit(e: React.FormEvent) {
     e.preventDefault();

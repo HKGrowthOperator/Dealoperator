@@ -42,7 +42,7 @@ export default async function Page({
           ready={authReady() && databaseReady()}
           preselected={preselected}
           invite={invite}
-          linkError={search.fehler === "link"}
+          linkError={(search.fehler || "").slice(0, 20)}
         />
       </main>
       <OperatorFooter />
