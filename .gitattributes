@@ -1,0 +1,3 @@
+# Historical Sites artifacts are kept locally, not in the portable source handoff.
+legacy-sites export-ignore
+examples export-ignore

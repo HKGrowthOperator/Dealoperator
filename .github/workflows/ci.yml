@@ -1,0 +1,39 @@
+name: Website checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run smoke
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t deal-operator:test .
+      - name: Verify container process
+        run: |
+          docker run -d --name operator-test -p 127.0.0.1:5175:3000 deal-operator:test
+          trap 'docker rm -f operator-test' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:5175/api/health; then
+              curl --fail --silent http://127.0.0.1:5175/ >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs operator-test
+          exit 1

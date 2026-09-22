@@ -1,0 +1,51 @@
+import { z } from "zod";
+import { authClient, authReady, safeNext } from "@/server/auth";
+import { database, databaseReady } from "@/server/database";
+import { rateLimit } from "@/server/operator";
+import { body, errorResponse, json } from "@/server/http";
+export async function POST(request: Request) {
+  try {
+    const raw = await body(request, 6000);
+    if (!authReady())
+      return json(
+        {
+          error:
+            "Die Anmeldung wird gerade eingerichtet. Du kannst die Community bereits in der Vorschau erkunden.",
+        },
+        503,
+      );
+    const client = await authClient();
+    if (raw.action === "signout") {
+      const { error } = await client.auth.signOut();
+      if (error) return json({ error: "Abmelden gerade nicht möglich." }, 503);
+      return json({ ok: true });
+    }
+    if (!databaseReady())
+      return json({ error: "Die Anmeldung wird gerade eingerichtet." }, 503);
+    const v = z
+      .object({
+        email: z.string().trim().email().max(254),
+        next: z.string().max(200).optional(),
+      })
+      .parse(raw);
+    await rateLimit(database(), `email:${v.email.toLowerCase()}`, 3, 900);
+    await rateLimit(database(), "auth-global", 100, 3600);
+    const redirect = new URL("/auth/callback", process.env.APP_URL!);
+    redirect.searchParams.set("next", safeNext(v.next || null));
+    const { error } = await client.auth.signInWithOtp({
+      email: v.email,
+      options: { emailRedirectTo: redirect.toString(), shouldCreateUser: true },
+    });
+    if (error)
+      return json(
+        {
+          error:
+            "Der Anmeldelink konnte gerade nicht versendet werden. Bitte versuche es später erneut.",
+        },
+        429,
+      );
+    return json({ ok: true });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}

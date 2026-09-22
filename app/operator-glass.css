@@ -1,0 +1,266 @@
+/* Translucent surfaces stay readable without blur support or animation. */
+:root {
+  --glass-line: rgba(145, 176, 223, 0.3);
+  --glass-shadow: 0 12px 36px rgba(15, 49, 105, 0.055);
+}
+body,
+.operator-site {
+  background: #f5f8ff;
+}
+.operator-site,
+.app-shell {
+  background-image:
+    radial-gradient(ellipse at 5% 55%, #d9eaff66, transparent 36%),
+    radial-gradient(ellipse at 96% 84%, #dce5ff88, transparent 35%);
+}
+.operator-header {
+  position: relative;
+  z-index: 20;
+  background: #ffffffdc;
+  border-bottom-color: #d4e0f3a6;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+.operator-hero {
+  background:
+    radial-gradient(ellipse at 74% 28%, #14457855, transparent 50%),
+    radial-gradient(ellipse at 16% 100%, #006cc633, transparent 42%),
+    linear-gradient(145deg, #06152f, #0b2245);
+}
+.hero-routine {
+  background: #ffffff09;
+  border-color: #9bc9ff38;
+  box-shadow:
+    0 26px 80px #00091c38,
+    inset 0 1px #ffffff0c;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+.routine-eyebrow {
+  background: #ffffffed;
+}
+.hero-step + .hero-step,
+.hero-routine > a {
+  border-color: #abcfff26;
+}
+.hero-routine > a {
+  background: #b5d6ff09;
+}
+.hero-step-icon {
+  background: #bddfff12;
+  border-color: #acd6ff2b;
+  box-shadow: inset 0 1px #ffffff14;
+}
+.operator-site :is(.card, .crew-stats > div, .claim-teaser, .benefit-grid > a),
+.app-shell .card,
+.discord-nudge,
+.week-banner {
+  background: #ffffffb8;
+  border: 1px solid var(--glass-line);
+  box-shadow:
+    var(--glass-shadow),
+    inset 0 1px #fff;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.crew-stats > div {
+  background: linear-gradient(145deg, #ffffffe6, #e7f0ff99);
+}
+.operator-site .ranking-card {
+  background: #ffffffd9;
+}
+.ranking-controls {
+  background: #ffffff4d;
+}
+.ranking-search {
+  background: #eaf1fa88;
+}
+.ranking-table-wrap {
+  position: relative;
+}
+.ranking-table th {
+  background: #edf4fc99;
+}
+.ranking-table tbody tr {
+  transition: background 0.2s ease;
+}
+.ranking-table tbody tr:hover {
+  background: #e5f0ff88;
+}
+.discord-card {
+  background:
+    radial-gradient(ellipse at 100% 0, #2478cb50, transparent 65%),
+    linear-gradient(150deg, #102746f5, #071832);
+  box-shadow:
+    0 15px 40px #0b2a4e18,
+    inset 0 1px #ffffff1c;
+  border-color: #a6c8f130;
+}
+.operator-site .benefit-grid > a:hover {
+  background: #ffffffef;
+  border-color: #91b8f08f;
+  box-shadow:
+    0 16px 40px #1747870d,
+    inset 0 1px #fff;
+}
+.operator-site .auth-card {
+  background: #ffffffd9;
+}
+.operator-footer {
+  background: #ffffff91;
+  border-top-color: #cedbf2b0;
+}
+.app-sidebar [data-slot="sidebar-inner"],
+.topbar {
+  background: #ffffffd9;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.card {
+  box-shadow: 0 8px 26px #163e7805;
+}
+.operator-site .btn,
+.btn,
+.benefit-grid > a,
+.hero-routine > a {
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.btn.primary,
+.btn.lime {
+  box-shadow:
+    0 5px 14px #0755f51c,
+    inset 0 1px #ffffff20;
+}
+.btn.primary:hover,
+.btn.lime:hover {
+  box-shadow: 0 8px 22px #0755f530;
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.rank-open {
+  padding: 10px;
+  border-radius: 8px;
+}
+.rank-open:hover {
+  background: #e8f2ff;
+}
+.hero-link {
+  border-color: #a1c7ef77;
+}
+.breadcrumb-separator {
+  color: #94a4bb;
+  padding-inline: 7px;
+}
+.onboarding-candidates {
+  display: grid;
+  gap: 12px;
+  margin-block: 24px;
+}
+.onboarding-candidates a {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid #cadcf5;
+  background: #edf4ffb3;
+  padding: 18px;
+  border-radius: 12px;
+  color: #123765;
+}
+.onboarding-candidates small {
+  color: #58708e;
+}
+.onboarding-divider {
+  border-top: 1px solid #d7e3f4;
+  padding-top: 24px;
+  margin-top: 24px;
+}
+.form-stack .checkbox-line {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+}
+.form-stack .checkbox-line input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: 0 0 18px;
+  margin-top: 4px;
+  accent-color: #0755f5;
+}
+.form-stack select {
+  min-height: 46px;
+  background: #fff;
+  color: #173c70;
+  border: 1px solid #cbdaf0;
+  padding: 10px;
+  border-radius: 8px;
+}
+@keyframes operator-arrive {
+  from {
+    opacity: 0.2;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .motion-arrive {
+    animation: operator-arrive 0.5s cubic-bezier(0.2, 0.7, 0.2, 1)
+      var(--arrival-delay, 0ms) both;
+  }
+  .operator-main,
+  .auth-layout,
+  .page-heading {
+    animation: operator-arrive 0.38s ease both;
+  }
+  .metric-tabs button,
+  .ranking-mode button {
+    transition:
+      background 0.2s ease,
+      box-shadow 0.2s ease,
+      color 0.2s ease;
+  }
+  @media (hover: hover) {
+    .btn:hover:not(:disabled),
+    .benefit-grid > a:hover {
+      transform: translateY(-2px);
+    }
+  }
+}
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .operator-header,
+  .topbar,
+  .operator-site
+    :is(.card, .crew-stats > div, .claim-teaser, .benefit-grid > a) {
+    background: #fff;
+  }
+  .hero-routine {
+    background: #10294b;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 560px) {
+  .hero-step + .hero-step {
+    border-top-color: #abcfff26;
+  }
+}
