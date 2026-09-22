@@ -29,3 +29,35 @@ Continue importing full day totals using stable participant keys and the actual 
 ## Validation
 
 Database tests cover month boundaries, daily vs monthly aggregation, daily winners, ties, teams, corrected imports, private-profile exclusion and unknown vs zero. Endpoint tests reject invalid/future/mismatched dates. Existing claim and authorization tests remain intact. Production build and standalone smoke checks must pass before release.
+
+## Gemeinsame Meldungen (`participants.kind`)
+
+Zwei Datensätze — „Myran und Baris" und „David & Jannik" — sind keine Personen, sondern von mehreren Personen gemeinsam erbrachte Leistungen. Sie gegen einzelne Personen zu ranken wäre unfair, und sie zu halbieren hieße, Zahlen zu erfinden.
+
+Die Art steht seit Migration `0002_participant_kind.sql` in einer eigenen Spalte `participants.kind` (`person` | `joint`). Der frühere Rollentext „Team · …" bleibt als Beschriftung erhalten, entscheidet aber nichts mehr: er ist frei bearbeitbar und war deshalb als Merkmal nicht haltbar.
+
+**Verbindliche Regel: im Einzelranking tritt genau eine Person mit ihren eigenen belegten Zahlen an.**
+
+Durchgesetzt wird das in der Datenverarbeitung, nicht in der Oberfläche:
+
+- `ranked()` in `lib/kpis.ts` filtert gemeinsame Meldungen heraus. Podium, Tabelle, Tagesgewinner und Monatsplatzierungen gehen alle durch diese Funktion, damit gibt es keinen Weg daran vorbei. `DailyLeader.people` enthält folglich nur Personen.
+- `aggregate()` bleibt unverändert und ist die einzige Stelle, an der gemeinsame Meldungen mitzählen — genau einmal, zur Gesamtleistung der Crew.
+- `summarizeRankingMonth` zählt `profiles` (Personen) und `joint` (gemeinsame Meldungen) getrennt. Zwei gemeinsame Meldungen sind nicht zwei zusätzliche Personen.
+- `searchProfiles` liefert nur `kind='person'`. `profileForSelection`, `startRequest` (über die Auswahl), die Teamfreigabe in `decideRequest` unter der Zeilensperre und `issueClaim` weisen gemeinsame Meldungen über `refusePersonalUse` ab. Fehlt die Spalte in einer Abfrage, bricht die Prüfung ab, statt stillschweigend durchzulassen.
+- Der Import kennt die Spalte `kind` (CSV und JSON, Vorgabe `person`). Ein `joint`-Datensatz wird zugleich aus der Profilsuche genommen.
+
+Die Oberfläche zeigt gemeinsame Meldungen weiterhin, aber außerhalb der Rangliste in einem eigenen Block „Gemeinsam gemeldet", ohne Rang und ohne Übernahmeknopf.
+
+Wenn später belegte Einzelwerte vorliegen, ersetzt beziehungsweise verrechnet der Import die zugehörige gemeinsame Meldung. Teamgesamtstand und dieselben Einzelwerte dürfen nie zusätzlich nebeneinander in die Gruppensumme laufen.
+
+## Mobile Darstellung
+
+Die Zahlenansicht kommt ohne seitliches Schieben aus; `overflow-x: hidden` als Notlösung gibt es nicht.
+
+- Die Rangliste ist eine Liste (`.rr-rank-list`), keine Tabelle: Rang, Name und Wert in einer Zeile, der Leistungsbalken darunter über die volle Breite. Lange Namen brechen um.
+- Das Podium stellt auf schmalen Geräten Platz 1 quer und prominent dar, Platz 2 und 3 kompakt darunter.
+- Die Gruppen-KPIs stehen in einem 2×2-Raster; die Zahlengröße wächst mit der Breite (`clamp`), damit auch lange Zahlen vollständig sichtbar bleiben.
+- Kennzahl- und Zeitraumwahl brechen um, statt seitlich zu scrollen.
+- Die Check-in-Historie im Mitgliedsbereich besteht aus Tageskarten (`.checkin-cards`): oben Datum und Bearbeiten, darunter die Kennzahlen im Raster, Energie und Reflexion in der Karte aufklappbar.
+
+Geprüft mit Playwright auf 280, 320, 360, 390, 430 und 1280 Pixeln — je Element auf eigenes horizontales Scrollen, Hinausragen und abgeschnittenen Text, auch in Monatsansicht, geöffnetem Archiv, Profil-Dialog und Suche sowie mit einem 48 Zeichen langen Namen und siebenstelligen Werten. Die Prüfung bricht ab, wenn das CSS nicht geladen ist, damit eine ungestylte Seite nicht als sauber durchgeht.

@@ -17,6 +17,15 @@ Nur das neue bestätigte Projekt in der Organisation Deal Operator verwenden. Da
 
 Nach späteren Schemaerweiterungen müssen Tabellenrechte und die Serverpolicy bewusst mitgeführt werden. Die Erstinstallationsdateien sind keine automatisch wiederholbaren Migrationen.
 
+### Nachträgliche Migrationen
+
+Für eine bestehende Installation liegen die Nachträge unter `database/migrations/` und werden einmalig in dieser Reihenfolge als Projektadministrator ausgeführt:
+
+1. `0001_onboarding_requests.sql` und danach `0001_onboarding_requests_grants.sql` (neue Tabellen brauchen Rechte und Policy ausdrücklich).
+2. `0002_participant_kind.sql` — fügt `participants.kind` hinzu und markiert die beiden bestehenden gemeinsamen Meldungen. Rein additiv, mit Vorgabewert `person`, deshalb ohne Rechte-Nachtrag: die tabellenweiten Rechte aus `runtime-role.sql` decken neue Spalten ab.
+
+`0002` ist am 22.09.2026 auf der produktiven Datenbank angewendet worden.
+
 ## 2. Coolify-Anwendung
 
 - Quelle: `HKGrowthOperator/Dealoperator`, Branch `main`.
