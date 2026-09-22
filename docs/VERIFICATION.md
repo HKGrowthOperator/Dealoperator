@@ -5,7 +5,7 @@ Stand: 22. September 2026.
 | Prüfung | Ergebnis |
 |---|---|
 | ESLint | Bestanden |
-| 35 fachliche Tests mit isolierter PGlite-Datenbank | 35 bestanden, 0 fehlgeschlagen |
+| 36 lokale Tests, davon 30 fachliche mit isolierter PGlite-Datenbank | 36 bestanden, 0 fehlgeschlagen |
 | Next.js Produktionsbuild einschließlich TypeScript | Bestanden |
 | Start des gebauten Standalone-Pakets | Bestanden |
 | Öffentliche Seiten, Demo-Seiten und lokal ausgelieferte Assets | HTTP-Prüfungen bestanden |

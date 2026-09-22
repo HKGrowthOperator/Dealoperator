@@ -64,14 +64,26 @@ export function connectionOptions(
       "DATABASE_SSL=disable ist ausschließlich für eine lokale Datenbank erlaubt.",
     );
   // node-postgres merges connection-string parameters over the sibling options
-  // below, so "ssl" would silently turn off the verified TLS built here and
-  // "options" would silently replace the session search_path. Both are refused
-  // loudly instead of stripped, so the connection string is corrected rather
-  // than quietly reinterpreted.
-  for (const key of ["ssl", "options"])
+  // below, and over the URL's own host, port and credentials. A query parameter
+  // could therefore switch off the verified TLS built here, replace the session
+  // search_path, or send the connection somewhere other than the address these
+  // checks just validated. They are refused loudly instead of stripped, so the
+  // connection string is corrected rather than quietly reinterpreted.
+  for (const key of [
+    "ssl",
+    "sslnegotiation",
+    "options",
+    "host",
+    "hostaddr",
+    "port",
+    "dbname",
+    "database",
+    "user",
+    "password",
+  ])
     if (url.searchParams.has(key))
       throw Error(
-        `DATABASE_URL darf keinen ${key}-Parameter enthalten. TLS und Suchpfad setzt der Server selbst.`,
+        `DATABASE_URL darf keinen ${key}-Parameter enthalten. Adresse, Zugangsdaten, TLS und Suchpfad setzt der Server selbst.`,
       );
   // URL ssl options otherwise override pg's verified TLS configuration.
   for (const key of [

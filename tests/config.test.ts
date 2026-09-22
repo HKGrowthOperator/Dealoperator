@@ -44,6 +44,34 @@ test("connection string cannot switch off TLS or reroute the search path", () =>
       }),
     /options-Parameter/,
   );
+  // The same precedence lets host/port/user reroute the connection past the
+  // checks above, so a loopback-looking URL could reach a remote host with
+  // DATABASE_SSL=disable, or slip back onto the transaction pooler.
+  assert.throws(
+    () =>
+      connectionOptions({
+        DATABASE_URL:
+          "postgresql://app:example@localhost:5432/postgres?host=remote.example.invalid",
+        DATABASE_SSL: "disable",
+      }),
+    /host-Parameter/,
+  );
+  assert.throws(
+    () =>
+      connectionOptions({
+        DATABASE_URL:
+          "postgresql://app:example@db.example.invalid:5432/postgres?port=6543",
+      }),
+    /port-Parameter/,
+  );
+  assert.throws(
+    () =>
+      connectionOptions({
+        DATABASE_URL:
+          "postgresql://app:example@db.example.invalid:5432/postgres?user=postgres",
+      }),
+    /user-Parameter/,
+  );
   // A refused connection string is reported as a configuration issue rather
   // than surfacing later as a missing-table error.
   assert.ok(

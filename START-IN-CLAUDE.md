@@ -34,4 +34,4 @@ Lies zuerst `README.md`, `docs/DEPLOYMENT.md`, `docs/ACCEPTANCE.md` und `docs/DI
 
 Next.js 16, React 19, Node 22, PostgreSQL über `pg`, Supabase Auth über `@supabase/ssr`. Die Anwendungsdaten liegen im privaten Schema `operator`. Nur die serverseitige Datenbankrolle erhält Zugriff; Eigentumsprüfungen liegen in den API-Anwendungsfällen. Kein `service_role` im Browser. Keine lokalen Demo-Daten als Produktionsspeicher verwenden.
 
-`/api/health` ist ein Prozesscheck, `/api/ready` prüft Konfiguration und Datenbank. Keiner dieser Checks bestätigt alleine funktionierenden Mailversand oder einen Discord-Bot. Die 35 lokalen Tests und der Produktions-Smoke-Test ersetzen die echte Abnahme nach dem Anschließen externer Dienste nicht.
+`/api/health` ist ein Prozesscheck, `/api/ready` prüft Konfiguration und Datenbank. Keiner dieser Checks bestätigt alleine funktionierenden Mailversand oder einen Discord-Bot. Die 36 lokalen Tests und der Produktions-Smoke-Test ersetzen die echte Abnahme nach dem Anschließen externer Dienste nicht.
