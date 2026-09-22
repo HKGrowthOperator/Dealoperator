@@ -2,7 +2,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Copy, Download, FileUp } from "lucide-react";
-import { berlinDate, metrics, parseImport, type ImportRow } from "@/lib/kpis";
+import {
+  berlinDate,
+  visibleMetrics as metrics,
+  parseImport,
+  type ImportRow,
+} from "@/lib/kpis";
 type ImportPreview = {
   key: string;
   revision: number;
@@ -30,7 +35,7 @@ function template() {
     "participantKey;name;company;role;email;date;" +
       metrics.join(";") +
       ";publicConsent",
-    `beispiel-alex;Alex · Beispiel;Beispielfirma;Sales;;${berlinDate()};100;20;5;3;3;2;1;;false`,
+    `beispiel-alex;Alex · Beispiel;Beispielfirma;Sales;;${berlinDate()};100;5;3;3;2;1;false`,
   ].join("\n");
 }
 export default function ImportConsole({

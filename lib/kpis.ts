@@ -35,10 +35,13 @@ export const shortMetricLabels: Record<PublicMetric, string> = {
   closingsHeld: "Closings gehalten",
   dealsWon: "Deals",
 };
+// Public views and exports share the verified metric selection.
+export const visibleMetrics = [...publicMetrics];
+export type VisibleMetric = PublicMetric;
 export const numberSchema = z.number().int().min(0).max(100000).nullable();
 export const countsSchema = z.object({
   attempts: numberSchema,
-  decisionMakerConversations: numberSchema,
+  decisionMakerConversations: numberSchema.default(null),
   settingsBooked: numberSchema,
   settingsHeld: numberSchema,
   closingsBooked: numberSchema,

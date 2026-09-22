@@ -6,7 +6,7 @@ import {
   aggregate,
   emptyCounts,
   metricLabels,
-  metrics,
+  visibleMetrics as metrics,
   type Metric,
 } from "@/lib/kpis";
 import CheckinEditor from "./features/checkin-editor";
@@ -1644,10 +1644,6 @@ export default function CommunityApp({
                                 <strong>{m.latest.attempts}</strong>Versuche
                               </span>
                               <span>
-                                <strong>{m.latest.conversations}</strong>
-                                Gespräche
-                              </span>
-                              <span>
                                 <strong>{m.latest.meetings}</strong>Termine
                               </span>
                               <small>
@@ -2108,7 +2104,7 @@ export default function CommunityApp({
                     {[
                       [
                         "Zahlen & Fortschritt",
-                        "Tracke deine eigenen Versuche, Gespräche und Termine.",
+                        "Tracke deine eigenen Anwahlen, Termine und Deals.",
                       ],
                       [
                         "Tägliche Reflexion",
@@ -2551,9 +2547,6 @@ export default function CommunityApp({
                   <div>
                     <span>
                       <strong>{member.latest.attempts}</strong>Versuche
-                    </span>
-                    <span>
-                      <strong>{member.latest.conversations}</strong>Gespräche
                     </span>
                     <span>
                       <strong>{member.latest.meetings}</strong>Termine

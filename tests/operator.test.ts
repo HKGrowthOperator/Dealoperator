@@ -283,10 +283,10 @@ test("two competing requests stay visible and exactly one wins the profile", asy
   const rows = await db.query(
     "SELECT id,status FROM onboarding_requests ORDER BY created_at",
   );
-  assert.deepEqual(
-    rows.map((r: any) => r.status).sort(),
-    ["approved", "superseded"],
-  );
+  assert.deepEqual(rows.map((r: any) => r.status).sort(), [
+    "approved",
+    "superseded",
+  ]);
   assert.equal((await ownState(db, alice)).participant.id, id);
   assert.equal((await ownState(db, bob)).participant, null);
 });
@@ -346,8 +346,11 @@ test("an invitation only unlocks selection and still needs the team", async () =
   assert.equal((await ownState(db, bob)).records[0].counts.attempts, 100);
   // Nach der Freigabe ist der Code verbraucht.
   assert.equal(
-    (await db.query("SELECT used_at FROM claim_tokens WHERE participant=$1", [id]))[0]
-      .used_at !== null,
+    (
+      await db.query("SELECT used_at FROM claim_tokens WHERE participant=$1", [
+        id,
+      ])
+    )[0].used_at !== null,
     true,
   );
 });
@@ -720,7 +723,10 @@ test("an open takeover request blocks a second empty profile", async () => {
     }),
     /wird gerade geprüft/,
   );
-  await assert.rejects(saveCheckin(db, alice, checkin()), /wird gerade geprüft/);
+  await assert.rejects(
+    saveCheckin(db, alice, checkin()),
+    /wird gerade geprüft/,
+  );
   assert.equal(
     (await db.query("SELECT count(*)::int AS n FROM participants"))[0].n,
     1,
@@ -899,4 +905,109 @@ test("the selection step exposes the team marker but never contact data", async 
   ]);
   // Das Teamprofil bleibt bei der Übernahme als solches erkennbar.
   assert.match(String(profile.role), /^Team/);
+});
+
+test("month history separates daily winners from monthly totals and excludes other months/private profiles", async () => {
+  const { publicRankingMonth } = await import("../server/ranking-history");
+  await imported([
+    row({
+      date: "2026-08-30",
+      counts: { ...emptyCounts(), attempts: 100, settingsBooked: 2 },
+    }),
+    row({ date: "2026-08-31", counts: { ...emptyCounts(), attempts: 20 } }),
+    row({ date: "2026-07-31", counts: { ...emptyCounts(), attempts: 9000 } }),
+    row({
+      participantKey: "bob-import",
+      name: "Bob Beispiel",
+      email: "",
+      date: "2026-08-30",
+      counts: { ...emptyCounts(), attempts: 50 },
+    }),
+    row({
+      participantKey: "bob-import",
+      name: "Bob Beispiel",
+      email: "",
+      date: "2026-08-31",
+      counts: { ...emptyCounts(), attempts: 80, settingsBooked: 0 },
+    }),
+    row({
+      participantKey: "private-import",
+      name: "Private Person",
+      date: "2026-08-30",
+      publicConsent: false,
+      counts: { ...emptyCounts(), attempts: 9999 },
+    }),
+  ]);
+  const month = await publicRankingMonth(db, "2026-08");
+  assert.equal(month.rows.length, 2);
+  assert.deepEqual(
+    month.days.map((day) => day.counts.attempts),
+    [150, 100],
+  );
+  assert.equal(aggregate(month.rows.map((r) => r.counts)).attempts, 250);
+  assert.equal(ranked(month.rows, "attempts")[0].name, "Bob Beispiel");
+  assert.deepEqual(
+    month.days.map((day) => day.leaders.attempts?.people[0].name),
+    ["Alice Beispiel", "Bob Beispiel"],
+  );
+  assert.deepEqual(
+    month.days.map((day) => day.counts.settingsBooked),
+    [2, 0],
+  );
+  assert.equal(
+    month.days[1].leaders.settingsBooked,
+    null,
+    "A zero isn't celebrated as a win",
+  );
+  assert.ok(month.days.every((day) => day.counts.dealsWon === null));
+  for (const field of [
+    "email",
+    "phone",
+    "reflection",
+    "import_key",
+    "Private Person",
+  ])
+    assert.ok(!JSON.stringify(month).includes(field));
+  assert.ok(
+    month.rows.every((r) => r.counts.decisionMakerConversations === null),
+  );
+  const daily = await publicRankingMonth(db, "2026-08", "2026-08-30");
+  assert.equal(aggregate(daily.rows.map((r) => r.counts)).attempts, 150);
+  assert.equal(
+    daily.days.length,
+    2,
+    "Daily view still offers the month's archive",
+  );
+  assert.deepEqual(
+    (await publicRankingMonth(db, "2026-08", "2026-08-29")).rows,
+    [],
+  );
+});
+
+test("daily corrections replace prior values, team totals count once and ties retain all winners", async () => {
+  const { publicRankingMonth } = await import("../server/ranking-history");
+  const team = row({
+    participantKey: "team-a",
+    name: "Myran und Baris",
+    role: "Team · Myran und Baris",
+    email: "",
+    date: "2026-08-30",
+    counts: { ...emptyCounts(), attempts: 150 },
+  });
+  await imported([
+    team,
+    row({ date: "2026-08-30", counts: { ...emptyCounts(), attempts: 300 } }),
+  ]);
+  await imported([{ ...team, counts: { ...emptyCounts(), attempts: 300 } }]);
+  const month = await publicRankingMonth(db, "2026-08");
+  assert.equal(month.days.length, 1);
+  assert.equal(month.days[0].counts.attempts, 600);
+  assert.equal(month.days[0].profiles, 2);
+  assert.equal(month.days[0].leaders.attempts?.people.length, 2);
+  assert.equal(
+    month.days[0].leaders.attempts?.people.filter((p) => p.team).length,
+    1,
+  );
+  assert.equal(month.rows.length, 2);
+  assert.deepEqual((await publicRankingMonth(db, "2026-06")).days, []);
 });
