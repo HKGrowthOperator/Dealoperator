@@ -6,6 +6,7 @@ import {
   aggregate,
   emptyCounts,
   metricLabels,
+  shortMetricLabels,
   visibleMetrics as metrics,
   type Metric,
 } from "@/lib/kpis";
@@ -1457,57 +1458,88 @@ export default function CommunityApp({
                       <Tag>{data.records.length} Einträge</Tag>
                     </div>
                     {data.records.length ? (
-                      <div className="table-scroll">
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Datum</th>
-                              {metrics.map((k) => (
-                                <th key={k}>{metricLabels[k]}</th>
-                              ))}
-                              <th>Energie</th>
-                              <th>
-                                <span className="sr-only">Bearbeiten</span>
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[...data.records]
-                              .sort((a, b) => b.date.localeCompare(a.date))
-                              .map((r) => {
-                                const c = r.counts || {
-                                  ...emptyCounts(),
-                                  attempts: r.attempts,
-                                  legacyMeetings: r.meetings,
-                                };
-                                return (
-                                  <tr key={r.date}>
-                                    <td>
-                                      {prettyDate(r.date)}{" "}
-                                      {r.date === dateKey() && (
-                                        <Tag tone="green">Heute</Tag>
-                                      )}
-                                    </td>
-                                    {metrics.map((k) => (
-                                      <td key={k}>{c[k] ?? "—"}</td>
-                                    ))}
-                                    <td>{r.energy}/10</td>
-                                    <td>
-                                      <button
-                                        className="icon-button"
-                                        aria-label={`Eintrag vom ${prettyDate(r.date)} bearbeiten`}
-                                        onClick={() => {
-                                          setRecord(r);
-                                          setModal("reflection");
-                                        }}
-                                      ></button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                          </tbody>
-                        </table>
-                      </div>
+                      <ul className="checkin-cards">
+                        {[...data.records]
+                          .sort((a, b) => b.date.localeCompare(a.date))
+                          .map((r) => {
+                            const c = r.counts || {
+                              ...emptyCounts(),
+                              attempts: r.attempts,
+                              legacyMeetings: r.meetings,
+                            };
+                            const notes = [r.win, r.next, r.help].filter(
+                              Boolean,
+                            );
+                            return (
+                              <li className="checkin-card" key={r.date}>
+                                <div className="checkin-card-top">
+                                  <div>
+                                    <strong>{prettyDate(r.date)}</strong>
+                                    {r.date === dateKey() && (
+                                      <Tag tone="green">Heute</Tag>
+                                    )}
+                                  </div>
+                                  <button
+                                    className="btn secondary"
+                                    onClick={() => {
+                                      setRecord(r);
+                                      setModal("reflection");
+                                    }}
+                                  >
+                                    <Settings2 size={15} />
+                                    Bearbeiten
+                                  </button>
+                                </div>
+                                <dl className="checkin-card-kpis">
+                                  {metrics.map((k) => (
+                                    <div key={k}>
+                                      <dt>{shortMetricLabels[k]}</dt>
+                                      <dd>{c[k] ?? "—"}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                                <details className="checkin-card-more">
+                                  <summary>
+                                    Energie {r.energy}/10
+                                    {notes.length
+                                      ? ` · ${notes.length} ${notes.length === 1 ? "Notiz" : "Notizen"}`
+                                      : ""}
+                                  </summary>
+                                  <div>
+                                    <Progress value={(r.energy ?? 0) * 10} />
+                                    {notes.length ? (
+                                      <>
+                                        {r.win && (
+                                          <p>
+                                            <span>Lief gut</span>
+                                            {r.win}
+                                          </p>
+                                        )}
+                                        {r.next && (
+                                          <p>
+                                            <span>Nächster Schritt</span>
+                                            {r.next}
+                                          </p>
+                                        )}
+                                        {r.help && (
+                                          <p>
+                                            <span>Unterstützung</span>
+                                            {r.help}
+                                          </p>
+                                        )}
+                                      </>
+                                    ) : (
+                                      <p className="hint">
+                                        Für diesen Tag ist keine Reflexion
+                                        hinterlegt.
+                                      </p>
+                                    )}
+                                  </div>
+                                </details>
+                              </li>
+                            );
+                          })}
+                      </ul>
                     ) : (
                       <Empty
                         icon={BarChart3}

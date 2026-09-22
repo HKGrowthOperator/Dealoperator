@@ -20,9 +20,11 @@ import {
   aggregate,
   berlinDate,
   daySchema,
+  isJoint,
   metricLabels,
   visibleMetrics,
   ranked,
+  soloRows,
   type VisibleMetric,
 } from "@/lib/kpis";
 import {
@@ -96,11 +98,15 @@ export default function RankingBoard({
   const loading = !current;
   const error = current?.error || "";
   const rows = useMemo(() => data?.rows || [], [data]);
+  // ranked() lässt gemeinsame Meldungen nicht antreten. Die Gesamtleistung
+  // rechnet weiter mit allen Zeilen, damit jede Meldung genau einmal zählt.
   const all = useMemo(() => ranked(rows, metric), [rows, metric]);
   const totals = useMemo(
     () => aggregate(rows.map((row) => row.counts)),
     [rows],
   );
+  const joint = useMemo(() => rows.filter(isJoint), [rows]);
+  const people = useMemo(() => soloRows(rows), [rows]);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const filtered = all.filter((row) =>
     `${row.name} ${row.company} ${row.role}`
@@ -109,7 +115,6 @@ export default function RankingBoard({
   );
   const podium = all.filter((row) => (row.counts[metric] ?? 0) > 0).slice(0, 3);
   const best = all[0]?.counts[metric] ?? 0;
-  const teamCount = rows.filter((row) => row.role.startsWith("Team")).length;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
   const event = !monthly && day === AKQUISE_DAY;
   const newest = rows.reduce(
@@ -199,13 +204,11 @@ export default function RankingBoard({
         <section className="rr-intro">
           <div>
             <span className="rr-eyebrow">
-              <span className="rr-live-dot" /> DIE CREW. DIE ZAHLEN. DER
-              FORTSCHRITT.
+              <span className="rr-live-dot" /> DIE CREW. DIE ZAHLEN.
             </span>
             <h1>
               Gemeinsam <em>abliefern.</em>
             </h1>
-            <p>Jeder Call zählt. Hier siehst du, was wir zusammen bewegen.</p>
           </div>
           <Link href="/beitreten" className="rr-profile-link">
             <ShieldCheck size={18} />
@@ -373,12 +376,14 @@ export default function RankingBoard({
                   </div>
                   <div>
                     <span>
-                      <Users size={18} /> Profile am Start
+                      <Users size={18} /> Am Start
                     </span>
-                    <strong>{fmt(rows.length)}</strong>
+                    <strong>{fmt(people.length)}</strong>
                     <small>
-                      {rows.length - teamCount} Einzelprofile
-                      {teamCount > 0 ? ` · ${teamCount} Teams` : ""}
+                      {people.length === 1 ? "Person" : "Personen"}
+                      {joint.length > 0
+                        ? ` · ${joint.length} gemeinsame ${joint.length === 1 ? "Meldung" : "Meldungen"}`
+                        : ""}
                     </small>
                   </div>
                 </div>
@@ -453,7 +458,6 @@ export default function RankingBoard({
                   <span>
                     Sortiert nach <strong>{metricLabels[metric]}</strong>
                   </span>
-                  <span>Gleiche Leistung, gleicher Rang.</span>
                 </div>
                 {podium.length > 0 && (
                   <div
@@ -478,23 +482,23 @@ export default function RankingBoard({
                             )}{" "}
                             PLATZ {row.rank}
                           </span>
-                          {row.role.startsWith("Team") && <small>TEAM</small>}
                         </div>
                         <span className="rr-podium-avatar">
                           {initials(row.name)}
-                          {row.rank === 1 && <Trophy size={12} />}
                         </span>
-                        <h3>{row.name}</h3>
-                        <span className="rr-podium-role">
-                          {row.role.startsWith("Team")
-                            ? "Gemeinsam gemeldete Leistung"
-                            : row.company || "Teil der Crew"}
+                        <span className="rr-podium-person">
+                          <h3>{row.name}</h3>
+                          <span className="rr-podium-role">
+                            {row.company || "Teil der Crew"}
+                          </span>
                         </span>
-                        <strong className="rr-podium-value">
-                          {fmt(row.counts[metric])}
-                        </strong>
-                        <span className="rr-podium-metric">
-                          {metricShortLabels[metric]}
+                        <span className="rr-podium-score">
+                          <strong className="rr-podium-value">
+                            {fmt(row.counts[metric])}
+                          </strong>
+                          <span className="rr-podium-metric">
+                            {metricShortLabels[metric]}
+                          </span>
                         </span>
                       </button>
                     ))}
@@ -504,7 +508,7 @@ export default function RankingBoard({
                   <div className="rr-leaderboard rr-glass">
                     <div className="rr-list-top">
                       <h3>
-                        Die ganze Crew <span>{rows.length}</span>
+                        Die ganze Crew <span>{people.length}</span>
                       </h3>
                       <label className="rr-search">
                         <Search size={17} />
@@ -525,84 +529,64 @@ export default function RankingBoard({
                       </label>
                     </div>
                     {filtered.length ? (
-                      <div className="rr-table-wrap">
-                        <table className="rr-table">
-                          <thead>
-                            <tr>
-                              <th>Rang</th>
-                              <th>Operator</th>
-                              <th>{metricShortLabels[metric]}</th>
-                            </tr>
-                          </thead>
-                          <tbody key={`${requestKey}-${metric}`}>
-                            {filtered.map((row, index) => (
-                              <tr
-                                key={row.id}
-                                data-place={row.rank ?? undefined}
-                                style={
-                                  {
-                                    "--row-delay": `${Math.min(index, 10) * 20}ms`,
-                                  } as CSSProperties
-                                }
-                              >
-                                <td>
-                                  <span className="rr-place">
-                                    {row.rank ?? "—"}
-                                  </span>
-                                </td>
-                                <td>
-                                  <button
-                                    className="rr-person"
-                                    onClick={() => setSelectedId(row.id)}
-                                  >
-                                    <span className="rr-avatar">
-                                      {initials(row.name)}
-                                    </span>
-                                    <span>
-                                      <strong>
-                                        {row.name}
-                                        {row.claimed && (
-                                          <ShieldCheck
-                                            size={13}
-                                            aria-label="Profil übernommen"
-                                          />
-                                        )}
-                                      </strong>
-                                      <small>
-                                        {row.role.startsWith("Team")
-                                          ? "Teamprofil"
-                                          : row.company ||
-                                            (row.claimed
-                                              ? "Teil der Crew"
-                                              : "Profil vorbereitet")}
-                                      </small>
-                                    </span>
-                                  </button>
-                                </td>
-                                <td>
-                                  <strong className="rr-table-value">
-                                    {fmt(row.counts[metric])}
-                                  </strong>
-                                  <span
-                                    className="rr-progress"
-                                    aria-hidden="true"
-                                  >
-                                    <i
-                                      style={{
-                                        width:
-                                          best > 0 &&
-                                          row.counts[metric] !== null
-                                            ? `${(row.counts[metric]! / best) * 100}%`
-                                            : "0%",
-                                      }}
+                      <ol
+                        className="rr-rank-list"
+                        key={`${requestKey}-${metric}`}
+                        aria-label={`Rangliste nach ${metricLabels[metric]}`}
+                      >
+                        {filtered.map((row, index) => (
+                          <li
+                            key={row.id}
+                            data-place={row.rank ?? undefined}
+                            style={
+                              {
+                                "--row-delay": `${Math.min(index, 12) * 22}ms`,
+                              } as CSSProperties
+                            }
+                          >
+                            <button
+                              className="rr-rank-row"
+                              onClick={() => setSelectedId(row.id)}
+                              aria-label={`${row.name}, Platz ${row.rank ?? "offen"}, ${fmt(row.counts[metric])} ${metricShortLabels[metric]}`}
+                            >
+                              <span className="rr-place">
+                                {row.rank ?? "—"}
+                              </span>
+                              <span className="rr-rank-name">
+                                <strong>
+                                  {row.name}
+                                  {row.claimed && (
+                                    <ShieldCheck
+                                      size={13}
+                                      aria-label="Profil übernommen"
                                     />
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                                  )}
+                                </strong>
+                                <small>
+                                  {row.company ||
+                                    (row.claimed
+                                      ? "Teil der Crew"
+                                      : "Profil vorbereitet")}
+                                </small>
+                              </span>
+                              <span className="rr-rank-value">
+                                <strong>{fmt(row.counts[metric])}</strong>
+                                <small>{metricShortLabels[metric]}</small>
+                              </span>
+                              <span className="rr-progress" aria-hidden="true">
+                                <i
+                                  style={{
+                                    width:
+                                      best > 0 && row.counts[metric] !== null
+                                        ? `${(row.counts[metric]! / best) * 100}%`
+                                        : "0%",
+                                  }}
+                                />
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ol>
                     ) : (
                       <div className="rr-empty">
                         <Phone size={27} />
@@ -623,9 +607,33 @@ export default function RankingBoard({
                         )}
                       </div>
                     )}
+                    {joint.length > 0 && (
+                      <div className="rr-joint">
+                        <div className="rr-joint-head">
+                          <h4>Gemeinsam gemeldet</h4>
+                          <span>Zählt zur Crew, nicht zum Einzelrang</span>
+                        </div>
+                        <ul>
+                          {joint.map((row) => (
+                            <li key={row.id}>
+                              <button onClick={() => setSelectedId(row.id)}>
+                                <Users size={15} />
+                                <span>{row.name}</span>
+                                <strong>{fmt(row.counts[metric])}</strong>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                        <p>
+                          Eine gemeinsam erbrachte Leistung tritt nicht gegen
+                          einzelne Personen an. Sie zählt genau einmal zur
+                          Gesamtleistung der Crew.
+                        </p>
+                      </div>
+                    )}
                     <div className="rr-table-caption">
                       <span>— = nicht gemeldet · 0 = ausdrücklich keine</span>
-                      <span>Teamwerte zählen einmal.</span>
+                      <span>Gleiche Werte teilen sich einen Rang.</span>
                     </div>
                     {newest && (
                       <p className="rr-data-updated">
@@ -747,8 +755,8 @@ export default function RankingBoard({
           <DialogHeader>
             <DialogTitle>{selected?.name}</DialogTitle>
             <DialogDescription>
-              {selected?.role.startsWith("Team")
-                ? "Gemeinsam gemeldete Teamleistung"
+              {selected && isJoint(selected)
+                ? "Gemeinsam gemeldete Leistung mehrerer Personen"
                 : selected?.company || "Teil der Deal Operator Crew"}
             </DialogDescription>
           </DialogHeader>
@@ -773,14 +781,22 @@ export default function RankingBoard({
                 Werte teilen sich einen Rang. Nicht gemeldete Kennzahlen bleiben
                 offen.
               </p>
-              {!selected.claimed && (
-                <Link
-                  className="btn primary"
-                  href={`/beitreten?profil=${encodeURIComponent(selected.id)}`}
-                >
-                  <Check size={17} />
-                  Das sind meine Zahlen
-                </Link>
+              {isJoint(selected) ? (
+                <p className="hint">
+                  Diese Meldung gehört mehreren Personen und lässt sich nicht
+                  als persönliches Profil übernehmen. Melde dich mit deinen
+                  eigenen Zahlen an.
+                </p>
+              ) : (
+                !selected.claimed && (
+                  <Link
+                    className="btn primary"
+                    href={`/beitreten?profil=${encodeURIComponent(selected.id)}`}
+                  >
+                    <Check size={17} />
+                    Das sind meine Zahlen
+                  </Link>
+                )
               )}
             </>
           )}
