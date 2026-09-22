@@ -1154,17 +1154,17 @@ export default function CommunityApp({
                     />
                     <Stat
                       onClick={openMetrics}
-                      icon={MessageCircle}
-                      label="Entscheidergespräche"
-                      value={metricTotal("decisionMakerConversations")}
-                      note="Jedes Gespräch bringt dich weiter."
-                    />
-                    <Stat
-                      onClick={openMetrics}
                       icon={CalendarDays}
                       label="Settings vereinbart"
                       value={metricTotal("settingsBooked")}
-                      note="Aus Gesprächen werden nächste Schritte."
+                      note="Aus Anwahlen werden nächste Schritte."
+                    />
+                    <Stat
+                      onClick={openMetrics}
+                      icon={CheckCheck}
+                      label="Settings gehalten"
+                      value={metricTotal("settingsHeld")}
+                      note="Termine, die wirklich stattgefunden haben."
                     />
                   </div>
                   <div className="dashboard-grid">

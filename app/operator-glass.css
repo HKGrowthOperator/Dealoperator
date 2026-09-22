@@ -634,3 +634,104 @@ tbody tr[data-rank="3"] .rank-place {
   margin: 0;
   color: #7c3b40;
 }
+
+/* Rechtliche Seiten: bewusst schmal und ruhig, wie auf der Hauptseite. */
+.legal-layout {
+  width: min(720px, 100% - 32px);
+  margin-inline: auto;
+  padding-block: 56px 72px;
+  color: #123765;
+}
+.legal-layout h1 {
+  font-size: clamp(1.9rem, 4vw, 2.5rem);
+  margin: 8px 0 12px;
+  letter-spacing: -0.02em;
+}
+.legal-layout h2 {
+  font-size: 1.02rem;
+  margin: 0 0 8px;
+  color: #123765;
+}
+.legal-layout section {
+  border-top: 1px solid #dde7f6;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.legal-layout p {
+  margin: 0 0 12px;
+  font-size: 0.95rem;
+  line-height: 1.72;
+  color: #44618a;
+}
+.legal-layout a {
+  color: #0755f5;
+}
+.legal-lead {
+  font-size: 1rem !important;
+  color: #58708e !important;
+}
+.legal-foot {
+  margin-top: 32px !important;
+  font-size: 0.86rem !important;
+  color: #7488a5 !important;
+}
+.legal-todo {
+  background: #fff4e2;
+  color: #8a5512;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 0.9em;
+}
+
+/* Rangliste: klarere Spitzenplätze, ruhigere Fläche, mehr Gewicht auf Zahl. */
+.ranking-section .ranking-heading {
+  align-items: center;
+}
+.crew-stats.group-performance {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+.ranking-card .rank-value {
+  font-size: 1.32rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.rank-place {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+tbody tr[data-rank="1"] .rank-value {
+  font-size: 1.5rem;
+  color: #8a6408;
+}
+tbody tr[data-rank] td {
+  padding-block: 15px;
+}
+tbody tr[data-rank]:hover {
+  background: #f2f8ff;
+}
+.rank-avatar {
+  box-shadow: inset 0 0 0 1px #ffffff80;
+}
+tbody tr[data-rank="1"] .rank-avatar {
+  background: linear-gradient(140deg, #f7d070, #e0a92c);
+  color: #4a3407;
+}
+.rank-bar {
+  height: 5px;
+  background: #e3ecf8;
+}
+tbody tr[data-rank="1"] .rank-bar::after {
+  background: linear-gradient(90deg, #e0a92c, #f7d070);
+}
+.metric-tabs button {
+  font-variant-numeric: tabular-nums;
+}
+/* Gestaffelter Aufbau: die Liste wächst von oben, ohne zu springen. */
+@media (prefers-reduced-motion: no-preference) {
+  tbody tr[data-rank="1"] { animation-delay: 0ms; }
+  tbody tr[data-rank="2"] { animation-delay: 40ms; }
+  tbody tr[data-rank="3"] { animation-delay: 80ms; }
+  tbody tr[data-rank="4"] { animation-delay: 110ms; }
+  tbody tr[data-rank="5"] { animation-delay: 135ms; }
+}

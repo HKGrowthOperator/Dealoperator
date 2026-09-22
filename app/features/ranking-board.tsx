@@ -17,8 +17,9 @@ import {
 import {
   berlinDate,
   metricLabels,
-  metrics,
+  publicMetrics,
   ranked,
+  shortMetricLabels,
   type Metric,
   type RankingRow,
 } from "@/lib/kpis";
@@ -209,10 +210,6 @@ export default function RankingBoard({
               <br />
               Dranbleiben sichtbar.
             </h1>
-            <p>
-              Ein ehrlicher Blick auf unsere Aktivität. Jede Kennzahl zählt für
-              sich.
-            </p>
           </section>
         )}
         <section id="ranking" className="ranking-section">
@@ -224,10 +221,6 @@ export default function RankingBoard({
                   ? "Das Community-Ranking."
                   : "Gemeinsam passiert mehr."}
               </h2>
-              <p>
-                Vergleiche Aktivität und Ergebnisse. Finde Menschen, mit denen
-                du weiterkommst.
-              </p>
             </div>
             {label && <span className="reported-badge">{label}</span>}
           </div>
@@ -285,30 +278,6 @@ export default function RankingBoard({
                     ? "Noch nicht gemeldet"
                     : `gemeldet von ${reported("dealsWon").length}`,
               },
-              {
-                icon: MessageCircle,
-                label: "Entscheidergespräche",
-                value: total("decisionMakerConversations"),
-                note: `gemeldet von ${reported("decisionMakerConversations").length}`,
-              },
-              {
-                icon: Check,
-                label: "Settings durchgeführt",
-                value: total("settingsHeld"),
-                note: `gemeldet von ${reported("settingsHeld").length}`,
-              },
-              {
-                icon: CalendarCheck,
-                label: "Closings durchgeführt",
-                value: total("closingsHeld"),
-                note: `gemeldet von ${reported("closingsHeld").length}`,
-              },
-              {
-                icon: CalendarCheck,
-                label: "Termine ohne Typangabe",
-                value: total("legacyMeetings"),
-                note: "Zusätzlich · Setting oder Closing noch offen",
-              },
             ].map((s) => (
               <div key={s.label}>
                 <span>
@@ -329,27 +298,14 @@ export default function RankingBoard({
                   role="group"
                   aria-label="Ranking-Kennzahl"
                 >
-                  {metrics.map((k) => (
+                  {publicMetrics.map((k) => (
                     <button
                       className={metric === k ? "active" : ""}
                       key={k}
                       aria-pressed={metric === k}
                       onClick={() => setMetric(k)}
                     >
-                      {
-                        (
-                          {
-                            attempts: "Calls",
-                            decisionMakerConversations: "Gespräche",
-                            settingsBooked: "Settings",
-                            settingsHeld: "Settings durchgeführt",
-                            closingsBooked: "Closings",
-                            closingsHeld: "Closings durchgeführt",
-                            dealsWon: "Deals",
-                            legacyMeetings: "Termine ohne Typangabe",
-                          } satisfies Record<Metric, string>
-                        )[k]
-                      }
+                      {shortMetricLabels[k]}
                     </button>
                   ))}
                 </div>
@@ -616,22 +572,13 @@ export default function RankingBoard({
                 · {from} bis {to}
               </div>
               <div className="profile-kpis">
-                {metrics
-                  .filter(
-                    (k) =>
-                      k !== "legacyMeetings" || selected.counts[k] !== null,
-                  )
-                  .map((k) => (
+                {publicMetrics.map((k) => (
                     <div key={k}>
                       <span>{metricLabels[k]}</span>
                       <strong>{fmt(selected.counts[k])}</strong>
                     </div>
                   ))}
               </div>
-              <p className="hint">
-                Ränge entstehen aus dem gesamten persönlichen Fortschritt. Diese
-                Ansicht zeigt nur den ausgewählten Zeitraum.
-              </p>
               {!selected.claimed && (
                 <Link
                   className="btn primary"

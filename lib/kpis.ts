@@ -11,6 +11,30 @@ export const metricLabels = {
 } as const;
 export type Metric = keyof typeof metricLabels;
 export const metrics = Object.keys(metricLabels) as Metric[];
+/**
+ * Kennzahlen, die öffentlich gezeigt werden.
+ *
+ * Entscheidergespräche und Termine ohne Typangabe sind bewusst NICHT dabei:
+ * beides wurde nicht verlässlich erfasst. Die Werte bleiben gespeichert und
+ * gehen nicht verloren — sie tragen nur keine öffentliche Aussage.
+ */
+export const publicMetrics = [
+  "attempts",
+  "settingsBooked",
+  "settingsHeld",
+  "closingsBooked",
+  "closingsHeld",
+  "dealsWon",
+] as const satisfies readonly Metric[];
+export type PublicMetric = (typeof publicMetrics)[number];
+export const shortMetricLabels: Record<PublicMetric, string> = {
+  attempts: "Calls",
+  settingsBooked: "Settings",
+  settingsHeld: "Settings gehalten",
+  closingsBooked: "Closings",
+  closingsHeld: "Closings gehalten",
+  dealsWon: "Deals",
+};
 export const numberSchema = z.number().int().min(0).max(100000).nullable();
 export const countsSchema = z.object({
   attempts: numberSchema,

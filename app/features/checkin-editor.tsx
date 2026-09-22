@@ -6,7 +6,7 @@ import {
   countsSchema,
   emptyCounts,
   metricLabels,
-  metrics,
+  publicMetrics,
 } from "@/lib/kpis";
 import type { RecordDay } from "../data";
 import { toast } from "sonner";
@@ -128,36 +128,30 @@ export default function CheckinEditor({
         />
       </label>
       <div className="checkin-fields">
-        {metrics
-          .filter(
-            (k) =>
-              k !== "legacyMeetings" || value.counts.legacyMeetings !== null,
-          )
-          .map((k) => (
-            <label key={k}>
-              {metricLabels[k]}
-              <input
-                aria-label={metricLabels[k]}
-                type="number"
-                min="0"
-                max="100000"
-                step="1"
-                inputMode="numeric"
-                value={value.counts[k] ?? ""}
-                placeholder="Nicht gemeldet"
-                onChange={(e) =>
-                  setValue((v) => ({
-                    ...v,
-                    counts: {
-                      ...v.counts,
-                      [k]:
-                        e.target.value === "" ? null : Number(e.target.value),
-                    },
-                  }))
-                }
-              />
-            </label>
-          ))}
+        {publicMetrics.map((k) => (
+          <label key={k}>
+            {metricLabels[k]}
+            <input
+              aria-label={metricLabels[k]}
+              type="number"
+              min="0"
+              max="100000"
+              step="1"
+              inputMode="numeric"
+              value={value.counts[k] ?? ""}
+              placeholder="Nicht gemeldet"
+              onChange={(e) =>
+                setValue((v) => ({
+                  ...v,
+                  counts: {
+                    ...v.counts,
+                    [k]: e.target.value === "" ? null : Number(e.target.value),
+                  },
+                }))
+              }
+            />
+          </label>
+        ))}
       </div>
       <p>
         Termine können aus früheren Gesprächen stammen. „Closings vereinbart“
