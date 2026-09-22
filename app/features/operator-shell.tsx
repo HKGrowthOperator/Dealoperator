@@ -35,6 +35,8 @@ export function OperatorFooter() {
       <div>
         <Link href="/community?modus=eigen">So funktioniert’s</Link>
         <Link href="/verwaltung">Verwaltung</Link>
+        <Link href="/impressum">Impressum</Link>
+        <Link href="/datenschutz">Datenschutz</Link>
       </div>
     </footer>
   );
