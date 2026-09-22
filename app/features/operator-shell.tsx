@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { Headphones } from "lucide-react";
 import OperatorWordmark from "./operator-wordmark";
-export function OperatorHeader() {
+import { DISCORD_INVITE } from "@/lib/discord";
+export function OperatorHeader({
+  discordUrl = DISCORD_INVITE,
+}: {
+  discordUrl?: string;
+}) {
   return (
     <header className="operator-header">
       <Link
@@ -13,7 +18,11 @@ export function OperatorHeader() {
       </Link>
       <nav aria-label="Hauptnavigation">
         <Link href="/ranking">Ranking</Link>
-        <Link href="/heute?modus=eigen">Community entdecken</Link>
+        {/* Führt direkt in den bestehenden Server. Kein zweiter Ort, an den
+            man erst beitreten müsste. */}
+        <a href={discordUrl} target="_blank" rel="noopener noreferrer">
+          Austausch auf Discord
+        </a>
         <Link className="btn primary" href="/beitreten">
           Kostenfrei mitmachen
         </Link>
