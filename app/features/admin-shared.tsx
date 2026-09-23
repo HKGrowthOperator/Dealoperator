@@ -81,6 +81,7 @@ export type NotificationStatus = {
     sentAt: string | null;
   }[];
 };
+export type ReviewKind = "person" | "day" | "value" | "unclear";
 export type ReviewCase = {
   id: string;
   day: string;
@@ -89,6 +90,17 @@ export type ReviewCase = {
   reason: string;
   status: string;
   created_at: string;
+  /** Art des Prüffalls; null bei älteren Prüffällen ohne gespeicherte Werte. */
+  kind: ReviewKind | null;
+  /** Gelesene Werte, die sich nach der Entscheidung übernehmen lassen. */
+  values: Partial<Counts>;
+  /** Bisheriger Wert bei einem Prüffall für eine einzelne Kennzahl. */
+  from: Partial<Counts> | null;
+  /** Wählbare Leistungstage; der erste ist der Vorschlag. */
+  days: string[];
+  participantId: string | null;
+  applicable: boolean;
+  aliasable: boolean;
 };
 export type DiscordPart = "link" | "posts" | "interactions" | "inventory";
 export type DiscordStatus = {
@@ -143,7 +155,9 @@ export type WinsAction =
   | "unverändert"
   | "übersprungen"
   | "prüffall"
-  | "ersetzt";
+  | "bekannt"
+  | "ersetzt"
+  | "ignoriert";
 export type WinsRow = {
   key: string | null;
   author: string;
@@ -159,6 +173,15 @@ export type WinsRow = {
   reasons: string[];
   notes: string[];
   excerpt: string;
+  review: {
+    kind: ReviewKind;
+    values: Partial<Counts>;
+    from: Partial<Counts> | null;
+    days: string[];
+    participantId: string | null;
+    applicable: boolean;
+    aliasable: boolean;
+  } | null;
 };
 export type WinsPreview = {
   rows: WinsRow[];

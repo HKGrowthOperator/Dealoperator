@@ -267,6 +267,16 @@ export async function discardDraft(db: Database, actor: Actor, raw: unknown) {
 // ---------------------------------------------------------------------------
 // Einreichen
 
+/**
+ * Ein Tag aus den Gruppenmeldungen (Wins-Import) füllt nur eine Lücke. Der
+ * eigene Tagesabschluss ersetzt ihn; umgekehrt überschreibt der Import nie
+ * einen eigenen Abschluss (server/wins-import.ts). Andere Importe (CSV,
+ * aufgeteilte Duo-Meldungen) bleiben kuratiert und gesperrt.
+ */
+export function replaceableImport(row: { origin?: string; source?: string }) {
+  return row.origin === "import" && row.source === "wins-import";
+}
+
 export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
   const v = submitSchema.parse(raw);
   if (v.day > berlinDate())
@@ -286,12 +296,13 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
         409,
       );
     const [old] = await tx.query(
-      "SELECT counts,reflection,revision,origin,first_submitted_at,discord_share,calls_documented_at FROM checkins WHERE participant=$1 AND day=$2 FOR UPDATE",
+      "SELECT counts,reflection,revision,origin,source,first_submitted_at,discord_share,calls_documented_at FROM checkins WHERE participant=$1 AND day=$2 FOR UPDATE",
       [participant, v.day],
     );
     // Kuratierte Importe (z. B. Akquise Day, aufgeteilte Duo-Meldungen) werden
-    // nie durch einen Abschluss ersetzt.
-    if (old && old.origin !== "closing")
+    // nie durch einen Abschluss ersetzt. Ein Tag aus den Gruppenmeldungen
+    // (Wins-Import) füllt nur eine Lücke: der eigene Abschluss ersetzt ihn.
+    if (old && old.origin !== "closing" && !replaceableImport(old))
       throw new AppError(
         "Für diesen Tag gibt es einen übernommenen Stand. Eine Korrektur dafür läuft über das Team.",
         409,
@@ -302,11 +313,14 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
         409,
       );
     // Termine ohne Typangabe und Entscheidergespräche nimmt das Formular
-    // nicht mehr an; vorhandene Werte (z. B. aus einem Import) bleiben stehen.
+    // nicht mehr an; vorhandene Werte eines früheren Abschlusses bleiben
+    // stehen. Ein ersetzter Import-Tag gibt keine Werte weiter: es gilt
+    // allein, was die Person selbst einreicht.
+    const kept = old?.origin === "closing" ? old.counts : null;
     const counts: Counts = {
       ...emptyCounts(),
-      decisionMakerConversations: old?.counts?.decisionMakerConversations ?? null,
-      legacyMeetings: old?.counts?.legacyMeetings ?? null,
+      decisionMakerConversations: kept?.decisionMakerConversations ?? null,
+      legacyMeetings: kept?.legacyMeetings ?? null,
       ...v.counts,
     };
     const reflection = v.reflection;
@@ -334,8 +348,9 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
          submitted_at=now(), updated_at=now(),
          -- Erste Dokumentation von Anrufen bleibt, auch über Korrekturen hinweg.
          calls_documented_at=COALESCE(checkins.calls_documented_at, CASE WHEN $7 THEN now() END),
-         first_submitted_at=checkins.first_submitted_at
-       WHERE checkins.origin='closing'
+         -- Ein ersetzter Import-Tag hat noch keine erste Einreichung.
+         first_submitted_at=COALESCE(checkins.first_submitted_at, excluded.first_submitted_at)
+       WHERE checkins.origin='closing' OR (checkins.origin='import' AND checkins.source='wins-import')
        RETURNING revision, first_submitted_at, submitted_at`,
       [participant, v.day, JSON.stringify(counts), JSON.stringify(reflection), revision, v.discord, (counts.attempts ?? 0) > 0],
     );
@@ -373,7 +388,7 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
 
 export async function ownClosings(db: Database, participant: string) {
   const rows = await db.query(
-    `SELECT day,counts,reflection,revision,origin,first_submitted_at,submitted_at,shared,discord_share,calls_documented_at
+    `SELECT day,counts,reflection,revision,origin,source,first_submitted_at,submitted_at,shared,discord_share,calls_documented_at
      FROM checkins WHERE participant=$1 ORDER BY day DESC`,
     [participant],
   );
@@ -383,6 +398,8 @@ export async function ownClosings(db: Database, participant: string) {
     reflection: r.reflection as Record<string, unknown>,
     revision: r.revision as number,
     origin: r.origin as "import" | "closing",
+    /** Übernommener Tag, den der eigene Abschluss ersetzen darf. */
+    replaceable: replaceableImport(r),
     firstSubmittedAt: r.first_submitted_at
       ? new Date(r.first_submitted_at).toISOString()
       : null,
@@ -432,7 +449,9 @@ export async function closingState(
     db.query(
       `SELECT d.day,d.counts,d.reflection,d.updated_at,d.base_revision FROM checkin_drafts d
         LEFT JOIN checkins c ON c.participant=d.participant AND c.day=d.day
-       WHERE d.participant=$1 AND d.base_revision >= COALESCE(c.revision,0)
+       WHERE d.participant=$1 AND (d.base_revision >= COALESCE(c.revision,0)
+         -- Ein später importierter Tag verdrängt den eigenen Entwurf nicht.
+         OR (c.origin='import' AND c.source='wins-import'))
        ORDER BY d.day DESC`,
       [e.participant.id],
     ),

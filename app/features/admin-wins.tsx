@@ -41,6 +41,12 @@ const ACTIONS: { id: WinsAction; label: string; tone: Tone; hint: string }[] =
       hint: "Nicht eindeutig. Wird beim Übernehmen als Prüffall angelegt und nicht gezählt.",
     },
     {
+      id: "bekannt",
+      label: "Prüffall bekannt",
+      tone: "neutral",
+      hint: "Für diese Meldung gibt es schon einen Prüffall. Es entsteht kein neuer.",
+    },
+    {
       id: "übersprungen",
       label: "Übersprungen",
       tone: "muted",
@@ -53,10 +59,16 @@ const ACTIONS: { id: WinsAction; label: string; tone: Tone; hint: string }[] =
       hint: "Früherer Zwischenstand derselben Person. Eine spätere Meldung gilt, nichts wird addiert.",
     },
     {
+      id: "ignoriert",
+      label: "Ohne Zahlen",
+      tone: "muted",
+      hint: "Keine Kennzahl erkannt (Plaudern, Medien). Wird nicht übernommen und ist kein Prüffall.",
+    },
+    {
       id: "unverändert",
       label: "Unverändert",
       tone: "neutral",
-      hint: "Der Stand stimmt schon überein.",
+      hint: "Der Stand stimmt schon überein oder eine neuere Meldung gilt.",
     },
   ];
 const actionInfo = (id: WinsAction) =>
@@ -95,8 +107,11 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
       )
     : [];
   const newCases = preview?.summary.prüffall ?? 0;
+  // „Alle“ ohne Nachrichten ohne Zahlen; die zeigt ihr eigener Filter.
   const shown = preview
-    ? preview.rows.filter((r) => filter === "alle" || r.action === filter)
+    ? preview.rows.filter((r) =>
+        filter === "alle" ? r.action !== "ignoriert" : r.action === filter,
+      )
     : [];
 
   async function runPreview(keepResult = false) {
@@ -151,8 +166,11 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
           <p>
             Tägliche Meldungen einfügen, Vorschau prüfen, dann übernehmen. Eine
             Meldung ist ein Stand, kein Zuwachs: je Person und Leistungstag
-            gilt die späteste Meldung. Termine ohne Typangabe werden nie zu
-            Settings oder Closings. Der eingefügte Text wird nicht gespeichert.
+            gilt die späteste Meldung. Den ganzen Verlauf erneut einzufügen
+            ist sicher: Bekanntes bleibt unverändert, ältere Nachrichten
+            überschreiben keine neueren. Eigene Tagesabschlüsse gehen immer
+            vor. Termine ohne Typangabe werden nie zu Settings oder Closings.
+            Der eingefügte Text wird nicht gespeichert.
           </p>
         </div>
       </div>
@@ -243,7 +261,10 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
               aria-pressed={filter === "alle"}
               onClick={() => setFilter("alle")}
             >
-              Alle <strong>{fmt(preview.rows.length)}</strong>
+              Alle{" "}
+              <strong>
+                {fmt(preview.rows.filter((r) => r.action !== "ignoriert").length)}
+              </strong>
             </button>
             {ACTIONS.map((a) => (
               <button
@@ -257,7 +278,7 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
               </button>
             ))}
           </div>
-          {preview.rows.length === 0 ? (
+          {preview.rows.every((r) => r.action === "ignoriert") && filter !== "ignoriert" ? (
             <p className="adm-empty">
               Im Text wurde keine Meldung erkannt. Prüfe, ob Name und Zahlen in
               einer Zeile stehen.
@@ -299,10 +320,14 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
 
 function WinsRowCard({ row }: { row: WinsRow }) {
   const info = actionInfo(row.action);
-  const metrics: Metric[] =
-    row.action === "neu" || row.action === "korrektur"
-      ? row.changed
-      : (Object.keys(row.after || {}) as Metric[]);
+  // Vorher → nachher bei Änderungen und bei einem späteren niedrigeren Wert.
+  const diff =
+    row.action === "neu" ||
+    row.action === "korrektur" ||
+    (row.review?.kind === "value" && !!row.before);
+  const metrics: Metric[] = diff
+    ? row.changed
+    : (Object.keys(row.after || {}) as Metric[]);
   return (
     <li className="adm-item adm-win" data-action={row.action}>
       <div className="adm-item-head">
@@ -329,7 +354,7 @@ function WinsRowCard({ row }: { row: WinsRow }) {
               <div key={m} data-changed={changed}>
                 <dt>{metricLabels[m]}</dt>
                 <dd>
-                  {row.action === "neu" || row.action === "korrektur" ? (
+                  {diff ? (
                     <>
                       <span className="adm-before">{fmt(before)}</span>
                       <span aria-hidden="true"> → </span>
@@ -370,9 +395,9 @@ function WinsRowCard({ row }: { row: WinsRow }) {
 }
 
 /**
- * Prüffälle aus dem Wins-Import: einem Profil als Alias zuordnen oder
- * verwerfen. Nach einer Zuordnung wird dieselbe Meldung beim nächsten
- * Import normal übernommen.
+ * Prüffälle aus dem Wins-Import. Jeder Prüffall trägt die gelesenen Werte:
+ * nach der Entscheidung (Profil, Tag) werden sie direkt übernommen. Ein
+ * erneutes Einfügen derselben Meldung legt keinen neuen Prüffall an.
  */
 export function ReviewCases({
   cases,
@@ -397,17 +422,18 @@ export function ReviewCases({
         <div>
           <h2 id="adm-cases-title">Prüffälle</h2>
           <p>
-            Meldungen, die sich nicht eindeutig einer Person oder Kennzahl
-            zuordnen ließen. „Als Alias zuordnen“ merkt sich den gemeldeten
-            Namen für dieses Profil. Füge den Text danach im Wins-Import erneut
-            ein, dann wird die Meldung normal übernommen.
+            Meldungen, die sich nicht eindeutig einer Person, einem Tag oder
+            einem Wert zuordnen ließen. Wähle Profil und Tag und übernimm die
+            Werte direkt. „Als Alias zuordnen“ merkt sich den gemeldeten Namen
+            zusätzlich für künftige Importe. Verworfene Meldungen kommen beim
+            nächsten Einfügen nicht wieder.
           </p>
         </div>
       </div>
       {notice && (
         <div className="adm-actions">
           <Feedback success={notice} />
-          {notice.startsWith("Zugeordnet") && (
+          {/nicht übernommen|Nichts übernommen/.test(notice) && (
             <button className="btn secondary" onClick={onImport}>
               Zum Wins-Import
             </button>
@@ -439,7 +465,7 @@ export function ReviewCases({
               <li key={c.id} className="adm-item" data-resolved="true">
                 <div className="adm-item-head">
                   <Badge tone="muted">
-                    {c.status === "resolved" ? "Zugeordnet" : "Verworfen"}
+                    {c.status === "resolved" ? "Entschieden" : "Verworfen"}
                   </Badge>
                   <span className="adm-meta">{formatDay(c.day)}</span>
                 </div>
@@ -454,6 +480,13 @@ export function ReviewCases({
   );
 }
 
+const KIND_LABEL: Record<string, string> = {
+  person: "Person unklar",
+  day: "Vortag oder heute?",
+  value: "Wert prüfen",
+  unclear: "Nicht eindeutig",
+};
+
 function CaseCard({
   item,
   participants,
@@ -463,27 +496,40 @@ function CaseCard({
   participants: Participant[];
   onResolved: (message: string) => void;
 }) {
-  // Enthält der Prüfgrund einen eindeutigen Vorschlag, ist er vorausgewählt.
-  const [suggested] = useState(() =>
-    suggestedProfile(item.reason, participants),
+  // Erkanntes Profil oder ein eindeutiger Vorschlag aus dem Prüfgrund ist
+  // vorausgewählt.
+  const [suggested] = useState(
+    () => item.participantId || suggestedProfile(item.reason, participants),
   );
   const [target, setTarget] = useState(suggested);
+  const [day, setDay] = useState(item.days[0] ?? item.day);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
-  async function resolve(decision: "alias" | "dismiss") {
+  const values = Object.entries(item.values) as [Metric, number][];
+  // Ältere Prüffälle ohne Art: wie bisher Name zuordnen oder verwerfen.
+  const needsProfile = item.aliasable || !item.participantId;
+  const name = participants.find((p) => p.id === target)?.name;
+  async function resolve(decision: "alias" | "apply" | "dismiss") {
     setBusy(decision);
     setError("");
     try {
-      await adminPost("resolveCase", {
+      const result = await adminPost<{ ok: boolean; message: string | null }>("resolveCase", {
         id: item.id,
         decision,
-        ...(decision === "alias" ? { participantId: target } : {}),
+        ...(decision !== "dismiss" && target ? { participantId: target } : {}),
+        ...(decision !== "dismiss" && item.days.length ? { day } : {}),
       });
-      const name = participants.find((p) => p.id === target)?.name;
       onResolved(
-        decision === "alias"
-          ? `Zugeordnet: „${item.name_seen}“ gehört jetzt zu ${name ?? "dem gewählten Profil"}. Füge den Text im Wins-Import erneut ein, um die Meldung zu übernehmen.`
-          : `Verworfen: „${item.name_seen}“.`,
+        decision === "dismiss"
+          ? `Verworfen: „${item.name_seen}“.`
+          : [
+              decision === "alias"
+                ? `Zugeordnet: „${item.name_seen}“ gehört jetzt zu ${name ?? "dem gewählten Profil"}.`
+                : `Entschieden für ${name ?? item.name_seen}.`,
+              result.message ?? "",
+            ]
+              .filter(Boolean)
+              .join(" "),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -494,7 +540,7 @@ function CaseCard({
   return (
     <li className="adm-item">
       <div className="adm-item-head">
-        <Badge tone="warn">Offen</Badge>
+        <Badge tone="warn">{item.kind ? KIND_LABEL[item.kind] : "Offen"}</Badge>
         <span className="adm-meta">
           Leistungstag {formatDay(item.day)} · angelegt{" "}
           {formatDateTime(item.created_at)}
@@ -502,6 +548,25 @@ function CaseCard({
       </div>
       <h3>Gemeldet als „{item.name_seen}“</h3>
       {item.reason && <p className="adm-hint">{item.reason}</p>}
+      {values.length > 0 && (
+        <dl className="adm-diff">
+          {values.map(([m, v]) => (
+            <div key={m} data-changed={!!item.from}>
+              <dt>{metricLabels[m]}</dt>
+              <dd>
+                {item.from && item.from[m] !== undefined && (
+                  <>
+                    <span className="adm-before">{fmt(item.from[m])}</span>
+                    <span aria-hidden="true"> → </span>
+                    <span className="sr-only"> neu </span>
+                  </>
+                )}
+                <strong>{fmt(v)}</strong>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
       {item.excerpt && (
         <details className="adm-excerpt">
           <summary>Auszug der Meldung</summary>
@@ -509,33 +574,58 @@ function CaseCard({
         </details>
       )}
       <div className="adm-case-form">
-          <ProfilePicker
-            participants={participants}
-            value={target}
-            onChange={setTarget}
-          />
-          {suggested && target === suggested && (
-            <p className="adm-hint">
-              Vorschlag aus dem Prüfgrund ist vorausgewählt. Bitte prüfen.
-            </p>
-          )}
-          <div className="adm-actions">
+        {item.applicable && item.days.length > 1 && (
+          <fieldset className="adm-fieldset adm-days">
+            <legend>Für welchen Tag gilt die Meldung?</legend>
+            {item.days.map((d, i) => (
+              <label key={d}>
+                <input
+                  type="radio"
+                  name={`day-${item.id}`}
+                  value={d}
+                  checked={day === d}
+                  onChange={() => setDay(d)}
+                />
+                {formatDay(d)}
+                {i === 0 ? " (Vorschlag)" : ""}
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {needsProfile && (
+          <ProfilePicker participants={participants} value={target} onChange={setTarget} />
+        )}
+        {needsProfile && suggested && target === suggested && (
+          <p className="adm-hint">Vorschlag ist vorausgewählt. Bitte prüfen.</p>
+        )}
+        <div className="adm-actions">
+          {item.aliasable && (
             <button
               className="btn primary"
               disabled={!target || busy !== ""}
               onClick={() => resolve("alias")}
             >
-              Als Alias zuordnen
+              {item.applicable ? "Als Alias zuordnen und übernehmen" : "Als Alias zuordnen"}
             </button>
+          )}
+          {item.applicable && (
             <button
-              className="btn secondary"
-              disabled={busy !== ""}
-              onClick={() => resolve("dismiss")}
+              className={item.aliasable ? "btn secondary" : "btn primary"}
+              disabled={!target || busy !== ""}
+              onClick={() => resolve("apply")}
             >
-              Verwerfen
+              {item.aliasable ? "Nur übernehmen" : "Übernehmen"}
             </button>
-          </div>
-          <Feedback error={error} />
+          )}
+          <button
+            className="btn secondary"
+            disabled={busy !== ""}
+            onClick={() => resolve("dismiss")}
+          >
+            Verwerfen
+          </button>
+        </div>
+        <Feedback error={error} />
       </div>
     </li>
   );
