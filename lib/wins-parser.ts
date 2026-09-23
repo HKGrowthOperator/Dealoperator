@@ -512,22 +512,26 @@ export function normaliseName(value: string) {
     .trim();
 }
 
+/**
+ * Alias passt: normalisierter Name, oder bei Absendern, die WhatsApp als
+ * Telefonnummer zeigt, ein Schlüssel statt der Nummer (key, vom Server).
+ */
+const aliasMatches = (entry: DirectoryEntry, wanted: string, key?: string | null) =>
+  (entry.aliases || []).some((a) => (key && a === key) || normaliseName(a) === wanted);
+
 /** Name oder Alias stimmt vollständig überein (nicht nur der Vorname). */
-export function exactAuthor(author: string, entry: DirectoryEntry) {
+export function exactAuthor(author: string, entry: DirectoryEntry, key?: string | null) {
   const wanted = normaliseName(author);
-  return (
-    normaliseName(entry.name) === wanted ||
-    (entry.aliases || []).some((a) => normaliseName(a) === wanted)
-  );
+  return normaliseName(entry.name) === wanted || aliasMatches(entry, wanted, key);
 }
 
-export function resolveAuthor(author: string, directory: DirectoryEntry[]) {
+export function resolveAuthor(author: string, directory: DirectoryEntry[], key?: string | null) {
   const wanted = normaliseName(author);
-  const exact = directory.filter(
-    (d) =>
-      normaliseName(d.name) === wanted ||
-      (d.aliases || []).some((a) => normaliseName(a) === wanted),
-  );
+  // Eine ausdrückliche Zuordnung (Alias) gewinnt vor dem Namensvergleich:
+  // so bleiben auch doppelte Anzeigenamen eindeutig.
+  const byAlias = directory.filter((d) => aliasMatches(d, wanted, key));
+  if (byAlias.length === 1) return byAlias;
+  const exact = [...new Set([...byAlias, ...directory.filter((d) => normaliseName(d.name) === wanted)])];
   if (exact.length) return exact;
   // Nur Vorname gemeldet: eindeutig, wenn genau ein Profil so beginnt.
   if (!wanted.includes(" "))
@@ -767,6 +771,7 @@ export function parseWins({
   lateNightCutoff = LATE_NIGHT_CUTOFF,
   morningUntil = MORNING_UNTIL,
   today = defaultDay,
+  aliasKeyOf,
 }: {
   text: string;
   defaultDay: string;
@@ -777,6 +782,8 @@ export function parseWins({
   morningUntil?: string;
   /** Heutiges Datum, für „Heute“/„Gestern“ als Tagestrenner. */
   today?: string;
+  /** Alias-Schlüssel für einen Absender (Telefonnummer), falls es einen gibt. */
+  aliasKeyOf?: (author: string) => string | null;
 }): WinsEntry[] {
   const entries: WinsEntry[] = splitMessages(text, defaultDay, today, { strict: true }).map((m) => {
     const reasons: string[] = [];
@@ -820,7 +827,8 @@ export function parseWins({
       );
     } else if (marks.yesterdayInProse)
       notes.push("„gestern“ steht nur im Text, nicht als Tagesangabe. Die Zahlen zählen für den Tag der Nachricht.");
-    const matches = m.author ? resolveAuthor(m.author, directory) : [];
+    const key = m.author && aliasKeyOf ? aliasKeyOf(m.author) : null;
+    const matches = m.author ? resolveAuthor(m.author, directory, key) : [];
     if (!Object.keys(metrics).length) reasons.push("Keine Kennzahl erkannt.");
     if (conflicts.length)
       reasons.push(
@@ -846,7 +854,7 @@ export function parseWins({
       reasons.push(
         `„${matches[0].name}“ ist eine gemeinsame Meldung und kein Einzelprofil.`,
       );
-    else if (!exactAuthor(m.author, matches[0]))
+    else if (!exactAuthor(m.author, matches[0], key))
       // Nur der Vorname passt: ein Vorschlag, keine Zuordnung. Erst wenn das
       // Team ihn als Alias bestätigt, zählt die Meldung.
       reasons.push(

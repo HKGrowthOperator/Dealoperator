@@ -432,3 +432,40 @@ test("morning reports and 'Nachtrag' without a day are review cases with the pre
   assert.ok(alexToday.observations.every((o) => o.stamp !== "2026-09-24 08:10"));
   assert.deepEqual([emilNoon.day, emilNoon.status, emilNoon.metrics.attempts], ["2026-09-24", "ok", 45]);
 });
+
+test("an explicit alias beats duplicate display names", () => {
+  const twins: DirectoryEntry[] = [
+    { id: "p-alex-1", name: "Alex B.", kind: "person" },
+    { id: "p-alex-2", name: "Alex B.", kind: "person", aliases: ["alex b"] },
+  ];
+  assert.deepEqual(resolveAuthor("Alex B.", twins).map((d) => d.id), ["p-alex-2"]);
+  const [e] = parseWins({
+    text: "[19:00, 23.9.2026] Alex B.: 40 Anwahlen",
+    defaultDay: "2026-09-23",
+    directory: twins,
+  });
+  assert.equal(e.status, "ok");
+  assert.equal(e.participantId, "p-alex-2");
+  // Ohne Alias bleibt es mehrdeutig.
+  const [open] = parseWins({
+    text: "[19:00, 23.9.2026] Alex B.: 40 Anwahlen",
+    defaultDay: "2026-09-23",
+    directory: twins.map((t) => ({ ...t, aliases: [] })),
+  });
+  assert.equal(open.status, "review");
+  assert.match(open.reasons.join(" "), /mehreren Profilen/);
+});
+
+test("a phone number sender matches its alias key, never its plain number", () => {
+  const withKey: DirectoryEntry[] = [
+    { id: "p-alex", name: "Alex B.", kind: "person", aliases: ["tel:schluessel"] },
+  ];
+  const [e] = parseWins({
+    text: "[19:00, 23.9.2026] +49 170 0000000: 40 Anwahlen",
+    defaultDay: "2026-09-23",
+    directory: withKey,
+    aliasKeyOf: (author) => (/^\+49 170/.test(author) ? "tel:schluessel" : null),
+  });
+  assert.equal(e.status, "ok");
+  assert.equal(e.participantId, "p-alex");
+});

@@ -114,6 +114,32 @@ function requireAdmin(actor: Actor) {
     throw new AppError("Dieser Bereich ist nur für das Team freigeschaltet.", 403);
 }
 
+/**
+ * Absender, die WhatsApp als Telefonnummer zeigt (kein Kontakt beim
+ * Exportierenden). Die Nummer wird nie gespeichert oder angezeigt: sichtbar
+ * ist eine maskierte Form, zugeordnet wird über einen Schlüssel aus der
+ * Nummer (Alias „tel:…“).
+ */
+function senderDigits(author: string) {
+  if (!/^\+?[\d\s()./-]{7,}$/.test(author.trim())) return null;
+  const digits = author.replace(/^\s*00/, "").replace(/\D/g, "");
+  return digits.length >= 7 ? digits : null;
+}
+export function phoneAliasKey(author: string) {
+  const digits = senderDigits(author);
+  return digits ? `tel:${hash(`wins-absender:${digits}`).slice(0, 32)}` : null;
+}
+/** „+49 170 0000000“ → „+49 ••• •••••00“: Ländervorwahl und die letzten zwei Ziffern. */
+export function maskSender(author: string) {
+  if (!senderDigits(author)) return author;
+  const total = author.replace(/\D/g, "").length;
+  let seen = 0;
+  return author.trim().replace(/\d/g, (d) => {
+    seen++;
+    return seen <= 2 || seen > total - 2 ? d : "•";
+  });
+}
+
 /** Kontaktdaten aus Auszügen entfernen, bevor etwas gespeichert oder gezeigt wird. */
 export function redact(value: string) {
   return value
@@ -136,9 +162,9 @@ async function directory(db: Database): Promise<DirectoryEntry[]> {
   }));
 }
 
+const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const pick = (counts: Partial<Counts>) =>
   Object.fromEntries(Object.entries(counts).filter(([, v]) => v !== null && v !== undefined)) as Partial<Counts>;
-const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 const shortDay = (day: string) => `${day.slice(8, 10)}.${day.slice(5, 7)}.`;
 const whenText = (stamp: string | null) =>
   stamp ? `${shortDay(stamp.slice(0, 10))} ${stamp.slice(11)} Uhr` : "ohne Uhrzeit";
@@ -299,6 +325,8 @@ type CasePayload = CaseInfo & {
   v: 1;
   /** Zeitpunkt der Nachricht, aus der die Werte stammen. */
   stamp: string | null;
+  /** Alias für den gemeldeten Namen (bei Telefonnummern ein Schlüssel statt der Nummer). */
+  aliasKey?: string | null;
 };
 
 /**
@@ -317,6 +345,7 @@ const payloadSchema = z.object({
   applicable: z.boolean(),
   aliasable: z.boolean(),
   stamp: z.string().max(20).nullable(),
+  aliasKey: z.string().max(100).nullable().optional(),
 });
 const onlyMetrics = (values: Record<string, number>) =>
   Object.fromEntries(Object.entries(values).filter(([k]) => k in metricLabels)) as Partial<Counts>;
@@ -380,7 +409,13 @@ type Built = {
 
 async function build(db: Database, text: string, day: string, now = new Date()): Promise<Built[]> {
   const nowStamp = berlinStamp(now);
-  const entries = parseWins({ text, defaultDay: day, directory: await directory(db), today: berlinDate(now) });
+  const entries = parseWins({
+    text,
+    defaultDay: day,
+    directory: await directory(db),
+    today: berlinDate(now),
+    aliasKeyOf: phoneAliasKey,
+  });
   const ok = entries.filter((e) => e.status === "ok" && e.participantId);
   const ids = [...new Set(ok.map((e) => e.participantId!))];
   const participants = new Map(
@@ -392,8 +427,11 @@ async function build(db: Database, text: string, day: string, now = new Date()):
   const byLine = new Map(entries.map((e) => [e.line, e]));
 
   const built: Built[] = [];
+  // Telefonnummern als Absender auch in Prüfgründen nur maskiert.
+  const masked = (e: WinsEntry, texts: string[]) =>
+    maskSender(e.author) === e.author ? texts : texts.map((t) => t.split(e.author).join(maskSender(e.author)));
   const base = (e: WinsEntry) => ({
-    author: e.author,
+    author: maskSender(e.author),
     participantId: e.participantId,
     participantName: e.participantName,
     day: e.day,
@@ -419,10 +457,11 @@ async function build(db: Database, text: string, day: string, now = new Date()):
         applicable: e.applicable,
         aliasable: !e.identified && !!e.author && e.author !== "(ohne Absender)",
         stamp: e.stamp,
+        aliasKey: phoneAliasKey(e.author) ?? normaliseName(e.author),
       };
       built.push({
-        row: { ...base(e), key: null, action: "prüffall", revision: 0, before: null, after: pick(e.metrics), changed: [], reasons: e.reasons, review: publicCase(payload) },
-        review: { fingerprint: entryFingerprint(e), nameSeen: e.author, reason: e.reasons.join(" "), payload },
+        row: { ...base(e), key: null, action: "prüffall", revision: 0, before: null, after: pick(e.metrics), changed: [], reasons: masked(e, e.reasons), review: publicCase(payload) },
+        review: { fingerprint: entryFingerprint(e), nameSeen: maskSender(e.author), reason: masked(e, e.reasons).join(" "), payload },
       });
       continue;
     }
@@ -506,7 +545,7 @@ async function build(db: Database, text: string, day: string, now = new Date()):
           notes: [],
           review: publicCase(payload),
         },
-        review: { fingerprint: conflictFingerprint(e.participantId, e.day, c), nameSeen: e.author, reason, payload },
+        review: { fingerprint: conflictFingerprint(e.participantId, e.day, c), nameSeen: maskSender(e.author), reason, payload },
       });
     }
   }
@@ -720,7 +759,9 @@ export async function resolveReviewCase(db: Database, actor: Actor, raw: unknown
       if (!p) throw new AppError("Dieses Profil gibt es nicht.", 404);
       if (p.kind !== "person")
         throw new AppError("Eine gemeinsame Meldung ist kein Ziel für einen Namen.", 409);
-      const alias = normaliseName(c.name_seen);
+      // Bei Telefonnummern ist name_seen maskiert; der Schlüssel steht im Prüffall.
+      const alias = payload?.aliasKey || normaliseName(c.name_seen);
+      if (!alias) throw new AppError("Für diesen Prüffall gibt es keinen Namen zum Zuordnen.", 409);
       const [existing] = await tx.query("SELECT participant FROM participant_aliases WHERE alias=$1", [alias]);
       if (existing && existing.participant !== p.id)
         throw new AppError("Dieser Name ist bereits einem anderen Profil zugeordnet.", 409);

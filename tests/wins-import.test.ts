@@ -307,3 +307,44 @@ test("full chat re-paste: profiles stay, numbers land on the right day, late rep
   assert.deepEqual(await profiles(), before);
   assert.equal((await db.query("SELECT id FROM import_review_cases")).length, 2);
 });
+
+test("phone number senders are masked in review cases; the alias is kept without the number", async () => {
+  const alex = await person("Alex B.");
+  const d1 = dayOffset(-2);
+  const sender = "+49 170 0000000";
+  await importChat([wa(d1, "19:30", sender, "10 Anwahlen")]);
+  const [c] = await reviewCases(db, admin);
+  assert.doesNotMatch(c.name_seen, /0000000|170 0/);
+  assert.match(c.name_seen, /^\+49 /);
+  assert.equal(c.aliasable, true);
+  await resolveReviewCase(db, admin, { id: c.id, decision: "alias", participantId: alex });
+  assert.deepEqual(await counts(alex, d1), { attempts: 10 });
+  // Nirgends steht die volle Nummer.
+  const stored = JSON.stringify([
+    await db.query("SELECT * FROM import_review_cases"),
+    await db.query("SELECT * FROM participant_aliases"),
+  ]);
+  assert.doesNotMatch(stored, /1700000000|170 0000000/);
+  // Die nächste Meldung von derselben Nummer landet auf demselben Profil.
+  const next = await importChat([wa(d1, "21:00", sender, "20 Anwahlen")]);
+  assert.equal(next.preview.rows[0].participantId, alex);
+  assert.equal(next.preview.rows[0].action, "korrektur");
+  assert.doesNotMatch(next.preview.rows[0].author, /0000000/);
+  assert.deepEqual(await counts(alex, d1), { attempts: 20 });
+});
+
+test("duplicate display names: the alias decides, every time", async () => {
+  const first = await person("Alex B.");
+  const second = await person("Alex B.");
+  const d1 = dayOffset(-2);
+  await importChat([wa(d1, "19:00", "Alex B.", "40 Anwahlen")]);
+  const [c] = await reviewCases(db, admin);
+  assert.match(c.reason, /mehreren Profilen/);
+  await resolveReviewCase(db, admin, { id: c.id, decision: "alias", participantId: second });
+  assert.equal(await counts(first, d1), null);
+  assert.deepEqual(await counts(second, d1), { attempts: 40 });
+  const next = await importChat([wa(d1, "21:00", "Alex B.", "45 Anwahlen")]);
+  assert.equal(next.preview.rows[0].participantId, second);
+  assert.deepEqual(await counts(second, d1), { attempts: 45 });
+  assert.equal(await counts(first, d1), null);
+});
