@@ -636,3 +636,46 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+.flow-password {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.flow-password input {
+  padding-right: 52px;
+}
+.flow .flow-reveal {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--flow-soft);
+  cursor: pointer;
+}
+.flow .flow-reveal:hover {
+  color: var(--flow-blue);
+}
+.flow-waiting {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef4fdcc;
+  color: var(--flow-ink);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.flow-waiting svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--flow-blue);
+}

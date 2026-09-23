@@ -1,5 +1,6 @@
 import Link from "next/link";
 import OperatorWordmark from "./operator-wordmark";
+import AccountMenu from "./account-menu";
 import { DISCORD_INVITE } from "@/lib/discord";
 
 /**
@@ -37,9 +38,12 @@ export function OperatorHeader({
           Discord
         </a>
       </nav>
-      <Link className="btn primary op-shell-primary" href="/tagesabschluss">
-        Tagesabschluss
-      </Link>
+      <div className="op-shell-actions">
+        <AccountMenu />
+        <Link className="btn primary op-shell-primary" href="/tagesabschluss">
+          Tagesabschluss
+        </Link>
+      </div>
     </header>
   );
 }

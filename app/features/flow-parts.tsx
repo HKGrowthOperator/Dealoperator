@@ -3,6 +3,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
+  Eye,
+  EyeOff,
   LoaderCircle,
   Lock,
   MailCheck,
@@ -376,7 +378,10 @@ export function ContactFields({
   email = "edit",
   hint = "none",
   nameSuggested = false,
+  afterEmail,
 }: {
+  /** Zusätzliches Feld direkt nach der E-Mail (Passwort bei der Registrierung). */
+  afterEmail?: React.ReactNode;
   value: Contact;
   onChange: (patch: Partial<Contact>) => void;
   errors: FieldErrors;
@@ -456,6 +461,7 @@ export function ContactFields({
           )}
         </div>
       )}
+      {afterEmail}
 
       <div className="flow-field" data-invalid={errors.phone ? "" : undefined}>
         <label htmlFor={`${id}-phone`}>Telefon</label>
@@ -523,6 +529,81 @@ export function ContactFields({
   );
 }
 
+/**
+ * Passwortfeld mit Anzeigen/Verbergen. autoComplete steuert den
+ * Passwort-Manager: „new-password“ beim Festlegen (er schlägt ein starkes
+ * vor und speichert es), „current-password“ beim Anmelden.
+ */
+export function PasswordField({
+  value,
+  onChange,
+  error,
+  autoComplete,
+  inputRef,
+  label = "Passwort",
+  note,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  autoComplete: "new-password" | "current-password";
+  inputRef?: React.Ref<HTMLInputElement>;
+  label?: string;
+  note?: string;
+}) {
+  const id = useId();
+  const [show, setShow] = useState(false);
+  const described = error ? `${id}-error` : note ? `${id}-note` : undefined;
+  return (
+    <div className="flow-field" data-invalid={error ? "" : undefined}>
+      <label htmlFor={`${id}-pw`}>{label}</label>
+      <div className="flow-password">
+        <input
+          id={`${id}-pw`}
+          ref={inputRef}
+          name="password"
+          type={show ? "text" : "password"}
+          autoComplete={autoComplete}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          maxLength={200}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={described}
+        />
+        <button
+          type="button"
+          className="flow-reveal"
+          aria-label={show ? "Passwort verbergen" : "Passwort anzeigen"}
+          aria-pressed={show}
+          onClick={() => setShow((v) => !v)}
+        >
+          {show ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+        </button>
+      </div>
+      {error ? (
+        <p id={`${id}-error`} className="flow-field-error">
+          {error}
+        </p>
+      ) : note ? (
+        <p id={`${id}-note`} className="flow-note">
+          {note}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Dieselbe Mindestregel wie auf dem Server. */
+export function checkPassword(value: string) {
+  if (!value) return "Bitte lege ein Passwort fest.";
+  if (value.length < 8) return "Bitte nimm mindestens 8 Zeichen.";
+  if (new TextEncoder().encode(value).length > 72) return "Bitte nimm höchstens 72 Zeichen.";
+  return "";
+}
+
 export function PrivacyNote() {
   return (
     <p className="flow-privacy">
@@ -564,7 +645,7 @@ export function InAppHint({ codeEnabled }: { codeEnabled: boolean }) {
   );
 }
 
-export type SentPurpose = "new" | "claim" | "assign" | "signin";
+export type SentPurpose = "new" | "claim" | "assign" | "signin" | "reset";
 
 const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
   new: () => "Danach legst du dein Profil an und trägst deinen ersten Tag ein.",
@@ -573,6 +654,8 @@ const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
   assign: () =>
     "Danach sucht das Team dein Profil heraus und ordnet es dir zu. Den Stand siehst du nach der Bestätigung.",
   signin: () => "Danach bist du angemeldet und landest direkt dort, wo du hinwolltest.",
+  reset: () =>
+    "Danach legst du ein Passwort fest. Ab dann meldest du dich mit E-Mail und Passwort an, ganz ohne Mail.",
 };
 
 /**
@@ -595,7 +678,10 @@ export function EmailSent({
   onChangeEmail,
   onRestart,
   headingRef,
+  waiting,
 }: {
+  /** Hinweis oder Formular, solange auf die Bestätigung gewartet wird. */
+  waiting?: React.ReactNode;
   email: string;
   purpose: SentPurpose;
   profileName?: string;
@@ -666,11 +752,13 @@ export function EmailSent({
         </p>
       )}
 
-      <p className="flow-body">
-        {codeEnabled
-          ? "Tipp auf den Link in der Mail oder gib den Code aus der Mail hier ein. Beides klappt auch, wenn du die Mail auf einem anderen Gerät öffnest."
-          : "Tipp auf den Link in der Mail. Öffne ihn in diesem Browser; in einem anderen lässt er sich aus Sicherheitsgründen nicht einlösen."}
-      </p>
+      {waiting ?? (
+        <p className="flow-body">
+          {codeEnabled
+            ? "Tipp auf den Link in der Mail oder gib den Code aus der Mail hier ein. Beides klappt auch, wenn du die Mail auf einem anderen Gerät öffnest."
+            : "Tipp auf den Link in der Mail. Öffne ihn in diesem Browser; in einem anderen lässt er sich aus Sicherheitsgründen nicht einlösen."}
+        </p>
+      )}
 
       {codeEnabled && (
         <form className="flow-code" onSubmit={verify} noValidate>

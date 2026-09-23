@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircle, LayoutDashboard, Settings } from "lucide-react";
+import { KeyRound, MessageCircle, LayoutDashboard, Settings } from "lucide-react";
 import { getCurrentUser, isTeam } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { closingState } from "@/server/closing";
@@ -88,6 +88,15 @@ export default async function Page({
             )}
           </nav>
         </div>
+        {!actor.hasPassword && (
+          <p className="cm-password-nudge">
+            <KeyRound size={18} aria-hidden="true" />
+            <span>
+              Leg ein Passwort fest, dann meldest du dich künftig ohne Mail an.
+            </span>
+            <Link href="/passwort">Passwort festlegen</Link>
+          </p>
+        )}
         <ClosingForm
           key={day}
           day={day}

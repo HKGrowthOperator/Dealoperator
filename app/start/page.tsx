@@ -50,6 +50,10 @@ export default async function Page({
   if (!bound) await noteConfirmedAccount(db, actor, toClaim);
   const state = await ownState(db, actor);
 
+  // Aus „Passwort vergessen oder noch keins?“: zuerst das Passwort festlegen,
+  // danach führt /passwort wieder hierher.
+  if (target.pathname === "/passwort") redirect("/passwort");
+
   // Bereits freigegebenes Profil: direkt in den eigenen Bereich.
   if (state.participant) redirect(next);
 

@@ -105,6 +105,7 @@ export default async function Page({
           pending={pending}
           initialWeg={(search.weg || "").slice(0, 10)}
           initialSchritt={(search.schritt || "").slice(0, 12)}
+          confirmedElsewhere={search.bestaetigt === "1"}
         />
       </main>
       <OperatorFooter />

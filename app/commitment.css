@@ -1733,3 +1733,35 @@
     transition: none;
   }
 }
+
+/* Hinweis für Konten ohne Passwort: einmal festlegen, dann ohne Mail anmelden. */
+.cm-password-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  border: 1px solid #b9d1f3;
+  border-radius: 12px;
+  background: #eef5ffe6;
+  color: #10294b;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.cm-password-nudge svg {
+  color: #0755f5;
+  flex: none;
+}
+.cm-password-nudge span {
+  flex: 1 1 200px;
+}
+.cm-password-nudge a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: #0755f5;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

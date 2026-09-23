@@ -2185,6 +2185,77 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+.op-shell-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+/* Kontosymbol: Anmelden/Registrieren bzw. eigener Bereich. */
+.op-account {
+  position: relative;
+}
+.op-account-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #d5e2f4;
+  border-radius: 50%;
+  background: #fff;
+  color: #1d3658;
+  cursor: pointer;
+}
+.op-account-button:hover,
+.op-account-button[aria-expanded="true"] {
+  border-color: #93b6ea;
+  color: #0755f5;
+}
+.op-account-dot {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #1f9d55;
+}
+.op-account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid #d5e2f4;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 40px #0b2a4e1f;
+}
+.op-account-menu a,
+.op-account-menu button {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #10294b;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.op-account-menu a:hover,
+.op-account-menu button:hover {
+  background: #edf3fc;
+  color: #0755f5;
+}
 .op-shell-footer > div a {
   display: inline-flex;
   align-items: center;
@@ -2202,7 +2273,7 @@
     order: 0;
     min-width: 0;
   }
-  .operator-site .operator-header .op-shell-primary {
+  .op-shell-header .op-shell-actions {
     order: 1;
     margin-left: auto;
   }

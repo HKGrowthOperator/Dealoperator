@@ -1,12 +1,13 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { LoaderCircle, LogIn, Mail } from "lucide-react";
+import { KeyRound, LoaderCircle, LogIn, Mail } from "lucide-react";
 import {
   call,
   EmailSent,
   InAppHint,
   linkErrorText,
+  PasswordField,
   RequestError,
   takeLinkError,
   useCountdown,
@@ -23,9 +24,13 @@ function targetLabel(next: string) {
   return "";
 }
 
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 /**
- * Anmeldung für bestehende Konten: E-Mail eingeben, Mail bestätigen, fertig.
- * Das ursprüngliche Ziel (next) bleibt über den ganzen Weg erhalten.
+ * Anmeldung für bestehende Konten mit E-Mail und Passwort, ohne Mail. Der
+ * Passwort-Manager kann beides speichern. Nur wer das Passwort vergessen oder
+ * noch keins festgelegt hat, bekommt einmalig einen Anmeldelink und legt
+ * danach eines fest. Das ursprüngliche Ziel (next) bleibt erhalten.
  */
 export default function AuthForm({
   ready,
@@ -39,9 +44,12 @@ export default function AuthForm({
   codeEnabled: boolean;
 }) {
   const id = useId();
+  const [mode, setMode] = useState<"password" | "link">("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [sentTo, setSentTo] = useState("");
-  const [fieldError, setFieldError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [message, setMessage] = useState(linkErrorText(error, codeEnabled));
   const [sendError, setSendError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,14 +58,16 @@ export default function AuthForm({
   const [waitFor, setWaitFor] = useState("");
   const [wait, setWait] = useCountdown(0);
   const inFlight = useRef(false);
-  const input = useRef<HTMLInputElement>(null);
-  const heading = useStepHeading(sentTo ? "sent" : "form");
+  const emailInput = useRef<HTMLInputElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const view = sentTo ? "sent" : mode;
+  const heading = useStepHeading(view);
   // Nach „E-Mail-Adresse ändern“ ins Feld statt auf die Überschrift.
   const focusInput = useRef(false);
   useEffect(() => {
     if (!sentTo && focusInput.current) {
       focusInput.current = false;
-      input.current?.focus();
+      emailInput.current?.focus();
     }
   }, [sentTo]);
   const target = targetLabel(next);
@@ -81,20 +91,61 @@ export default function AuthForm({
     return () => clearTimeout(timer);
   }, [error, codeEnabled]);
 
-  async function send(resend: boolean) {
+  function failEmail(text: string) {
+    setEmailError(text);
+    emailInput.current?.focus();
+  }
+
+  async function signIn() {
+    if (inFlight.current) return;
+    const address = email.trim().toLowerCase();
+    setEmailError("");
+    setPasswordError("");
+    setMessage("");
+    if (!address) return failEmail("Bitte gib deine E-Mail-Adresse an.");
+    if (!EMAIL.test(address)) return failEmail("Bitte prüfe deine E-Mail-Adresse.");
+    if (!password) {
+      setPasswordError("Bitte gib dein Passwort ein.");
+      passwordInput.current?.focus();
+      return;
+    }
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      const data = await call<{ next: string }>("/api/auth", {
+        action: "signin",
+        email: address,
+        password,
+        next,
+      });
+      // Vollständiger Seitenwechsel: der Passwort-Manager bietet danach das
+      // Speichern an, und die neue Sitzung gilt überall.
+      window.location.assign(data.next);
+    } catch (err) {
+      const e = err as RequestError;
+      if (e.field === "password") {
+        setPasswordError(e.message);
+        passwordInput.current?.focus();
+      } else if (e.field === "email") failEmail(e.message);
+      else setMessage(e.message);
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function sendLink(resend: boolean) {
     if (inFlight.current) return;
     const address = (resend ? sentTo : email).trim().toLowerCase();
     if (!resend) {
-      if (!address) return fail("Bitte gib deine E-Mail-Adresse an.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address))
-        return fail("Bitte prüfe deine E-Mail-Adresse.");
+      setEmailError("");
+      if (!address) return failEmail("Bitte gib deine E-Mail-Adresse an.");
+      if (!EMAIL.test(address)) return failEmail("Bitte prüfe deine E-Mail-Adresse.");
     }
     inFlight.current = true;
     if (resend) setResending(true);
     else setBusy(true);
     setMessage("");
     setSendError("");
-    setFieldError("");
     setResent(false);
     try {
       const data = await call<{ resendAfter?: number }>("/api/auth", { email: address, next });
@@ -109,7 +160,7 @@ export default function AuthForm({
         setWait(e.retryAfter);
       }
       if (resend) setSendError(e.message);
-      else if (e.field === "email" || e.status === 400) fail(e.message);
+      else if (e.field === "email" || e.status === 400) failEmail(e.message);
       else setMessage(e.message);
     } finally {
       inFlight.current = false;
@@ -118,113 +169,141 @@ export default function AuthForm({
     }
   }
 
-  function fail(text: string) {
-    setFieldError(text);
-    input.current?.focus();
-  }
-
   const blocked = wait > 0 && email.trim().toLowerCase() === waitFor;
 
-  return (
-    <section className="auth-card card flow">
-      <div className="flow-step" key={sentTo ? "sent" : "form"}>
-        {sentTo ? (
+  if (sentTo)
+    return (
+      <section className="auth-card card flow">
+        <div className="flow-step" key="sent">
           <EmailSent
             email={sentTo}
-            purpose="signin"
+            purpose="reset"
             codeEnabled={codeEnabled}
-            next={next}
+            next="/passwort"
             saved={false}
             resendIn={wait}
             resent={resent}
             resending={resending}
             error={sendError}
-            onResend={() => void send(true)}
+            onResend={() => void sendLink(true)}
             onChangeEmail={() => {
               focusInput.current = true;
               setSentTo("");
             }}
             headingRef={heading}
           />
-        ) : (
-          <>
-            <span className="icon-tile lime">
-              <LogIn />
-            </span>
-            <h1 ref={heading} tabIndex={-1}>
-              Bei Deal Operator anmelden.
-            </h1>
-            <p className="flow-lead">
-              {codeEnabled
-                ? "Gib deine E-Mail ein. Wir schicken dir einen Link und einen Code zum Anmelden."
-                : "Gib deine E-Mail ein. Wir schicken dir einen Link zum Anmelden."}
-              {target && ` Danach geht es direkt weiter ${target}.`}
-            </p>
-            {!ready && (
-              <div className="flow-notice">
-                <strong>Die Anmeldung öffnet in Kürze.</strong>
-                <p>Das öffentliche Ranking zeigt schon jetzt den gemeldeten Stand.</p>
-              </div>
-            )}
-            {message && (
-              <p className="form-error" role="alert">
-                {message}
+        </div>
+      </section>
+    );
+
+  return (
+    <section className="auth-card card flow">
+      <div className="flow-step" key={mode}>
+        <span className="icon-tile lime">{mode === "password" ? <LogIn /> : <KeyRound />}</span>
+        <h1 ref={heading} tabIndex={-1}>
+          {mode === "password" ? "Bei Deal Operator anmelden." : "Passwort vergessen?"}
+        </h1>
+        <p className="flow-lead">
+          {mode === "password"
+            ? `Mit E-Mail und Passwort. Du bleibst danach auf diesem Gerät angemeldet.${target ? ` Es geht direkt weiter ${target}.` : ""}`
+            : "Kein Problem, auch wenn du noch nie eins festgelegt hast. Wir schicken dir einmal einen Link, danach legst du ein Passwort fest."}
+        </p>
+        {!ready && (
+          <div className="flow-notice">
+            <strong>Die Anmeldung öffnet in Kürze.</strong>
+            <p>Das öffentliche Ranking zeigt schon jetzt den gemeldeten Stand.</p>
+          </div>
+        )}
+        {message && (
+          <p className="form-error" role="alert">
+            {message}
+          </p>
+        )}
+        {mode === "link" && <InAppHint codeEnabled={codeEnabled} />}
+        <form
+          className="flow-form"
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            void (mode === "password" ? signIn() : sendLink(false));
+          }}
+        >
+          <div className="flow-field" data-invalid={emailError ? "" : undefined}>
+            <label htmlFor={`${id}-email`}>E-Mail</label>
+            <input
+              id={`${id}-email`}
+              ref={emailInput}
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint={mode === "password" ? "next" : "send"}
+              maxLength={254}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setEmailError("");
+              }}
+              aria-invalid={emailError ? true : undefined}
+              aria-describedby={emailError ? `${id}-error` : undefined}
+            />
+            {emailError && (
+              <p id={`${id}-error`} className="flow-field-error">
+                {emailError}
               </p>
             )}
-            <InAppHint codeEnabled={codeEnabled} />
-            <form
-              className="flow-form"
-              noValidate
-              onSubmit={(e) => {
-                e.preventDefault();
-                void send(false);
+          </div>
+          {mode === "password" && (
+            <PasswordField
+              value={password}
+              onChange={(value) => {
+                setPassword(value);
+                setPasswordError("");
               }}
-            >
-              <div className="flow-field" data-invalid={fieldError ? "" : undefined}>
-                <label htmlFor={`${id}-email`}>E-Mail</label>
-                <input
-                  id={`${id}-email`}
-                  ref={input}
-                  name="email"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  enterKeyHint="send"
-                  maxLength={254}
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setFieldError("");
-                  }}
-                  aria-invalid={fieldError ? true : undefined}
-                  aria-describedby={fieldError ? `${id}-error` : undefined}
-                />
-                {fieldError && (
-                  <p id={`${id}-error`} className="flow-field-error">
-                    {fieldError}
-                  </p>
-                )}
-              </div>
-              <button className="btn primary full" disabled={!ready || busy || blocked}>
-                {busy ? <LoaderCircle className="spin" size={18} /> : <Mail size={18} />}
-                Anmeldemail senden
-                {blocked && (
-                  <span className="flow-wait">
-                    {" "}
-                    ({Math.floor(wait / 60)}:{String(wait % 60).padStart(2, "0")})
-                  </span>
-                )}
-              </button>
-            </form>
-            <p className="flow-small">Kein Passwort nötig. Deine E-Mail steht nie im Ranking.</p>
-            <p className="flow-signin">
-              Noch kein Konto? <Link href={startHref}>Kostenfrei starten</Link>
-            </p>
-          </>
-        )}
+              error={passwordError}
+              autoComplete="current-password"
+              inputRef={passwordInput}
+            />
+          )}
+          <button
+            className="btn primary full"
+            disabled={!ready || busy || (mode === "link" && blocked)}
+          >
+            {busy ? (
+              <LoaderCircle className="spin" size={18} />
+            ) : mode === "password" ? (
+              <LogIn size={18} />
+            ) : (
+              <Mail size={18} />
+            )}
+            {mode === "password" ? "Anmelden" : "Link zum Passwort senden"}
+            {mode === "link" && blocked && (
+              <span className="flow-wait">
+                {" "}
+                ({Math.floor(wait / 60)}:{String(wait % 60).padStart(2, "0")})
+              </span>
+            )}
+          </button>
+        </form>
+        <div className="flow-actions">
+          <button
+            type="button"
+            className="flow-link"
+            onClick={() => {
+              setMode(mode === "password" ? "link" : "password");
+              setMessage("");
+              setPasswordError("");
+            }}
+          >
+            {mode === "password" ? "Passwort vergessen oder noch keins?" : "Zurück zur Anmeldung mit Passwort"}
+          </button>
+        </div>
+        <p className="flow-signin">
+          Noch kein Konto? <Link href={startHref}>Kostenfrei registrieren</Link>
+        </p>
       </div>
     </section>
   );

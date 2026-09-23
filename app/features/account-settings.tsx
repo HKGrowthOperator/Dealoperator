@@ -161,6 +161,11 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
         </form>
       )}
       {!demo && (
+        <Link className="btn secondary" href="/passwort">
+          Passwort festlegen oder ändern
+        </Link>
+      )}
+      {!demo && (
         <button
           className="btn secondary"
           onClick={async () => {

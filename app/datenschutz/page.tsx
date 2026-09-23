@@ -68,8 +68,12 @@ export default function Page() {
             Anmeldung und Konten laufen über Supabase (Supabase Inc.). Die
             Datenbank dieses Projekts liegt in der Region Europa (Frankfurt).
             Verarbeitet werden E-Mail-Adresse, Zeitpunkt der Bestätigung und
-            technische Sitzungsdaten. Es gibt kein Passwort: die Anmeldung
-            erfolgt über einen einmaligen Link per E-Mail.
+            technische Sitzungsdaten. Das Passwort legst du selbst fest; es
+            wird nur als sicherer Hashwert beim Anmeldedienst (Supabase)
+            gespeichert, nie im Klartext und nicht bei uns. Die Anmeldung
+            erfolgt mit E-Mail und Passwort; eine Mail mit einmaligem Link
+            gibt es nur zur Bestätigung der Adresse und wenn das Passwort
+            vergessen wurde.
           </p>
           <p>
             Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO für die Nutzung des

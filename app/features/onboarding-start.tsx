@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronRight,
+  CircleCheck,
   LoaderCircle,
   LogIn,
   Mail,
@@ -15,6 +16,7 @@ import { splitPhone } from "@/lib/phone";
 import {
   call,
   checkContact,
+  checkPassword,
   ContactFields,
   EMPTY_CONTACT,
   EmailSent,
@@ -23,6 +25,7 @@ import {
   InAppHint,
   isTeamProfile,
   linkErrorText,
+  PasswordField,
   PrivacyNote,
   ProfileCard,
   ProfileSearch,
@@ -38,7 +41,7 @@ import {
 } from "./flow-parts";
 
 type Mode = "new" | "claim" | "assign";
-type Step = "choice" | "taken" | "search" | "contact" | "sent";
+type Step = "choice" | "taken" | "search" | "contact" | "sent" | "confirmed";
 
 export type PendingStart = {
   kind: "new" | "claim";
@@ -106,7 +109,10 @@ export default function OnboardingStart({
   pending,
   initialWeg = "",
   initialSchritt = "",
+  confirmedElsewhere = false,
 }: {
+  /** Bestätigungslink auf einem anderen Gerät geöffnet (?bestaetigt=1). */
+  confirmedElsewhere?: boolean;
   ready: boolean;
   codeEnabled: boolean;
   preselected: Profile | null;
@@ -134,7 +140,9 @@ export default function OnboardingStart({
       : (urlMode ?? null);
   // Ohne belegten Versand keine Bestätigungsansicht: dann steht das Formular
   // mit den gespeicherten Angaben da.
-  const initialStep: Step = fromPending
+  const initialStep: Step = confirmedElsewhere && !pending
+    ? "confirmed"
+    : fromPending
     ? pending.profileTaken
       ? "choice"
       : pending.mailSent && initialSchritt !== "angaben"
@@ -185,6 +193,16 @@ export default function OnboardingStart({
     initialStep === "sent" ? linkErrorText(linkError, codeEnabled) : "",
   );
   const [busy, setBusy] = useState(false);
+  // Das Passwort bleibt nur im Speicher dieses Tabs: damit meldet sich das
+  // Gerät selbst an, sobald die Adresse bestätigt ist, auch wenn die Mail auf
+  // dem Handy geöffnet wurde. Nie im Entwurf, nie in der Adresse.
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const passwordRef = useRef("");
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
   const sentBefore = fromPending && pending.mailSent && !pending.profileTaken ? pending : null;
@@ -380,10 +398,20 @@ export default function OnboardingStart({
       resend && sentWith ? sentWith : { mode: mode as Mode, profile: selected, contact };
     const email = using.contact.email.trim().toLowerCase();
     try {
-      const data = await call<{ resendAfter?: number }>("/api/onboarding", {
-        action: "start",
-        value: payload(using.mode, using.profile, using.contact),
-      });
+      const data = await call<{ resendAfter?: number; signedIn?: boolean; next?: string }>(
+        "/api/onboarding",
+        resend
+          ? { action: "resend" }
+          : {
+              action: "start",
+              value: { ...payload(using.mode, using.profile, using.contact), password },
+            },
+      );
+      if (data.signedIn && data.next) {
+        window.location.assign(data.next);
+        return;
+      }
+      passwordRef.current = resend ? passwordRef.current : password;
       setSentWith(using);
       setSentTo(email);
       setSaved(true);
@@ -403,7 +431,10 @@ export default function OnboardingStart({
         setWait(e.retryAfter);
       }
       if (resend) setSendError(e.message);
-      else if (e.field && FIELDS.includes(e.field as ContactField)) {
+      else if (e.field === "password") {
+        setPasswordError(e.message);
+        passwordInput.current?.focus();
+      } else if (e.field && FIELDS.includes(e.field as ContactField)) {
         const next = { [e.field]: e.message } as FieldErrors;
         setErrors(next);
         focusFirstError(next, fields);
@@ -418,13 +449,80 @@ export default function OnboardingStart({
     }
   }
 
+  /** Mit dem Passwort aus diesem Tab (oder dem eben eingetippten) anmelden. */
+  async function signIn(secret: string) {
+    if (!secret || loggingIn) return false;
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const data = await call<{ next: string }>("/api/auth", {
+        action: "signin",
+        email: sentTo,
+        password: secret,
+        next: "/tagesabschluss",
+      });
+      window.location.assign(data.next);
+      return true;
+    } catch (err) {
+      const e = err as RequestError;
+      // Noch nicht bestätigt: einfach weiter warten.
+      if (e.status !== 409) setLoginError(e.message);
+      setLoggingIn(false);
+      return false;
+    }
+  }
+
+  // Warten auf die Bestätigung: fragt in Abständen nach, ob die Adresse
+  // bestätigt ist (auch auf einem anderen Gerät), und meldet dieses Gerät dann
+  // mit dem Passwort an. Supabase wird dabei nur gefragt, wenn es ein Signal gibt.
+  useEffect(() => {
+    if (step !== "sent") return;
+    let stopped = false;
+    let running = false;
+    async function check() {
+      if (stopped || running || document.visibilityState !== "visible") return;
+      running = true;
+      try {
+        const { state } = await call<{ state: string }>("/api/onboarding?status=bestaetigung");
+        if (!stopped && state === "confirmed") {
+          setConfirmed(true);
+          if (passwordRef.current) await signIn(passwordRef.current);
+        }
+      } catch {
+        /* nächster Versuch beim nächsten Takt */
+      } finally {
+        running = false;
+      }
+    }
+    const timer = setInterval(check, 4000);
+    const first = setTimeout(check, 1500);
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      clearTimeout(first);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+    // signIn liest nur Refs und stabile Werte.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, sentTo]);
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current) return;
     const found = checkContact(contact);
+    const pwError = checkPassword(password);
     setErrors(found);
+    setPasswordError(pwError);
     if (Object.keys(found).length) {
       focusFirstError(found, fields);
+      return;
+    }
+    if (pwError) {
+      passwordInput.current?.focus();
       return;
     }
     void send(false);
@@ -494,7 +592,73 @@ export default function OnboardingStart({
             }}
             onRestart={fromPending ? () => go("choice", null, null) : undefined}
             headingRef={heading}
+            waiting={
+              confirmed && !passwordRef.current ? (
+                <form
+                  className="flow-form flow-inline-login"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void signIn(password);
+                  }}
+                >
+                  <p className="flow-waiting">
+                    <CircleCheck size={18} aria-hidden="true" />
+                    <span>E-Mail bestätigt. Melde dich jetzt mit deinem Passwort an.</span>
+                  </p>
+                  <input type="hidden" name="email" autoComplete="username" value={sentTo} readOnly />
+                  <PasswordField
+                    value={password}
+                    onChange={setPassword}
+                    error={loginError}
+                    autoComplete="current-password"
+                  />
+                  <button className="btn primary full" disabled={loggingIn || !password}>
+                    {loggingIn && <LoaderCircle className="spin" size={18} />}
+                    Anmelden
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <p className="flow-waiting" aria-live="polite">
+                    <LoaderCircle className="spin" size={18} aria-hidden="true" />
+                    <span>
+                      {confirmed
+                        ? "E-Mail bestätigt. Du wirst angemeldet …"
+                        : passwordRef.current
+                          ? "Tipp auf den Link in der Mail. Das klappt auch auf dem Handy: Sobald du bestätigt hast, geht es hier von selbst weiter."
+                          : "Tipp auf den Link in der Mail. Danach meldest du dich mit deinem Passwort an."}
+                    </span>
+                  </p>
+                  {loginError && (
+                    <p className="form-error" role="alert">
+                      {loginError}
+                    </p>
+                  )}
+                </>
+              )
+            }
           />
+        )}
+
+        {step === "confirmed" && (
+          <>
+            <span className="icon-tile lime">
+              <CircleCheck />
+            </span>
+            <h1 ref={heading} tabIndex={-1}>
+              E-Mail bestätigt.
+            </h1>
+            <p className="flow-lead">
+              Auf dem Gerät, auf dem du dich registriert hast, geht es jetzt von
+              selbst weiter. Du willst hier weitermachen? Dann melde dich mit
+              E-Mail und Passwort an.
+            </p>
+            <div className="flow-actions">
+              <Link className="btn primary full" href="/anmelden?next=%2Ftagesabschluss">
+                Hier anmelden
+              </Link>
+            </div>
+          </>
         )}
 
         {step === "choice" && (
@@ -622,10 +786,10 @@ export default function OnboardingStart({
             )}
             <p className="flow-lead">
               {mode === "claim"
-                ? "Noch deine Kontaktdaten, dann bestätigst du deine E-Mail."
+                ? "Noch deine Kontaktdaten und ein Passwort, dann bestätigst du einmal deine E-Mail."
                 : mode === "assign"
                   ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
-                  : "Drei Angaben, dann bestätigst du deine E-Mail."}
+                  : "Name, E-Mail, Passwort und Telefon. Danach bestätigst du einmal deine E-Mail."}
             </p>
             {isTeamProfile(selected) && mode === "claim" && (
               <div className="flow-notice">
@@ -644,6 +808,19 @@ export default function OnboardingStart({
             <InAppHint codeEnabled={codeEnabled} />
             <form className="flow-form" onSubmit={submit} noValidate>
               <ContactFields
+                afterEmail={
+                  <PasswordField
+                    value={password}
+                    onChange={(value) => {
+                      setPassword(value);
+                      setPasswordError("");
+                    }}
+                    error={passwordError}
+                    autoComplete="new-password"
+                    inputRef={passwordInput}
+                    note="Mindestens 8 Zeichen. Damit meldest du dich künftig an, ohne Mail."
+                  />
+                }
                 value={contact}
                 onChange={patch}
                 errors={errors}
@@ -659,7 +836,7 @@ export default function OnboardingStart({
               )}
               <button className="btn primary full" disabled={!ready || busy || blocked}>
                 {busy ? <LoaderCircle className="spin" size={18} /> : <Mail size={18} />}
-                Bestätigungsmail senden
+                Registrieren
                 {blocked && (
                   <span className="flow-wait">
                     {" "}
