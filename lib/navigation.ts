@@ -10,6 +10,8 @@ const destinations = new Set([
   "/profil-uebernehmen",
   "/verwaltung",
   "/ranking",
+  "/tagesabschluss",
+  "/reflexionen",
 ]);
 export function safeNext(value: string | null) {
   if (!value || !/^\/(?!\/)[a-zA-Z0-9/_?=&-]*$/.test(value))
