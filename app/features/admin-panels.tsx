@@ -275,7 +275,11 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
                 <DiscordPanel status={overview.discord} />
               )}
               {tab === "team" && overview.team && (
-                <TeamPanel team={overview.team} onChanged={reload} />
+                <TeamPanel
+                  team={overview.team}
+                  participants={loaded.participants}
+                  onChanged={reload}
+                />
               )}
             </>
           )}

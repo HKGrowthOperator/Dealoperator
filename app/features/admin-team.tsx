@@ -1,7 +1,15 @@
 "use client";
 import { useState } from "react";
 import { UsersRound } from "lucide-react";
-import { Badge, Feedback, adminPost, formatDateTime, type TeamOverview } from "./admin-shared";
+import {
+  Badge,
+  Feedback,
+  ProfilePicker,
+  adminPost,
+  formatDateTime,
+  type Participant,
+  type TeamOverview,
+} from "./admin-shared";
 
 const ROLE_LABEL = {
   owner: "Admin (fest)",
@@ -12,13 +20,16 @@ const ROLE_LABEL = {
 /**
  * Team & Rollen: Admins vergeben und entziehen Admin- und Moderatorrollen.
  * Fest hinterlegte Konten (OPERATOR_ADMIN_IDS) sind nur sichtbar, nicht
- * änderbar.
+ * änderbar. Für Profile ohne Konto lässt sich eine Rolle vormerken; sie gilt
+ * nach der freigegebenen Übernahme des Profils.
  */
 export function TeamPanel({
   team,
+  participants,
   onChanged,
 }: {
   team: TeamOverview;
+  participants: Participant[];
   onChanged: () => Promise<void>;
 }) {
   const [filter, setFilter] = useState("");
@@ -28,6 +39,10 @@ export function TeamPanel({
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [profileId, setProfileId] = useState("");
+  const [profileRole, setProfileRole] = useState<"admin" | "moderator">("moderator");
+  // Nur freie, persönliche Profile; gemeinsame Meldungen blendet der Picker aus.
+  const freeProfiles = participants.filter((p) => !p.claimed && p.kind === "person");
 
   const needle = filter.trim().toLocaleLowerCase("de");
   const shown = team.accounts.filter(
@@ -56,6 +71,26 @@ export function TeamPanel({
     }
   }
 
+  async function designate(
+    participantId: string,
+    next: "admin" | "moderator" | null,
+    done: string,
+  ) {
+    setBusy(`profil:${participantId}`);
+    setError("");
+    setSuccess("");
+    try {
+      await adminPost("designateRole", { participantId, role: next });
+      setSuccess(done);
+      if (participantId === profileId) setProfileId("");
+      await onChanged();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <section className="adm-card" aria-labelledby="adm-team-title">
       <div className="adm-card-head">
@@ -75,10 +110,13 @@ export function TeamPanel({
         </div>
       </div>
       <p className="adm-hint">
-        <strong>Admin:</strong> alles, auch Regeln, Akquise Days,
-        Benachrichtigungen, Discord, CSV-Import und Rollen.{" "}
-        <strong>Moderator:</strong> Team-Inbox, Wins-Import, Prüffälle, Pausen
-        und Übernahmen, ohne Einstellungen und ohne Kontaktliste.
+        <strong>Moderator:</strong> Team-Inbox, Wins-Import, Prüffälle, Pausen,
+        Übernahmen prüfen und Team-Pushs, dazu Sessions aller Mitglieder
+        bearbeiten und absagen sowie im Discord die Moderatorrolle (für
+        verknüpfte Discord-Konten). Keine Einstellungen, keine Kontaktliste.{" "}
+        <strong>Admin:</strong> alles davon und zusätzlich Regeln,
+        Benachrichtigungen, Discord-Einrichtung, CSV-Import, Akquise Days und
+        Rollen.
       </p>
 
       <Feedback error={error} success={success} />
@@ -224,6 +262,103 @@ export function TeamPanel({
             Die Auswahl zeigt Konten, die sich schon einmal mit bestätigter
             E-Mail angemeldet haben.
           </p>
+        </form>
+      )}
+
+      <h3 className="adm-subhead">Rolle für ein Profil vormerken</h3>
+      <p className="adm-hint">
+        Für Personen mit Profil aus dem Ranking, die noch kein Konto haben. Die
+        Rolle gilt, sobald das Team die Übernahme dieses Profils freigegeben
+        hat.
+      </p>
+      {team.designations.length > 0 && (
+        <ul className="adm-list">
+          {team.designations.map((d) => {
+            const name = d.name
+              ? `${d.name}${d.company ? ` · ${d.company}` : ""}`
+              : "Profil nicht mehr vorhanden";
+            return (
+              <li key={d.participantId} className="adm-item adm-compact">
+                <div className="adm-item-head">
+                  <Badge tone={d.available ? "action" : "warn"}>
+                    {d.available
+                      ? `Wird ${ROLE_LABEL[d.role]}`
+                      : "Profil nicht mehr übernehmbar"}
+                  </Badge>
+                  <span className="adm-meta">
+                    Vorgemerkt am {formatDateTime(d.designatedAt)} von{" "}
+                    {d.designatedBy}
+                  </span>
+                </div>
+                <h3>{name}</h3>
+                <div className="adm-actions">
+                  <button
+                    className="btn secondary"
+                    disabled={!!busy}
+                    onClick={() =>
+                      void designate(
+                        d.participantId,
+                        null,
+                        `Vormerkung für ${d.name ?? "das Profil"} entfernt.`,
+                      )
+                    }
+                  >
+                    Entfernen
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {freeProfiles.length === 0 ? (
+        <p className="adm-empty">
+          Gerade gibt es kein freies Profil einer einzelnen Person.
+        </p>
+      ) : (
+        <form
+          className="adm-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const picked = freeProfiles.find((p) => p.id === profileId);
+            if (!picked) {
+              setError("Bitte wähle zuerst ein Profil aus.");
+              return;
+            }
+            void designate(
+              picked.id,
+              profileRole,
+              `${picked.name} wird nach der Freigabe der Übernahme ${ROLE_LABEL[profileRole]}.`,
+            );
+          }}
+        >
+          <ProfilePicker
+            participants={freeProfiles}
+            value={profileId}
+            onChange={setProfileId}
+            label="Profil ohne Konto"
+          />
+          <label className="adm-field adm-field-narrow">
+            <span>Rolle</span>
+            <select
+              value={profileRole}
+              onChange={(e) =>
+                setProfileRole(e.target.value as "admin" | "moderator")
+              }
+            >
+              <option value="moderator">Moderator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <div className="adm-actions">
+            <button
+              type="submit"
+              className="btn primary"
+              disabled={!!busy || !profileId}
+            >
+              Vormerken
+            </button>
+          </div>
         </form>
       )}
     </section>
