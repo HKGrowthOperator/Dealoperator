@@ -48,7 +48,11 @@ export async function isTeamMember(db: Database, owner: string) {
 
 export async function teamList(db: Database, actor: Actor) {
   requireAdmin(actor);
-  const roles = await db.query("SELECT owner,role,granted_at FROM team_roles");
+  // Ohne Migration 0004 bleibt die übrige Verwaltung nutzbar; die Liste
+  // zeigt dann nur die feste Grundverwaltung.
+  const roles = (await rolesTable(db))
+    ? await db.query("SELECT owner,role,granted_at FROM team_roles")
+    : [];
   const owners = ownerIds();
   const ids = [...new Set([...owners, ...roles.map((r) => r.owner as string)])];
   const people = ids.length
@@ -78,14 +82,13 @@ export async function teamList(db: Database, actor: Actor) {
   const accounts = await db.query(
     `SELECT a.owner,a.email,p.name FROM account_private a
        LEFT JOIN participants p ON p.owner=a.owner
-      WHERE a.email IS NOT NULL AND a.email<>''
-      ORDER BY COALESCE(p.name,a.email) LIMIT 500`,
+      WHERE a.email IS NOT NULL AND a.email<>'' AND a.owner <> ALL($1::text[])
+      ORDER BY COALESCE(p.name,a.email) LIMIT 1000`,
+    [ids],
   );
   return {
     members,
-    accounts: accounts
-      .filter((a) => !ids.includes(a.owner))
-      .map((a) => ({ owner: a.owner as string, email: a.email as string, name: (a.name as string) || null })),
+    accounts: accounts.map((a) => ({ owner: a.owner as string, email: a.email as string, name: (a.name as string) || null })),
   };
 }
 
@@ -104,6 +107,8 @@ export async function setTeamRole(db: Database, actor: Actor, raw: unknown) {
       "Dieses Konto ist fest als Verwaltung hinterlegt und lässt sich hier nicht ändern.",
       409,
     );
+  if (!(await rolesTable(db)))
+    throw new AppError("Rollen gehen erst nach der Datenbankänderung 0004.", 503);
   const [account] = await db.query("SELECT owner FROM account_private WHERE owner=$1", [v.owner]);
   if (!account) throw new AppError("Dieses Konto gibt es nicht.", 404);
   if (v.role === null) {

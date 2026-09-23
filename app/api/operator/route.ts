@@ -70,6 +70,9 @@ export async function POST(request: Request) {
         403,
       );
     if (value.action === "previewImport") {
+      // Wie der CSV-Import selbst nur für Admins.
+      if (!actor.admin)
+        throw new AppError("Den CSV-Import nutzt nur ein Admin.", 403);
       const rows = parseImport(z.string().max(250000).parse(value.text));
       return json({ rows, preview: await previewImport(db, rows) });
     }

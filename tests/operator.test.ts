@@ -275,7 +275,7 @@ test("non-admin cannot import or create claim invitations", async () => {
     /Verwaltung/,
   );
   const id = await imported();
-  await assert.rejects(issueClaim(db, alice, id), /Team/);
+  await assert.rejects(issueClaim(db, alice, id), /Admin/);
 });
 test("a confirmed email alone never hands over a prepared profile", async () => {
   const id = await imported();

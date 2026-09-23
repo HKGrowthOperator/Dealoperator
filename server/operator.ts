@@ -433,8 +433,9 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
  * Eigentum und überspringt die Teamfreigabe nicht.
  */
 export async function issueClaim(db: Database, actor: Actor, id: string) {
-  if (!isTeam(actor))
-    throw new AppError("Nur das Team kann Einladungen erstellen.", 403);
+  // Einladungscodes entstehen im CSV-Reiter, der nur Admins offensteht.
+  if (!actor.admin)
+    throw new AppError("Einladungen erstellt nur ein Admin.", 403);
   return db.transaction(async (tx) => {
     const [p] = await tx.query(
       "SELECT id,kind FROM participants WHERE id=$1 AND owner IS NULL FOR UPDATE",

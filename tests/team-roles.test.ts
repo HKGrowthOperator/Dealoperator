@@ -7,8 +7,9 @@ import { Database } from "../server/database";
 import { berlinDate } from "../lib/kpis";
 import { defaultCommitmentSettings } from "../lib/commitment";
 import { requestPause } from "../server/closing";
+import { issueClaim } from "../server/operator";
 import { decidePause, saveCommitmentRules, teamInbox } from "../server/admin";
-import { dispatch, subscribe, teamEvent } from "../server/notify";
+import { dispatch, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent } from "../server/notify";
 import { recheck } from "../server/scheduler";
 import { isTeamMember, setTeamRole, teamList, teamRecipients } from "../server/roles";
 
@@ -95,6 +96,10 @@ test("moderators handle team tasks but not settings or roles", async () => {
   await decidePause(db, mo, { id, decision: "approved" });
   assert.ok(Array.isArray(await teamInbox(db, mo)));
   await assert.rejects(saveCommitmentRules(db, mo, defaultCommitmentSettings), /Admin/);
+  // Einladungscodes gehören zum CSV-Reiter und damit zu den Admins.
+  const free = randomUUID();
+  await db.query("INSERT INTO participants(id,name) VALUES($1,'Offen')", [free]);
+  await assert.rejects(issueClaim(db, mo, free), /Admin/);
 });
 
 test("every admin and moderator gets each team alert once; a removed role stops open pushes", async () => {
@@ -139,4 +144,40 @@ test("switching off team pushes keeps the separate email safeguard", async () =>
     ["email", "pending"],
     ["push", "skipped"],
   ]);
+});
+
+test("everyone can save reminder settings; team members also their team switches", async () => {
+  const base = { reminders: true, quietStart: null, quietEnd: null };
+  // Mitglied: keine Team-Schalter, aber speichern klappt.
+  await savePrefs(db, alice, base);
+  await assert.rejects(savePrefs(db, alice, { ...base, teamAlerts: false }), /Team/);
+  // Moderator: schaltet Pushs ab, E-Mail bleibt an.
+  await setTeamRole(db, owner, { owner: "mo", role: "moderator" });
+  await savePrefs(db, mo, { ...base, teamAlerts: false });
+  let prefs = await notificationPrefs(db, "mo");
+  assert.equal(prefs.teamAlerts, false);
+  assert.equal(prefs.teamEmail, true);
+  await savePrefs(db, mo, { ...base, teamEmail: false });
+  prefs = await notificationPrefs(db, "mo");
+  assert.equal(prefs.teamEmail, false);
+  // Admin ohne Team-Felder: Standard bleibt an.
+  await savePrefs(db, owner, { ...base, reminders: false });
+  prefs = await notificationPrefs(db, "owner");
+  assert.equal(prefs.reminders, false);
+  assert.equal(prefs.teamEmail, true);
+});
+
+test("someone who saved reminders before becoming team still gets team emails", async () => {
+  await savePrefs(db, alice, { reminders: true, quietStart: null, quietEnd: null });
+  await setTeamRole(db, owner, { owner: "alice", role: "moderator" });
+  const moderator = { ...alice, moderator: true };
+  await ensureAdminPrefs(db, moderator);
+  assert.equal((await notificationPrefs(db, "alice")).teamEmail, true);
+  await signup("new-3");
+  await dispatch(db, recheck, new Date(), (async () => ({ statusCode: 201 })) as any);
+  const [mail] = await db.query(
+    "SELECT status FROM notifications WHERE recipient='alice' AND channel='email'",
+  );
+  // Wartet nur noch auf die Mail-Konfiguration, statt übersprungen zu werden.
+  assert.equal(mail.status, "pending");
 });
