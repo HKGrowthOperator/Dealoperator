@@ -33,6 +33,8 @@ type Request = {
   import_key: string | null;
   known_phone: string | null;
   competing: number | string;
+  /** Für das Profil in Team & Rollen vorgemerkte Rolle; gilt mit der Freigabe. */
+  designated_role: "admin" | "moderator" | null;
 };
 
 type Candidate = {
@@ -42,6 +44,12 @@ type Candidate = {
   kind: string;
   claimed: boolean;
   searchable: boolean;
+  designated_role?: "admin" | "moderator" | null;
+};
+
+const ROLE: Record<"admin" | "moderator", string> = {
+  admin: "Admin",
+  moderator: "Moderator",
 };
 
 const LABEL: Record<string, string> = {
@@ -239,6 +247,14 @@ export default function ReviewQueue({
                     <b className="team-flag"> · Gemeinsames Teamprofil</b>
                   )}
                 </small>
+                {decidable && r.designated_role && (
+                  <span
+                    className="review-role"
+                    title="In Team & Rollen für dieses Profil vorgemerkt. Mit der Freigabe bekommt das Konto die Rolle."
+                  >
+                    Wird nach Freigabe {ROLE[r.designated_role]}
+                  </span>
+                )}
               </div>
               <span className={`review-status ${r.status}`}>
                 {r.status === "pending" && <Clock size={14} />}
@@ -386,6 +402,9 @@ export default function ReviewQueue({
                                 {p.name}
                                 {p.company ? ` · ${p.company}` : ""}
                                 {p.searchable ? "" : " · nur per Einladung"}
+                                {p.designated_role
+                                  ? ` · wird nach Freigabe ${ROLE[p.designated_role]}`
+                                  : ""}
                               </button>
                             </li>
                           ))}
