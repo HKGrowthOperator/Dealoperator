@@ -72,6 +72,8 @@ export type ClosingRecord = {
   };
   revision: number;
   origin: "import" | "closing";
+  /** Übernommener Tag aus den Gruppenmeldungen: der eigene Abschluss ersetzt ihn. */
+  replaceable?: boolean;
   firstSubmittedAt: string | null;
   submittedAt: string | null;
   shared: boolean;
@@ -463,7 +465,9 @@ function formFor(state: ClosingState, day: string): FormState {
       values.help = text(record.reflection.help);
     }
   }
-  if (draft && record?.origin !== "import") {
+  // Ein gesperrter übernommener Stand (z. B. Akquise Day) nimmt keinen Entwurf an.
+  const locked = record?.origin === "import" && !record.replaceable;
+  if (draft && !locked) {
     for (const k of COUNT_KEYS)
       if (k in draft.counts) values.counts[k] = countText(draft.counts[k]);
     const r = draft.reflection;
@@ -479,7 +483,7 @@ function formFor(state: ClosingState, day: string): FormState {
     discord: record?.origin === "closing" ? record.discord : false,
     acknowledged: false,
     dirty: false,
-    draftAt: draft && record?.origin !== "import" ? draft.updatedAt : null,
+    draftAt: draft && !locked ? draft.updatedAt : null,
   };
 }
 
@@ -720,7 +724,10 @@ export default function ClosingForm({
   const canSubmit = eligibility.eligible;
   const record = state.closings.find((c) => c.day === form.day) ?? null;
   const submitted = record?.origin === "closing" ? record : null;
-  const imported = record?.origin === "import" ? record : null;
+  // Gesperrt: kuratierter Import. Ersetzbar: vom Team aus den Gruppenmeldungen
+  // übernommen — der eigene Abschluss gewinnt.
+  const imported = record?.origin === "import" && !record.replaceable ? record : null;
+  const prefilled = record?.origin === "import" && record.replaceable ? record : null;
   const status = statusOf(state, form.day);
   const due = (() => {
     try {
@@ -749,7 +756,9 @@ export default function ClosingForm({
       if (!prev || prev === form.day) return null;
       if (state.trackingStart && prev < state.trackingStart) return null;
       if (state.firstClosableDay && prev < state.firstClosableDay) return null;
-      if (state.closings.some((c) => c.day === prev)) return null;
+      // Ein vom Team übernommener Stand ersetzt den eigenen Abschluss nicht.
+      if (state.closings.some((c) => c.day === prev && (c.origin === "closing" || !c.replaceable)))
+        return null;
       const d = deadlineFor(prev, settings, pauses);
       if (nowMs >= d.getTime()) return null;
       return {
@@ -1244,6 +1253,19 @@ export default function ClosingForm({
                 Eingereicht {submitted.submittedAt ? `am ${formatMoment(submitted.submittedAt, tz)}` : ""}.
                 Du kannst den Tag korrigieren. Bis du die neue Fassung vollständig einreichst,
                 gilt die zuletzt eingereichte. Für die Frist zählt deine erste Einreichung.
+              </p>
+            </div>
+          )}
+          {prefilled && (
+            <div className="cm-alert info">
+              <ShieldCheck size={18} aria-hidden="true" />
+              <p>
+                Für diesen Tag hat das Team deine Zahlen aus den Gruppenmeldungen übernommen
+                ({COUNT_KEYS.filter((k) => typeof prefilled.counts[k] === "number")
+                  .map((k) => `${metricLabels[k]} ${prefilled.counts[k]}`)
+                  .join(", ") || "ohne Zahlen"}
+                ). Sie sind unten vorausgefüllt. Mit deinem Tagesabschluss ersetzt du sie; bis
+                dahin zählt der übernommene Stand im Ranking.
               </p>
             </div>
           )}

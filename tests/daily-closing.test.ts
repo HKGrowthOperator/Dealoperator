@@ -380,3 +380,35 @@ test("saved rules with the retired calling-streak switch stay valid; only one st
   assert.equal("zeroCallDayBreaksCallingStreak" in saved, false);
   await db.query("DELETE FROM app_settings WHERE key='commitment'");
 });
+
+test("an own closing replaces a day filled from the group messages; curated imports stay locked", async () => {
+  const id = await member(alice, "Alice");
+  const imported = async (source: string) =>
+    db.query(
+      `INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,$3::jsonb,$4,'import')
+       ON CONFLICT(participant,day) DO UPDATE SET counts=excluded.counts,source=excluded.source`,
+      [id, today(), JSON.stringify({ attempts: 70, legacyMeetings: 2 }), source],
+    );
+  // Ein Entwurf von vorher.
+  await saveDraft(db, alice, { day: today(), baseRevision: 0, counts: { attempts: 45 }, reflection: {} });
+  // Kuratierter Import (z. B. CSV, Akquise Day): bleibt gesperrt.
+  await imported("owner-import");
+  await assert.rejects(submitClosing(db, alice, closing({ expectedRevision: 1 })), /übernommenen Stand/);
+  assert.equal((await closingState(db, alice, today().slice(0, 7))).drafts.length, 0);
+  // Aus den Gruppenmeldungen übernommen: nur eine Lücke, die der eigene
+  // Abschluss füllt. Der Entwurf bleibt sichtbar.
+  await imported("wins-import");
+  const state = await closingState(db, alice, today().slice(0, 7));
+  assert.equal(state.closings[0].replaceable, true);
+  assert.equal(state.drafts[0]?.counts.attempts, 45);
+  // Ein übernommener Tag zählt nicht als eigener Abschluss.
+  assert.equal(state.summary?.closedDays ?? 0, 0);
+  await submitClosing(db, alice, closing({ expectedRevision: 1 }));
+  const [row] = await db.query("SELECT counts,origin,revision,first_submitted_at FROM checkins WHERE participant=$1", [id]);
+  assert.equal(row.origin, "closing");
+  assert.equal(row.revision, 2);
+  assert.ok(row.first_submitted_at);
+  assert.equal(row.counts.attempts, 40);
+  // Werte aus dem übernommenen Stand werden nicht mitgenommen.
+  assert.equal(row.counts.legacyMeetings, null);
+});
