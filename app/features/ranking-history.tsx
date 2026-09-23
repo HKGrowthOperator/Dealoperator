@@ -3,12 +3,13 @@ import { useState } from "react";
 import { CalendarDays, Trophy } from "lucide-react";
 import type { VisibleMetric } from "@/lib/kpis";
 import {
-  AKQUISE_DAY,
+  eventLabel,
   formatDay,
   formatMonth,
   metricShortLabels,
   monthRange,
   type RankingDay,
+  type RankingEvent,
 } from "@/lib/ranking-history";
 
 const fmt = (value: number | null) =>
@@ -19,6 +20,7 @@ export default function RankingHistory({
   metric,
   selectedDay,
   today,
+  events,
   onDay,
 }: {
   month: string;
@@ -26,6 +28,8 @@ export default function RankingHistory({
   metric: VisibleMetric;
   selectedDay?: string;
   today: string;
+  /** Gekennzeichnete Tage (Akquise Days). Nur Kennzeichnung, keine Wertung. */
+  events: RankingEvent[];
   onDay: (day: string) => void;
 }) {
   const [hovered, setHovered] = useState<string | null>(null);
@@ -35,16 +39,20 @@ export default function RankingHistory({
     (_, index) => `${month}-${String(index + 1).padStart(2, "0")}`,
   );
   const byDay = new Map(days.map((day) => [day.day, day]));
+  const eventByDay = new Map(events.map((event) => [event.day, event]));
+  const monthEvents = events
+    .filter((event) => event.day.startsWith(`${month}-`))
+    .toSorted((a, b) => a.day.localeCompare(b.day));
   const max = Math.max(1, ...days.map((day) => day.counts[metric] ?? 0));
-  const highlighted = byDay.get(
-    hovered || selectedDay || days.at(-1)?.day || "",
-  );
+  const focusDay = hovered || selectedDay || days.at(-1)?.day || "";
+  const highlighted = byDay.get(focusDay);
   const leaders = days.filter((day) => day.leaders[metric]).toReversed();
   const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
   const label = (day: string) => {
     const entry = byDay.get(day);
     const winner = entry?.leaders[metric];
-    return `${formatDay(day)}${day === AKQUISE_DAY ? ", Akquise Day" : ""}: ${entry ? `${fmt(entry.counts[metric])} ${metricShortLabels[metric]}` : "keine Meldung"}${winner ? `. Platz 1: ${winner.people.map((person) => person.name).join(", ")} mit ${fmt(winner.value)}` : ""}`;
+    const event = eventByDay.get(day);
+    return `${formatDay(day)}${event ? `, ${eventLabel(event)}` : ""}: ${entry ? `${fmt(entry.counts[metric])} ${metricShortLabels[metric]}` : "keine Meldung"}${winner ? `. Platz 1: ${winner.people.map((person) => person.name).join(", ")} mit ${fmt(winner.value)}` : ""}`;
   };
   return (
     <section
@@ -53,15 +61,17 @@ export default function RankingHistory({
     >
       <div className="rr-panel-heading">
         <span className="rr-eyebrow">
-          <CalendarDays size={15} /> DEIN MONAT IM BLICK
+          <CalendarDays size={15} /> TAGESWERTE DER GRUPPE
         </span>
         <h2>{formatMonth(month)}</h2>
-        <p>Jeder Balken ein Tag. Jeder Tag ein neuer Start.</p>
+        <p>Jeder Balken ist ein einzelner Tageswert, keine laufende Summe.</p>
       </div>
       <div className="rr-chart-reading" aria-live="polite">
         <div>
           <span>
-            {highlighted ? formatDay(highlighted.day, true) : "Tagesleistung"}
+            {focusDay
+              ? `Gruppe am ${formatDay(focusDay, true)}`
+              : "Noch kein Tag mit Meldung"}
           </span>
           <strong>{fmt(highlighted?.counts[metric] ?? null)}</strong>
         </div>
@@ -89,7 +99,7 @@ export default function RankingHistory({
               title={label(day)}
               aria-pressed={selectedDay === day}
               data-selected={selectedDay === day}
-              data-event={day === AKQUISE_DAY}
+              data-event={eventByDay.has(day)}
               data-missing={value === null}
               onMouseEnter={() => setHovered(day)}
               onFocus={() => setHovered(day)}
@@ -122,9 +132,15 @@ export default function RankingHistory({
           <i className="missing" />
           Keine Meldung
         </span>
+        {monthEvents.length > 0 && (
+          <span>
+            <i className="event" />
+            Event-Tag
+          </span>
+        )}
       </div>
       <div className="rr-calendar-heading">
-        <h3>Dein Tagesarchiv</h3>
+        <h3>Tagesarchiv</h3>
         <span>Tag antippen</span>
       </div>
       <div
@@ -149,7 +165,7 @@ export default function RankingHistory({
             aria-pressed={selectedDay === day}
             data-selected={selectedDay === day}
             data-reported={byDay.has(day)}
-            data-event={day === AKQUISE_DAY}
+            data-event={eventByDay.has(day)}
             onClick={() => onDay(day)}
           >
             <span>{Number(day.slice(-2))}</span>
@@ -159,15 +175,22 @@ export default function RankingHistory({
           </button>
         ))}
       </div>
-      {month === AKQUISE_DAY.slice(0, 7) && (
+      {monthEvents.map((event) => (
         <button
+          key={event.day}
           className="rr-event-shortcut"
-          onClick={() => onDay(AKQUISE_DAY)}
+          aria-pressed={selectedDay === event.day}
+          disabled={event.day > today}
+          onClick={() => onDay(event.day)}
         >
           <span className="rr-event-dot" />
-          22.09. · Akquise Day <span>akquise.de</span>
+          <span className="rr-event-shortcut-text">
+            {formatDay(event.day, true)} · {event.title}
+            <small>Tagesranking öffnen</small>
+          </span>
+          {event.partner && <span>{event.partner}</span>}
         </button>
-      )}
+      ))}
       <div className="rr-calendar-heading">
         <h3>
           <Trophy size={16} /> Tagesgewinner
@@ -186,8 +209,8 @@ export default function RankingHistory({
                 <span className="rr-winner-names">
                   {leader.people.map((p) => p.name).join(" & ")}
                   <small>
-                    {day.day === AKQUISE_DAY
-                      ? "Akquise Day"
+                    {eventByDay.has(day.day)
+                      ? eventByDay.get(day.day)!.title
                       : leader.people.length > 1
                         ? "Geteilter erster Platz"
                         : "Platz 1"}

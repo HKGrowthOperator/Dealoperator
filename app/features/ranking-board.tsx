@@ -3,18 +3,26 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Phone,
-  Users,
-  Trophy,
+  BellRing,
   CalendarCheck,
-  Search,
-  RefreshCw,
+  ChartColumn,
   Check,
-  ShieldCheck,
-  Headphones,
+  ClipboardCheck,
   Copy,
+  Flame,
+  Handshake,
+  Headphones,
+  HeartHandshake,
   Medal,
+  MessagesSquare,
+  Phone,
+  RefreshCw,
+  Search,
+  ShieldCheck,
   Sparkles,
+  TrendingUp,
+  Trophy,
+  Users,
 } from "lucide-react";
 import {
   aggregate,
@@ -28,12 +36,14 @@ import {
   type VisibleMetric,
 } from "@/lib/kpis";
 import {
-  AKQUISE_DAY,
-  bookedAppointments,
+  eventLabel,
   formatDay,
   formatMonth,
   metricShortLabels,
+  monthRange,
   monthSchema,
+  withPermanentEvents,
+  type RankingEvent,
   type RankingMonth,
 } from "@/lib/ranking-history";
 import { DISCORD_INVITE } from "@/lib/discord";
@@ -57,13 +67,23 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((part) => part[0])
     .join("");
+
+/**
+ * Getrennte Ranglisten. Dranbleiben ist eine eigene Wertung aus den Serien,
+ * kein Mischwert aus Kennzahlen.
+ */
+const COMMITMENT = "dranbleiben";
+type Choice = VisibleMetric | typeof COMMITMENT;
 const primaryMetrics: VisibleMetric[] = [
   "attempts",
   "settingsBooked",
   "closingsBooked",
-  "dealsWon",
 ];
-const secondaryMetrics: VisibleMetric[] = ["settingsHeld", "closingsHeld"];
+const secondaryMetrics: VisibleMetric[] = [
+  "dealsWon",
+  "settingsHeld",
+  "closingsHeld",
+];
 
 type LoadedRanking = {
   key: string;
@@ -71,15 +91,100 @@ type LoadedRanking = {
   error: string;
   updated: string;
 };
+/** Öffentliche Dranbleiben-Zeile. Nie ein privater Status. */
+type CommitmentRow = {
+  id: string;
+  name: string;
+  company: string;
+  calling: { current: number; best: number };
+  reflection: { current: number; best: number };
+  activeDays: number;
+  closedDays: number;
+};
+type LoadedCommitment = { key: string; rows: CommitmentRow[]; error: string };
+
+function validEvents(value: unknown): RankingEvent[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (event): event is RankingEvent =>
+      !!event &&
+      typeof event.day === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(event.day) &&
+      typeof event.title === "string" &&
+      event.title.length > 0,
+  );
+}
+function validCommitment(value: unknown): CommitmentRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (row): row is CommitmentRow =>
+      !!row &&
+      typeof row.id === "string" &&
+      typeof row.name === "string" &&
+      typeof row.calling?.current === "number" &&
+      typeof row.reflection?.current === "number" &&
+      typeof row.activeDays === "number",
+  );
+}
+
+/**
+ * Plätze für die bereits sortierte Serverliste. Gleiche Serien und gleiche
+ * aktive Tage teilen sich einen Platz.
+ */
+function placeCommitment(rows: CommitmentRow[]) {
+  const signature = (row: CommitmentRow) =>
+    `${row.calling.current}|${row.reflection.current}|${row.activeDays}`;
+  const places: number[] = [];
+  rows.forEach((row, index) => {
+    places.push(
+      index > 0 && signature(rows[index - 1]) === signature(row)
+        ? places[index - 1]
+        : index + 1,
+    );
+  });
+  return rows.map((row, index) => ({ ...row, rank: places[index] }));
+}
+
+const steps = [
+  {
+    icon: Headphones,
+    title: "Zusammen callen",
+    text: "Verabrede Call-Blöcke mit anderen oder such dir einen Buddy. Zu zweit fällt der nächste Anruf leichter.",
+    discord: "Auf Discord verabreden",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Täglich festhalten",
+    text: "Anwahlen, Settings und Closings plus eine kurze Reflexion: Was lief gut, was machst du beim nächsten Calling-Tag besser?",
+  },
+  {
+    icon: TrendingUp,
+    title: "Fortschritt sehen",
+    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serien. Die Gruppe steht dabei vor den Einzelplätzen.",
+  },
+  {
+    icon: BellRing,
+    title: "Erinnert werden",
+    text: "Wenn du Erinnerungen auf deinem Gerät einschaltest, kommt abends ein Hinweis, falls dein Abschluss noch fehlt. Mitmachen geht auch ohne.",
+  },
+  {
+    icon: HeartHandshake,
+    title: "Sich gegenseitig stützen",
+    text: "Lies die Learnings der anderen und antworte auf Discord. Dort besprecht ihr auch, was heute nicht lief.",
+    reflections: true,
+    discord: "Discord öffnen",
+  },
+] as const;
+
 export default function RankingBoard({
   discordUrl,
+  onlyRanking = false,
 }: {
   discordUrl?: string;
+  /** /ranking: nur Ergebnisse, ohne Einstiegserklärung. */
   onlyRanking?: boolean;
 }) {
   const params = useSearchParams();
-  // Der Einstieg in den Server muss immer ein Ziel haben, auch wenn die Seite
-  // ohne übergebene Adresse gerendert wird.
   const discord = discordUrl || DISCORD_INVITE;
   const today = berlinDate();
   const parsedDay = daySchema.safeParse(params.get("day"));
@@ -88,15 +193,24 @@ export default function RankingBoard({
     params.has("month") && parsedMonth.success && !params.has("day");
   const day = parsedDay.success ? parsedDay.data : today;
   const month = monthly ? parsedMonth.data : day.slice(0, 7);
-  const metric = visibleMetrics.includes(params.get("metric") as VisibleMetric)
-    ? (params.get("metric") as VisibleMetric)
-    : "attempts";
+  const requested = params.get("metric");
+  const choice: Choice =
+    requested === COMMITMENT
+      ? COMMITMENT
+      : visibleMetrics.includes(requested as VisibleMetric)
+        ? (requested as VisibleMetric)
+        : "attempts";
+  const commitmentView = choice === COMMITMENT;
+  // Verlauf und Profil brauchen eine Kennzahl; bei Dranbleiben die Anwahlen.
+  const metric: VisibleMetric = commitmentView ? "attempts" : choice;
   const [search, setSearch] = useState("");
   const [loaded, setLoaded] = useState<LoadedRanking | null>(null);
   const [retry, setRetry] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [eventList, setEventList] = useState<RankingEvent[] | null>(null);
+  const [commitment, setCommitment] = useState<LoadedCommitment | null>(null);
   const requestKey = `${month}/${monthly ? "month" : day}`;
   const current = loaded?.key === requestKey ? loaded : null;
   const data = current?.data;
@@ -113,19 +227,62 @@ export default function RankingBoard({
   const joint = useMemo(() => rows.filter(isJoint), [rows]);
   const people = useMemo(() => soloRows(rows), [rows]);
   const selected = rows.find((row) => row.id === selectedId) ?? null;
+  const needle = search.toLocaleLowerCase("de");
   const filtered = all.filter((row) =>
     `${row.name} ${row.company} ${row.role}`
       .toLocaleLowerCase("de")
-      .includes(search.toLocaleLowerCase("de")),
+      .includes(needle),
   );
   const podium = all.filter((row) => (row.counts[metric] ?? 0) > 0).slice(0, 3);
   const best = all[0]?.counts[metric] ?? 0;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
-  const event = !monthly && day === AKQUISE_DAY;
   const newest = rows.reduce(
     (latest, row) => (row.updatedAt > latest ? row.updatedAt : latest),
     "",
   );
+
+  // Gekennzeichnete Tage kommen vom Server. Ohne Antwort bleibt der
+  // Akquise Day vom 22.09.2026 trotzdem gekennzeichnet.
+  const events = useMemo(() => withPermanentEvents(eventList), [eventList]);
+  const eventByDay = useMemo(
+    () => new Map(events.map((event) => [event.day, event])),
+    [events],
+  );
+  const event = monthly ? undefined : eventByDay.get(day);
+  const otherEvents = events
+    .filter(
+      (item) =>
+        item.day.startsWith(`${month}-`) &&
+        item.day <= today &&
+        (monthly || item.day !== day),
+    )
+    .toSorted((a, b) => a.day.localeCompare(b.day));
+  // Geplante Event-Tage: nur als Hinweis, ein Ranking gibt es erst am Tag.
+  const upcoming = events
+    .filter((item) => item.day > today)
+    .toSorted((a, b) => a.day.localeCompare(b.day))[0];
+
+  // Dranbleiben: Serien mit Stand heute, aktive Tage im gewählten Monat.
+  const range = monthRange(month, today);
+  const commitmentKey = `${range.from}/${range.to}`;
+  const commitmentState =
+    commitment?.key === commitmentKey ? commitment : null;
+  const commitmentRows = useMemo(
+    () => placeCommitment(commitmentState?.rows || []),
+    [commitmentState],
+  );
+  const commitmentFiltered = commitmentRows.filter((row) =>
+    `${row.name} ${row.company}`.toLocaleLowerCase("de").includes(needle),
+  );
+  const runningStreaks = commitmentState?.error
+    ? null
+    : commitmentState
+      ? commitmentState.rows.filter((row) => row.calling.current > 0).length
+      : null;
+  const latestReported =
+    !monthly && data && rows.length === 0
+      ? data.days.filter((entry) => entry.day !== day).at(-1)
+      : undefined;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -181,20 +338,67 @@ export default function RankingBoard({
     };
   }, [requestKey, month, day, monthly, retry]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/events", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw Error(payload.error);
+        if (!controller.signal.aborted)
+          setEventList(validEvents(payload.events));
+      })
+      .catch(() => {
+        // Nicht erreichbar: der feste Akquise Day bleibt als Rückfall.
+        if (!controller.signal.aborted) setEventList([]);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const [from, to] = commitmentKey.split("/");
+    fetch(`/api/ranking/dranbleiben?from=${from}&to=${to}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok)
+          throw Error(
+            payload.error || "Die Serien sind gerade nicht abrufbar.",
+          );
+        if (!controller.signal.aborted)
+          setCommitment({
+            key: commitmentKey,
+            rows: validCommitment(payload.rows),
+            error: "",
+          });
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted)
+          setCommitment({
+            key: commitmentKey,
+            rows: [],
+            error: (e as Error).message,
+          });
+      });
+    return () => controller.abort();
+  }, [commitmentKey, retry]);
+
   function navigate(
     period: { day: string } | { month: string },
-    nextMetric = metric,
+    nextChoice: Choice = choice,
   ) {
-    const next = new URLSearchParams({ ...period, metric: nextMetric });
+    const next = new URLSearchParams({ ...period, metric: nextChoice });
     window.history.pushState(null, "", `${window.location.pathname}?${next}`);
     setSelectedId(null);
     setShareMessage("");
   }
-  function chooseMetric(value: VisibleMetric) {
+  function choose(value: Choice) {
     navigate(monthly ? { month } : { day }, value);
   }
   async function share() {
-    const url = `${window.location.origin}/ranking?${new URLSearchParams({ ...(monthly ? { month } : { day }), metric })}`;
+    const url = `${window.location.origin}/ranking?${new URLSearchParams({ ...(monthly ? { month } : { day }), metric: choice })}`;
     try {
       await navigator.clipboard.writeText(url);
       setShareMessage("Link kopiert");
@@ -206,41 +410,104 @@ export default function RankingBoard({
     <div className="operator-site rr-site">
       <OperatorHeader discordUrl={discord} />
       <main className="rr-main">
-        {/* Steht bewusst außerhalb der Lade- und Fehlerzweige: der Weg zurück
-            in den Server darf nie davon abhängen, ob die Zahlen gerade
-            abrufbar sind oder ob jemand angemeldet ist. */}
-        <section className="rr-intro">
-          <div className="rr-intro-copy">
+        {onlyRanking ? (
+          <section className="rr-intro rr-intro-compact">
             <span className="rr-eyebrow">
-              <span className="rr-live-dot" /> DIE CREW. DIE ZAHLEN.
+              <span className="rr-live-dot" /> ERGEBNISSE
             </span>
-            <h1>
-              Zusammen callen.
-              <br />
-              Gemeinsam <em>dranbleiben.</em>
-            </h1>
+            <h1>Was wir gemeinsam schaffen.</h1>
             <p>
-              Hier halten wir fest, was wir gemeinsam erreichen. Auf Discord
-              verabreden wir die nächsten Call-Blöcke, teilen Learnings und
-              pushen uns gegenseitig.
+              Erst die Gruppe, dann die Einzelplätze. Tag und Monat getrennt,
+              jede Kennzahl mit eigener Rangliste. Fehlende Meldungen zählen
+              nicht als null.
             </p>
             <div className="rr-intro-actions">
-              <a
-                className="rr-discord-cta"
-                href={discord}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Headphones size={19} />
-                Auf Discord weitercallen
-              </a>
-              <Link href="/beitreten" className="rr-intro-secondary">
-                <ShieldCheck size={17} />
-                Meine Zahlen &amp; mein Profil
+              <Link href="/tagesabschluss" className="rr-cta-primary">
+                <ClipboardCheck size={18} />
+                Tagesabschluss machen
               </Link>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="rr-intro rr-hero" aria-labelledby="rr-title">
+            <div className="rr-intro-copy">
+              <span className="rr-eyebrow">
+                <span className="rr-live-dot" /> KOSTENFREI FÜR AKTIVE CALLER
+              </span>
+              <h1 id="rr-title">
+                Zusammen callen.
+                <br />
+                Gemeinsam <em>dranbleiben.</em>
+              </h1>
+              <p>
+                Deal Operator hilft dir, am Telefon dranzubleiben: regelmäßig
+                zusammen callen, jeden Calling-Tag Zahlen und Learnings
+                festhalten und sehen, wie du und die Gruppe vorankommen.
+              </p>
+              <div className="rr-intro-actions">
+                <Link href="/tagesabschluss" className="rr-cta-primary">
+                  <ClipboardCheck size={18} />
+                  Tagesabschluss machen
+                </Link>
+                <a href="#ergebnisse" className="rr-intro-secondary">
+                  <ChartColumn size={17} />
+                  Ergebnisse ansehen
+                </a>
+              </div>
+              <p className="rr-intro-note">
+                Neu hier? <Link href="/beitreten">Kostenfrei mitmachen</Link>
+              </p>
+            </div>
+            <ol
+              className="rr-steps"
+              id="so-funktionierts"
+              aria-label="So hilft dir Deal Operator dranzubleiben"
+            >
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <li
+                    key={step.title}
+                    style={{ "--step": index } as CSSProperties}
+                  >
+                    <span className="rr-step-icon" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <div>
+                      <strong className="rr-step-title">{step.title}</strong>
+                      <p>{step.text}</p>
+                      {("reflections" in step || "discord" in step) && (
+                        <span className="rr-step-links">
+                          {"reflections" in step && (
+                            <Link href="/reflexionen">Reflexionen lesen</Link>
+                          )}
+                          {"discord" in step && (
+                            <a
+                              href={discord}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {step.discord}
+                            </a>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        )}
+
+        <div className="rr-results-anchor" id="ergebnisse">
+          {!onlyRanking && (
+            <div className="rr-section-head">
+              <span className="rr-eyebrow">ERGEBNISSE</span>
+              <h2>Erst die Gruppe, dann die Einzelplätze.</h2>
+            </div>
+          )}
+        </div>
 
         <section className="rr-toolbar" aria-label="Ranking-Zeitraum">
           <div className="rr-segment" role="group" aria-label="Ansicht">
@@ -315,24 +582,48 @@ export default function RankingBoard({
         {event && (
           <div className="rr-event-banner">
             <span className="rr-event-tag">
-              <Sparkles size={15} /> AKQUISE DAY
+              <Sparkles size={15} /> {event.title.toLocaleUpperCase("de")}
             </span>
             <p>
               <strong>
-                22. September 2026. Gemeinsam den Hörer in die Hand.
+                {eventLabel(event)} · {formatDay(event.day)}
               </strong>
-              <span>
-                Danke an{" "}
-                <a
-                  href="https://akquise.de"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  akquise.de
-                </a>{" "}
-                für diesen Tag und an alle, die mitgezogen haben.
-              </span>
+              {event.thanks && <span>{event.thanks}</span>}
+              {event.url && (
+                <a href={event.url} target="_blank" rel="noopener noreferrer">
+                  {event.partner || event.url.replace(/^https:\/\//, "")}
+                </a>
+              )}
+              <small>
+                Unten siehst du das Tagesranking dieses Tages. Die Leistung
+                steckt genau einmal in Tages- und Monatswerten, ohne
+                Zusatzwertung.
+              </small>
             </p>
+          </div>
+        )}
+        {(otherEvents.length > 0 || upcoming) && (
+          <div className="rr-event-strip" aria-label="Gekennzeichnete Tage">
+            {upcoming && (
+              <p className="rr-event-upcoming">
+                <CalendarCheck size={14} />
+                <span>
+                  Geplant: {eventLabel(upcoming)} am {formatDay(upcoming.day)}
+                </span>
+              </p>
+            )}
+            {otherEvents.map((item) => (
+              <button
+                key={item.day}
+                onClick={() => navigate({ day: item.day })}
+              >
+                <Sparkles size={14} />
+                <span>
+                  {formatDay(item.day, true)} · {eventLabel(item)}
+                </span>
+                <small>Tagesranking ansehen</small>
+              </button>
+            ))}
           </div>
         )}
 
@@ -350,22 +641,22 @@ export default function RankingBoard({
         ) : loading ? (
           <div className="rr-skeleton" role="status">
             <RefreshCw size={22} className="spin" />
-            <span>Die Leistung der Crew wird geladen …</span>
+            <span>Die Leistung der Gruppe wird geladen …</span>
           </div>
         ) : (
           data && (
             <>
               <section
                 className="rr-scoreboard"
-                aria-label={`Gemeinsame Leistung: ${periodLabel}`}
+                aria-label={`Gruppenleistung: ${periodLabel}`}
               >
                 <div className="rr-scoreboard-top">
                   <span className="rr-eyebrow">
                     {monthly
-                      ? "UNSER MONAT"
+                      ? "GRUPPENLEISTUNG · MONAT"
                       : event
-                        ? "DAS HABEN WIR GEMEINSAM ERREICHT"
-                        : "UNSER TAG"}
+                        ? `GRUPPENLEISTUNG · ${event.title.toLocaleUpperCase("de")}`
+                        : "GRUPPENLEISTUNG · TAG"}
                   </span>
                   <span className="rr-period-label">{periodLabel}</span>
                 </div>
@@ -377,24 +668,34 @@ export default function RankingBoard({
                     <strong key={`${requestKey}-calls`}>
                       {fmt(totals.attempts)}
                     </strong>
-                    <small>Hörer in die Hand. Gemeinsam dran.</small>
-                  </div>
-                  <div>
-                    <span>
-                      <CalendarCheck size={18} /> Termine vereinbart
-                    </span>
-                    <strong>{fmt(bookedAppointments(totals))}</strong>
-                    <small>Settings & Closings</small>
-                  </div>
-                  <div>
-                    <span>
-                      <Trophy size={18} /> Deals gewonnen
-                    </span>
-                    <strong>{fmt(totals.dealsWon)}</strong>
                     <small>
-                      {totals.dealsWon === null
+                      {totals.attempts === null
                         ? "Noch nicht gemeldet"
-                        : "Aus Einsatz wird Ergebnis."}
+                        : monthly
+                          ? "Summe dieses Monats"
+                          : "Tageswert"}
+                    </small>
+                  </div>
+                  <div>
+                    <span>
+                      <CalendarCheck size={18} /> Settings
+                    </span>
+                    <strong>{fmt(totals.settingsBooked)}</strong>
+                    <small>
+                      {totals.settingsBooked === null
+                        ? "Noch nicht gemeldet"
+                        : "vereinbart"}
+                    </small>
+                  </div>
+                  <div>
+                    <span>
+                      <Handshake size={18} /> Closings
+                    </span>
+                    <strong>{fmt(totals.closingsBooked)}</strong>
+                    <small>
+                      {totals.closingsBooked === null
+                        ? "Noch nicht gemeldet"
+                        : "vereinbart"}
                     </small>
                   </div>
                   <div>
@@ -403,7 +704,7 @@ export default function RankingBoard({
                     </span>
                     <strong>{fmt(people.length)}</strong>
                     <small>
-                      {people.length === 1 ? "Person" : "Personen"}
+                      {people.length === 1 ? "Person" : "Personen"} mit Meldung
                       {joint.length > 0
                         ? ` · ${joint.length} gemeinsame ${joint.length === 1 ? "Meldung" : "Meldungen"}`
                         : ""}
@@ -411,14 +712,30 @@ export default function RankingBoard({
                   </div>
                 </div>
                 <div className="rr-score-detail">
-                  <span>Davon vereinbart</span>
-                  <button onClick={() => chooseMetric("settingsBooked")}>
-                    <strong>{fmt(totals.settingsBooked)}</strong> Settings
+                  <button onClick={() => choose("dealsWon")}>
+                    <strong>{fmt(totals.dealsWon)}</strong> Deals gewonnen
                   </button>
-                  <button onClick={() => chooseMetric("closingsBooked")}>
-                    <strong>{fmt(totals.closingsBooked)}</strong> Closings
-                  </button>
+                  {runningStreaks !== null && (
+                    <button onClick={() => choose(COMMITMENT)}>
+                      <Flame size={13} />
+                      <strong>{fmt(runningStreaks)}</strong>
+                      {runningStreaks === 1
+                        ? "laufende Calling-Serie"
+                        : "laufende Calling-Serien"}
+                    </button>
+                  )}
                 </div>
+                {latestReported && (
+                  <p className="rr-score-hint">
+                    Für diesen Tag ist noch nichts gemeldet.{" "}
+                    <button
+                      onClick={() => navigate({ day: latestReported.day })}
+                    >
+                      Letzten Tag mit Meldungen ansehen (
+                      {formatDay(latestReported.day, true)})
+                    </button>
+                  </p>
+                )}
                 {data.label && (
                   <p className="rr-snapshot-label">{data.label}</p>
                 )}
@@ -427,17 +744,21 @@ export default function RankingBoard({
               <section
                 className="rr-competition"
                 id="ranking"
-                aria-label="Community-Ranking"
+                aria-label="Einzelplätze"
               >
                 <div className="rr-ranking-heading">
                   <div>
                     <span className="rr-eyebrow">
-                      {monthly ? "MONATSRANKING" : "TAGESRANKING"}
+                      EINZELPLÄTZE · {monthly ? "MONAT" : "TAG"}
                     </span>
                     <h2>
-                      {monthly
-                        ? "Die Crew im Monatsvergleich."
-                        : "Wer hat abgeliefert?"}
+                      {commitmentView
+                        ? "Wer bleibt dran?"
+                        : monthly
+                          ? "Monatsranking"
+                          : event
+                            ? `Tagesranking ${event.title}`
+                            : "Tagesranking"}
                     </h2>
                   </div>
                   <span>{periodLabel}</span>
@@ -445,44 +766,64 @@ export default function RankingBoard({
                 <div
                   className="rr-metric-bar"
                   role="group"
-                  aria-label="Ranking-Kennzahl"
+                  aria-label="Rangliste wählen"
                 >
                   {primaryMetrics.map((key) => (
                     <button
                       key={key}
-                      aria-pressed={metric === key}
-                      onClick={() => chooseMetric(key)}
+                      aria-pressed={choice === key}
+                      onClick={() => choose(key)}
                     >
                       {metricShortLabels[key]}
                     </button>
                   ))}
+                  <button
+                    aria-pressed={commitmentView}
+                    onClick={() => choose(COMMITMENT)}
+                    className="rr-commit-tab"
+                  >
+                    <Flame size={14} /> Dranbleiben
+                  </button>
                   <label className="rr-more-metrics">
                     <span className="sr-only">Weitere Kennzahlen</span>
                     <select
                       aria-label="Weitere Kennzahlen"
-                      value={secondaryMetrics.includes(metric) ? metric : ""}
+                      value={
+                        secondaryMetrics.includes(choice as VisibleMetric)
+                          ? choice
+                          : ""
+                      }
                       onChange={(e) => {
                         if (e.target.value)
-                          chooseMetric(e.target.value as VisibleMetric);
+                          choose(e.target.value as VisibleMetric);
                       }}
                     >
                       <option value="" disabled>
-                        Durchgeführte Termine
+                        Weitere Kennzahlen
                       </option>
                       {secondaryMetrics.map((key) => (
                         <option value={key} key={key}>
-                          {metricShortLabels[key]}
+                          {metricLabels[key]}
                         </option>
                       ))}
                     </select>
                   </label>
                 </div>
                 <div className="rr-ranking-context">
-                  <span>
-                    Sortiert nach <strong>{metricLabels[metric]}</strong>
-                  </span>
+                  {commitmentView ? (
+                    <span>
+                      Sortiert nach aktueller <strong>Calling-Serie</strong>,
+                      dann Reflexions-Serie, dann aktiven Tagen.
+                    </span>
+                  ) : (
+                    <span>
+                      Sortiert nach <strong>{metricLabels[metric]}</strong>
+                      {monthly ? " im Monat" : " an diesem Tag"}. Jede
+                      Kennzahl hat ihre eigene Rangliste.
+                    </span>
+                  )}
                 </div>
-                {podium.length > 0 && (
+                {!commitmentView && podium.length > 0 && (
                   <div
                     className="rr-podium"
                     key={`${requestKey}-${metric}`}
@@ -531,17 +872,23 @@ export default function RankingBoard({
                   <div className="rr-leaderboard rr-glass">
                     <div className="rr-list-top">
                       <h3>
-                        Gemeldet: {metricShortLabels[metric]}{" "}
+                        {commitmentView
+                          ? "Dranbleiben"
+                          : `Gemeldet: ${metricShortLabels[metric]}`}{" "}
                         <span>
-                          {search
-                            ? `${filtered.length} von ${all.length}`
-                            : all.length}
+                          {commitmentView
+                            ? search
+                              ? `${commitmentFiltered.length} von ${commitmentRows.length}`
+                              : commitmentRows.length
+                            : search
+                              ? `${filtered.length} von ${all.length}`
+                              : all.length}
                         </span>
                       </h3>
                       <label className="rr-search">
                         <Search size={17} />
                         <input
-                          aria-label="Caller suchen"
+                          aria-label="Person suchen"
                           placeholder="Name suchen"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
@@ -556,7 +903,111 @@ export default function RankingBoard({
                         )}
                       </label>
                     </div>
-                    {filtered.length ? (
+                    {commitmentView ? (
+                      !commitmentState ? (
+                        <div className="rr-empty" role="status">
+                          <RefreshCw size={24} className="spin" />
+                          <p>Die Serien werden geladen …</p>
+                        </div>
+                      ) : commitmentState.error ? (
+                        <div className="rr-empty" role="alert">
+                          <h3>Die Serien sind gerade nicht abrufbar.</h3>
+                          <p>{commitmentState.error}</p>
+                          <button
+                            className="btn primary"
+                            onClick={() => setRetry((value) => value + 1)}
+                          >
+                            Erneut laden
+                          </button>
+                        </div>
+                      ) : commitmentFiltered.length ? (
+                        <ol
+                          className="rr-rank-list rr-commit-list"
+                          aria-label="Rangliste Dranbleiben"
+                        >
+                          {commitmentFiltered.map((row, index) => (
+                            <li
+                              key={row.id}
+                              data-place={row.rank}
+                              style={
+                                {
+                                  "--row-delay": `${Math.min(index, 12) * 22}ms`,
+                                } as CSSProperties
+                              }
+                            >
+                              <div className="rr-commit-row">
+                                <span className="rr-place">
+                                  <span className="sr-only">Platz </span>
+                                  {row.rank}
+                                </span>
+                                <span className="rr-rank-name">
+                                  <strong>{row.name}</strong>
+                                  <small>{row.company || "Teil der Crew"}</small>
+                                </span>
+                                <dl className="rr-commit-stats">
+                                  <div data-lead="true">
+                                    <dt>Calling-Serie</dt>
+                                    <dd>
+                                      <strong>
+                                        {fmt(row.calling.current)}
+                                      </strong>
+                                      <small>
+                                        Bestwert {fmt(row.calling.best)}
+                                      </small>
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Reflexions-Serie</dt>
+                                    <dd>
+                                      <strong>
+                                        {fmt(row.reflection.current)}
+                                      </strong>
+                                      <small>
+                                        Bestwert {fmt(row.reflection.best)}
+                                      </small>
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Aktive Tage</dt>
+                                    <dd>
+                                      <strong>{fmt(row.activeDays)}</strong>
+                                      <small>
+                                        {fmt(row.closedDays)}{" "}
+                                        {row.closedDays === 1
+                                          ? "Abschluss"
+                                          : "Abschlüsse"}
+                                      </small>
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <div className="rr-empty">
+                          <Flame size={27} />
+                          <h3>
+                            {search
+                              ? "Kein Profil gefunden."
+                              : "Noch keine öffentlichen Serien."}
+                          </h3>
+                          <p>
+                            {search
+                              ? "Versuche einen anderen Namen."
+                              : "Hier erscheinen Personen, die ihren Tagesabschluss selbst einreichen und der öffentlichen Anzeige zugestimmt haben."}
+                          </p>
+                          {!search && (
+                            <Link
+                              href="/tagesabschluss"
+                              className="btn primary"
+                            >
+                              Tagesabschluss machen
+                            </Link>
+                          )}
+                        </div>
+                      )
+                    ) : filtered.length ? (
                       <ol
                         className="rr-rank-list"
                         key={`${requestKey}-${metric}`}
@@ -621,23 +1072,23 @@ export default function RankingBoard({
                             ? "Kein Profil gefunden."
                             : people.length > 0
                               ? `Noch keine Meldung für ${metricShortLabels[metric]}.`
-                              : "Dieser Tag gehört noch euch."}
+                              : "Für diesen Zeitraum ist noch nichts gemeldet."}
                         </h3>
                         <p>
                           {search
                             ? "Versuche einen anderen Namen."
                             : people.length > 0
-                              ? "Für andere Kennzahlen gibt es Meldungen — wechsle oben die Auswahl."
-                              : `Für ${monthly ? "diesen Monat" : "diesen Tag"} sind noch keine öffentlichen Zahlen gemeldet. Wähle einen Tag im Archiv oder halte deinen nächsten Call-Block fest.`}
+                              ? "Für andere Kennzahlen gibt es Meldungen. Wechsle oben die Auswahl."
+                              : `Für ${monthly ? "diesen Monat" : "diesen Tag"} sind noch keine öffentlichen Zahlen gemeldet. Wähle einen Tag im Archiv oder halte deinen Calling-Tag im Tagesabschluss fest.`}
                         </p>
                         {!search && (
-                          <Link href="/beitreten" className="btn primary">
-                            Meine Zahlen eintragen
+                          <Link href="/tagesabschluss" className="btn primary">
+                            Tagesabschluss machen
                           </Link>
                         )}
                       </div>
                     )}
-                    {joint.length > 0 && (
+                    {!commitmentView && joint.length > 0 && (
                       <div className="rr-joint">
                         <div className="rr-joint-head">
                           <h4>Gemeinsame Meldungen</h4>
@@ -679,13 +1130,32 @@ export default function RankingBoard({
                       </div>
                     )}
                     <div className="rr-table-caption">
-                      <span>
-                        Nur Personen mit einer Meldung für diese Kennzahl. 0 ist
-                        eine Meldung.
-                      </span>
-                      <span>Gleiche Werte teilen sich einen Rang.</span>
+                      {commitmentView ? (
+                        <>
+                          <span>
+                            Serien zählen fristgerecht eingereichte
+                            Tagesabschlüsse an Pflicht-Tagen. Wochenenden sind
+                            keine Pflicht-Tage. Die Calling-Serie wächst nur
+                            mit Anwahlen, die Reflexions-Serie auch an Tagen
+                            ohne Anwahlen.
+                          </span>
+                          <span>
+                            Serien: Stand heute. Aktive Tage und Abschlüsse:{" "}
+                            {formatMonth(month)}. Nur eigene Tagesabschlüsse
+                            mit öffentlicher Anzeige.
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            Nur Personen mit einer Meldung für diese Kennzahl.
+                            0 ist eine Meldung, keine Meldung ist keine 0.
+                          </span>
+                          <span>Gleiche Werte teilen sich einen Rang.</span>
+                        </>
+                      )}
                     </div>
-                    {newest && (
+                    {!commitmentView && newest && (
                       <p className="rr-data-updated">
                         Letzte Meldung aktualisiert am{" "}
                         {new Date(newest).toLocaleString("de-DE", {
@@ -708,19 +1178,13 @@ export default function RankingBoard({
                       >
                         <CalendarCheck size={16} />
                         {archiveOpen
-                          ? "Archiv schließen"
-                          : "Verlauf & Tagesarchiv"}
+                          ? "Verlauf schließen"
+                          : "Tagesverlauf & Archiv"}
                       </button>
-                      {discord && (
-                        <a
-                          href={discord}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Headphones size={16} />
-                          Discord
-                        </a>
-                      )}
+                      <Link href="/reflexionen">
+                        <MessagesSquare size={16} />
+                        Reflexionen
+                      </Link>
                     </div>
                     <div
                       className="rr-aside-content"
@@ -733,42 +1197,33 @@ export default function RankingBoard({
                         metric={metric}
                         selectedDay={monthly ? undefined : day}
                         today={today}
+                        events={events}
                         onDay={(value) => {
                           navigate({ day: value });
                           setArchiveOpen(false);
                         }}
                       />
-                      <div className="rr-discord">
-                        <Headphones size={23} />
-                        <h3>
-                          Die Zahlen hier.
-                          <br />
-                          Die Energie auf Discord.
-                        </h3>
+                      <div className="rr-exchange rr-glass">
+                        <span className="rr-eyebrow">
+                          <MessagesSquare size={14} /> AUSTAUSCH
+                        </span>
+                        <h3>Learnings teilen, Buddy finden.</h3>
                         <p>
-                          Zusammen callen, Wins teilen und morgen wieder
-                          antreten. Deine Crew wartet.
+                          Angemeldete Mitglieder lesen unter Reflexionen, was
+                          bei anderen funktioniert hat. Antworten, Buddy-Suche
+                          und gemeinsame Call-Blöcke laufen auf Discord.
                         </p>
-                        {discord ? (
+                        <div className="rr-exchange-links">
+                          <Link href="/reflexionen">Reflexionen lesen</Link>
                           <a
-                            className="btn primary"
                             href={discord}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
-                            Zur Crew auf Discord
+                            <Headphones size={15} />
+                            Discord öffnen
                           </a>
-                        ) : (
-                          <Link
-                            className="btn primary"
-                            href="/community?modus=eigen"
-                          >
-                            Community entdecken
-                          </Link>
-                        )}
-                        <small>
-                          Buddys, Austausch & KPI-Tracking sind kostenfrei.
-                        </small>
+                        </div>
                       </div>
                     </div>
                   </aside>
@@ -794,7 +1249,7 @@ export default function RankingBoard({
           )
         )}
       </main>
-      <OperatorFooter />
+      <OperatorFooter discordUrl={discord} />
       <Dialog
         open={!!selected}
         onOpenChange={(open) => {
@@ -815,7 +1270,7 @@ export default function RankingBoard({
               <div className="rr-profile-period">
                 <CalendarCheck size={16} />
                 {periodLabel}
-                {event && <span>Akquise Day</span>}
+                {event && <span>{event.title}</span>}
               </div>
               <div className="profile-kpis">
                 {visibleMetrics.map((key) => (

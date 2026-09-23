@@ -7,7 +7,7 @@ import PageMotion from "./features/page-motion";
 export const metadata: Metadata = {
   title: "Deal Operator — Gemeinsam dranbleiben.",
   description:
-    "Deal Operator – deine kostenfreie Sales-Community. Zahlen reflektieren, Call-Buddys finden und gemeinsam besser werden.",
+    "Deal Operator ist kostenfrei: Zusammen callen, jeden Calling-Tag Zahlen und Learnings festhalten, Fortschritt sehen und gemeinsam dranbleiben.",
   icons: { icon: "/favicon.svg" },
 };
 export default function RootLayout({

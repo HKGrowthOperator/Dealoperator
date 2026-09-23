@@ -18,6 +18,38 @@ export const monthSchema = z
     "Wähle einen gültigen Monat, der nicht in der Zukunft liegt.",
   );
 export const AKQUISE_DAY = "2026-09-22";
+/** Gekennzeichneter Tag wie ein Akquise Day. Nur Anzeige, keine Wertung. */
+export type RankingEvent = {
+  day: string;
+  title: string;
+  partner: string;
+  url: string;
+  thanks: string;
+};
+/**
+ * Rückfall, falls /api/events leer oder nicht erreichbar ist. Der 22.09.2026
+ * bleibt dauerhaft gekennzeichnet, auch ohne Datenbank.
+ */
+export const AKQUISE_EVENT: RankingEvent = {
+  day: AKQUISE_DAY,
+  title: "Akquise Day",
+  partner: "akquise.de",
+  url: "https://akquise.de",
+  thanks:
+    "Danke an akquise.de für diesen Tag und an alle, die mitgezogen haben.",
+};
+/** Serverliste plus dauerhafter Akquise Day, nach Tag absteigend. */
+export function withPermanentEvents(events: RankingEvent[] | null | undefined) {
+  const list = Array.isArray(events) ? events : [];
+  const merged = list.some((event) => event.day === AKQUISE_DAY)
+    ? list
+    : [...list, AKQUISE_EVENT];
+  return [...merged].sort((a, b) => b.day.localeCompare(a.day));
+}
+/** „Akquise Day von akquise.de“ bzw. nur der Titel ohne Partner. */
+export function eventLabel(event: Pick<RankingEvent, "title" | "partner">) {
+  return event.partner ? `${event.title} von ${event.partner}` : event.title;
+}
 export const metricShortLabels: Record<VisibleMetric, string> = {
   attempts: "Anwahlen",
   settingsBooked: "Settings",
