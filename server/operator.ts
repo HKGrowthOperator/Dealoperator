@@ -271,7 +271,9 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         ref: id,
         state: "confirmed",
         title: `Neues Profil angelegt: ${value.name}`,
-        body: "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer fehlt noch.",
+        body: phone
+          ? "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer angegeben (nicht geprüft)."
+          : "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer fehlt noch.",
         alert: { key: `signup:${actor.userId}`, kind: "new" },
       });
     return { ok: true, id };
@@ -525,6 +527,10 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
     await outbox(tx, p.id);
     return { ok: true };
   });
+}
+/** Zähler zurücksetzen, z. B. Codeversuche nach einer neuen Mail. */
+export async function clearRateLimit(db: Database, key: string) {
+  await db.query("DELETE FROM rate_limits WHERE key=$1", [hash(key)]);
 }
 export async function rateLimit(
   db: Database,

@@ -47,11 +47,18 @@ export function sendFailure(error: AuthFailure) {
   const code = error?.code || "";
   const status = error?.status || 0;
   if (status === 429 || code.startsWith("over_") || /rate limit|security purposes/i.test(error?.message || "")) {
-    const seconds = Number(/after (\d+) seconds?/i.exec(error?.message || "")?.[1]) || RESEND_SECONDS;
+    // Eine Zahl nur, wenn Supabase sie nennt (Wartezeit je Adresse). Das
+    // stündliche Mail-Kontingent des Projekts hat keine feste Restzeit.
+    const seconds = Number(/after (\d+) seconds?/i.exec(error?.message || "")?.[1]);
+    if (seconds > 0)
+      return new AppError(
+        `Aus Sicherheitsgründen geht die nächste Mail erst in ${seconds} Sekunden.`,
+        429,
+        seconds,
+      );
     return new AppError(
-      `Aus Sicherheitsgründen geht die nächste Mail erst in ${seconds} Sekunden.`,
+      "Gerade gehen zu viele Anmeldemails raus. Bitte versuche es etwas später noch einmal; deine Angaben bleiben hier stehen.",
       429,
-      seconds,
     );
   }
   if (code === "email_address_invalid" || code === "validation_failed")
@@ -75,7 +82,7 @@ export function codeFailure(error: AuthFailure) {
       400,
     );
   if (status === 429 || code.startsWith("over_"))
-    return new AppError("Zu viele Versuche. Bitte warte kurz und versuche es dann erneut.", 429, 60);
+    return new AppError("Zu viele Versuche. Bitte warte einen Moment und versuche es dann erneut.", 429);
   if (status >= 500) return new AppError("Die Prüfung klappt gerade nicht. Bitte versuche es gleich noch einmal.", 503);
   return new AppError("Dieser Code stimmt nicht. Prüfe ihn oder fordere einen neuen an.", 400);
 }

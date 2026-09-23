@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 import { authClient, authReady, getCurrentUser } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
-import { AppError } from "@/server/operator";
+import { AppError, clearRateLimit } from "@/server/operator";
 import { emailCodeEnabled, emailRedirect, RESEND_SECONDS, sendFailure } from "@/server/email-auth";
 import {
   answerInfoRequest,
+  browserSecret,
+  markMailSent,
   profileForSelection,
   requestClaimSignedIn,
   requestForActor,
@@ -50,10 +52,7 @@ export async function GET(request: Request) {
         ),
       });
 
-    return json({
-      ready: true,
-      profiles: await searchProfiles(db, search.get("q") || ""),
-    });
+    throw new AppError("Unbekannte Anfrage.");
   } catch (e) {
     return errorResponse(e);
   }
@@ -62,6 +61,15 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const raw = await body(request, 8000);
+    // Profilsuche per POST: der gesuchte Name steht so in keiner Adresse und
+    // in keinem Zugriffsprotokoll.
+    if (raw?.action === "search") {
+      if (!databaseReady()) return json({ ready: false, profiles: [] });
+      return json({
+        ready: true,
+        profiles: await searchProfiles(database(), z.string().max(200).parse(raw.q ?? "")),
+      });
+    }
     if (!authReady() || !databaseReady())
       return json(
         {
@@ -85,12 +93,14 @@ export async function POST(request: Request) {
     if (raw?.action !== "start") throw new AppError("Unbekannte Aktion.");
 
     const db = database();
-    const created = await startRequest(db, raw.value);
     // Merkt sich in diesem Browser, welche Anfrage gerade gestellt wurde:
-    // Der Bestätigungslink bindet genau diese Anfrage, und /starten zeigt
-    // ihre Angaben wieder an. Schon vor dem Versand gesetzt, damit die Angaben
-    // auch nach einem abgelehnten Versand (Wartezeit) nicht verloren sind.
-    (await cookies()).set(ONBOARDING_COOKIE, created.id, {
+    // Der Bestätigungslink bindet genau diese Anfrage, und /starten zeigt ihre
+    // Angaben wieder an, aber nur diesem Browser (Geheimnis im Cookie, Beleg
+    // am Absenden). Schon vor dem Versand gesetzt, damit die Angaben auch nach
+    // einem abgelehnten Versand nicht verloren sind.
+    const browser = browserSecret();
+    const created = await startRequest(db, raw.value, browser.proof);
+    (await cookies()).set(ONBOARDING_COOKIE, `${created.id}.${browser.secret}`, {
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.APP_URL?.startsWith("https://") ?? false,
@@ -115,6 +125,10 @@ export async function POST(request: Request) {
       },
     });
     if (error) throw sendFailure(error);
+    // Beleg für „Mail geschickt“ (Übergabe an Supabase), und ein neuer Code
+    // hebt die Sperre für Codeversuche auf.
+    await markMailSent(db, created.id, created.email);
+    await clearRateLimit(db, `verify:${created.email}`);
     return json({
       ok: true,
       resubmitted: created.resubmitted,

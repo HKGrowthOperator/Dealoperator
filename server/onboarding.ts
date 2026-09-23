@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
@@ -79,6 +79,8 @@ export async function profileForSelection(
   db: Database,
   id: string,
   invite?: string,
+  /** Einladung wurde für diese Anfrage schon geprüft (erneutes Senden). */
+  inviteChecked = false,
 ) {
   const [p] = await db.query(
     "SELECT id,name,company,role,kind,searchable,owner FROM participants WHERE id=$1",
@@ -92,7 +94,7 @@ export async function profileForSelection(
   // Eine gemeinsame Meldung gehört mehreren Personen. Sie ist kein
   // persönliches Konto und lässt sich auch mit Einladung nicht übernehmen.
   refusePersonalUse(p, JOINT_NOT_CLAIMABLE);
-  if (!p.searchable) {
+  if (!p.searchable && !inviteChecked) {
     const [token] = invite
       ? await db.query(
           "SELECT hash FROM claim_tokens WHERE hash=$1 AND participant=$2 AND used_at IS NULL AND expires_at>now()",
@@ -121,8 +123,14 @@ export const ONBOARDING_COOKIE = "do_onboarding";
  * bestätigt ist. Die Auswahl überlebt dadurch den Bestätigungslink, ohne dass
  * Kontaktdaten in einer URL stehen.
  */
-export async function startRequest(db: Database, raw: unknown) {
+export async function startRequest(
+  db: Database,
+  raw: unknown,
+  /** sha256 des Browser-Geheimnisses aus dem Cookie; siehe pendingForBrowser. */
+  browserProof = "",
+) {
   const v = startSchema.parse(raw);
+  const note = browserProof ? `browser:${browserProof}` : "";
   const phone = normalisePhone(v.phone, v.phoneCountry);
   if (!phone.ok) throw new AppError(phone.reason, 400, undefined, "phone");
 
@@ -149,7 +157,15 @@ export async function startRequest(db: Database, raw: unknown) {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${v.email}`]);
     let participant: string | null = null;
     if (v.kind === "claim" && v.participantId) {
-      const p = await profileForSelection(tx, v.participantId, v.invite);
+      // Erneutes Senden derselben Anfrage (etwa nach einem Link-Fehler) braucht
+      // den Einladungscode nicht noch einmal: er wurde beim ersten Absenden
+      // geprüft. Vergeben oder gemeinsam bleibt trotzdem ausgeschlossen.
+      const [prior] = await tx.query(
+        `SELECT 1 FROM onboarding_requests
+          WHERE lower(email)=$1 AND participant=$2 AND status IN (${OPEN_LIST}) LIMIT 1`,
+        [v.email, v.participantId],
+      );
+      const p = await profileForSelection(tx, v.participantId, v.invite, Boolean(prior));
       participant = p.id;
     }
     const [existing] = await tx.query(
@@ -162,7 +178,7 @@ export async function startRequest(db: Database, raw: unknown) {
     // sonst könnte jeder, der die Adresse kennt, die Angaben überschreiben,
     // die das Team gerade prüft.
     if (existing && existing.status !== "awaiting_email")
-      return { id: existing.id as string, kind: v.kind, participant, resubmitted: true };
+      return { id: existing.id as string, email: v.email, kind: v.kind, participant, resubmitted: true };
     if (existing) {
       // Erneutes Absenden aktualisiert die Angaben, statt eine zweite offene
       // Anfrage für dieselbe Person und dasselbe Profil anzulegen.
@@ -174,8 +190,8 @@ export async function startRequest(db: Database, raw: unknown) {
          WHERE id=$1`,
         [existing.id, v.fullName, phone.value, v.phone, v.hint, v.kind],
       );
-      await log(tx, existing.id, v.email, "resubmitted", "");
-      return { id: existing.id as string, kind: v.kind, participant, resubmitted: true };
+      await log(tx, existing.id, v.email, "resubmitted", note);
+      return { id: existing.id as string, email: v.email, kind: v.kind, participant, resubmitted: true };
     }
     const id = randomUUID();
     await tx.query(
@@ -183,48 +199,82 @@ export async function startRequest(db: Database, raw: unknown) {
        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
       [id, v.kind, participant, v.email, v.fullName, phone.value, v.phone, v.hint],
     );
-    await log(tx, id, v.email, "submitted", "");
+    await log(tx, id, v.email, "submitted", note);
     // Noch kein Team-Eintrag: die E-Mail ist unbestätigt und kann vertippt
     // oder fremd sein. Die Verwaltung sieht unbestätigte Registrierungen
     // gesammelt (siehe unconfirmedRegistrations); Eintrag, Push und E-Mail
     // entstehen erst bei der Bestätigung in bindConfirmedRequest.
-    return { id, kind: v.kind, participant, resubmitted: false };
+    return { id, email: v.email, kind: v.kind, participant, resubmitted: false };
   });
 }
 
 /**
- * Angaben der noch unbestätigten Anfrage aus DIESEM Browser (httpOnly-Cookie),
- * damit /starten nach Zurück, Neuladen oder einem fehlgeschlagenen Link den
- * Stand wieder zeigt, statt alles neu abzufragen. Nur solange die E-Mail
- * unbestätigt ist und die Anfrage frisch ist; danach gilt die Anmeldung.
+ * Cookie-Wert „<Anfrage-ID>.<Geheimnis>“. Die ID bindet beim Bestätigen genau
+ * diese Anfrage; das Geheimnis beweist, dass DIESER Browser das letzte
+ * Absenden gemacht hat (sein sha256 steht im Ereignis „submitted“ bzw.
+ * „resubmitted“). Nur dann zeigt /starten die Angaben wieder an.
  */
-export async function pendingForBrowser(db: Database, id: string | undefined) {
-  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+export function browserSecret() {
+  const secret = randomBytes(24).toString("base64url");
+  return { secret, proof: sha256(secret) };
+}
+export function requestIdFromCookie(value: string | undefined) {
+  const id = (value || "").split(".")[0];
+  return /^[0-9a-f-]{36}$/i.test(id) ? id : undefined;
+}
+const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+
+/**
+ * Angaben der noch unbestätigten Anfrage aus DIESEM Browser, damit /starten
+ * nach Zurück, Neuladen oder einem fehlgeschlagenen Link den Stand wieder
+ * zeigt. Nur, wenn dieser Browser zuletzt abgeschickt hat: Wer dieselbe
+ * Adresse vorher oder nachher woanders eingibt, sieht hier nichts.
+ * mailSent sagt, ob nach dem letzten Absenden eine Mail wirklich an Supabase
+ * übergeben wurde (Ereignis „mail_sent“); sonst wird kein Versand behauptet.
+ * Ein inzwischen an jemand anderen vergebenes Profil erscheint als
+ * profileTaken statt still zu verschwinden.
+ */
+export async function pendingForBrowser(db: Database, cookie: string | undefined) {
+  const [id, secret] = (cookie || "").split(".");
+  if (!requestIdFromCookie(id) || !secret || secret.length > 100) return null;
   const [r] = await db.query(
-    `SELECT r.kind,r.participant,r.email,r.full_name,r.phone,r.hint,
-            EXTRACT(EPOCH FROM now()-r.updated_at)::float AS age,
-            p.name,p.company,p.role,p.owner
+    `SELECT r.kind,r.participant,r.status,r.email,r.full_name,r.phone,r.hint,
+            p.name,p.company,p.role,p.owner,
+            (SELECT e.note FROM onboarding_events e
+              WHERE e.request=r.id AND e.action IN ('submitted','resubmitted')
+              ORDER BY e.id DESC LIMIT 1) AS proof,
+            (SELECT EXTRACT(EPOCH FROM now()-m.created_at)::float FROM onboarding_events m
+              WHERE m.request=r.id AND m.action='mail_sent'
+                AND m.id > (SELECT max(e.id) FROM onboarding_events e
+                             WHERE e.request=r.id AND e.action IN ('submitted','resubmitted'))
+              ORDER BY m.id DESC LIMIT 1) AS mail_age
        FROM onboarding_requests r LEFT JOIN participants p ON p.id=r.participant
-      WHERE r.id=$1 AND r.status='awaiting_email'
-        AND r.updated_at > now() - interval '2 days'`,
+      WHERE r.id=$1 AND r.updated_at > now() - interval '2 days'
+        AND (r.status='awaiting_email' OR (r.status='superseded' AND p.owner IS NOT NULL))`,
     [id],
   );
-  if (!r) return null;
+  if (!r || r.proof !== `browser:${sha256(secret)}`) return null;
+  const taken = Boolean(r.participant && r.owner);
   return {
     kind: r.kind as RequestKind,
-    // Ein inzwischen vergebenes Profil wird nicht wieder angeboten.
-    profile:
-      r.participant && !r.owner
-        ? { id: r.participant as string, name: r.name as string, company: r.company as string, role: r.role as string }
-        : null,
-    profileTaken: Boolean(r.participant && r.owner),
+    profile: r.participant && !r.owner
+      ? { id: r.participant as string, name: r.name as string, company: r.company as string, role: r.role as string }
+      : null,
+    profileTaken: taken,
+    takenName: taken ? (r.name as string) : "",
     email: r.email as string,
     fullName: r.full_name as string,
     phone: r.phone as string,
     hint: r.hint as string,
-    /** Sekunden seit dem letzten Absenden, für die Wartezeit bis „Erneut senden“. */
-    secondsAgo: Number(r.age) || 0,
+    mailSent: r.mail_age !== null && r.mail_age !== undefined,
+    /** Sekunden seit dem letzten Versand, für die Wartezeit bis „Erneut senden“. */
+    secondsAgo: Number(r.mail_age) || 0,
   };
+}
+
+/** Nach erfolgreicher Übergabe an Supabase: Beleg für „Mail geschickt“. */
+export async function markMailSent(db: Database, id: string, email: string) {
+  await log(db, id, email, "mail_sent", "");
 }
 
 async function log(
@@ -321,6 +371,14 @@ export async function bindConfirmedRequest(
       [actor.userId, actor.email, request.phone],
     );
     await log(tx, request.id, actor.userId, "email_confirmed", "");
+    // Andere noch unbestätigte Anfragen dieser Adresse (anderer Weg, anderes
+    // Profil) sind damit erledigt. Sie dürften sich sonst später an das Konto
+    // hängen oder eine Zuordnung durch das Team blockieren.
+    await tx.query(
+      `UPDATE onboarding_requests SET status='superseded',updated_at=now()
+        WHERE lower(email)=$1 AND status='awaiting_email' AND id<>$2`,
+      [actor.email, request.id],
+    );
     // Der Übergang awaiting_email → bestätigt passiert unter Sperre genau
     // einmal. Spätere Logins, Magic-Links oder Neuladen finden keine offene
     // awaiting_email-Anfrage mehr und lösen deshalb nichts aus.
@@ -528,6 +586,13 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       if (!v.participantId)
         throw new AppError("Bitte wähle zuerst das passende Profil aus.", 400);
       request.participant = v.participantId;
+      // Eine ältere offene Anfrage derselben Adresse für genau dieses Profil
+      // würde den Eindeutigkeitsindex verletzen; sie ist mit dieser erledigt.
+      await tx.query(
+        `UPDATE onboarding_requests SET status='superseded',updated_at=now()
+          WHERE lower(email)=lower($1) AND participant=$2 AND id<>$3 AND status IN (${OPEN_LIST})`,
+        [request.email, v.participantId, request.id],
+      );
       await tx.query("UPDATE onboarding_requests SET participant=$2 WHERE id=$1", [
         request.id,
         v.participantId,

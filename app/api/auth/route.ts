@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { authClient, authReady, safeNext } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
-import { AppError, rateLimit } from "@/server/operator";
+import { AppError, clearRateLimit, rateLimit } from "@/server/operator";
 import { body, errorResponse, json } from "@/server/http";
 import {
   codeFailure,
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
         `verify:${v.email}`,
         10,
         900,
-        "Zu viele Versuche mit dieser Adresse. Bitte fordere gleich einen neuen Code an.",
+        "Zu viele falsche Codes. Fordere eine neue Mail an; mit ihrem Code geht es sofort weiter. Der Link in der Mail funktioniert weiterhin.",
       );
       const { error } = await client.auth.verifyOtp({
         email: v.email,
@@ -96,6 +96,9 @@ export async function POST(request: Request) {
       options: { emailRedirectTo: emailRedirect(v.next), shouldCreateUser: true },
     });
     if (error) throw sendFailure(error);
+    // Neue Mail, neuer Code: frühere Fehlversuche zählen nicht mehr. Eine neue
+    // Mail macht den alten Code ungültig, Raten wird dadurch nicht leichter.
+    await clearRateLimit(db, `verify:${v.email}`);
     return json({ ok: true, resendAfter: RESEND_SECONDS, code: emailCodeEnabled() });
   } catch (e) {
     return errorResponse(e);
