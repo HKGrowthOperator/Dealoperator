@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentUser, safeNext } from "@/server/auth";
+import { getCurrentUser, isTeam, safeNext } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
 import {
@@ -49,6 +49,10 @@ export default async function Page({
   // wird; Push und E-Mail kommen in diesem Fall erst mit der Anfrage.
   if (!bound) await noteConfirmedAccount(db, actor, toClaim);
   const state = await ownState(db, actor);
+
+  // Team-Konten mit Ziel Verwaltung (etwa aus einem Team-Push) direkt dorthin,
+  // auch ohne eigenes Profil.
+  if (isTeam(actor) && target.pathname === "/verwaltung" && !bound) redirect(next);
 
   // Aus „Passwort vergessen oder noch keins?“: zuerst das Passwort festlegen,
   // danach führt /passwort wieder hierher.

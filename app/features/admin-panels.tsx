@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Bell,
@@ -99,6 +99,9 @@ async function fetchOverview(signal?: AbortSignal): Promise<Loaded> {
 export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
   const params = useSearchParams();
   const requested = params.get("bereich");
+  // Aus einem Team-Push: genau diesen Eintrag bzw. diese Anfrage zeigen.
+  const focusEntry = Number(params.get("eintrag")) || 0;
+  const focusRequest = params.get("anfrage") || "";
   const tabs = TABS.filter((t) => role === "admin" || !t.adminOnly);
   const tab: TabId =
     isTab(requested) && tabs.some((t) => t.id === requested) ? requested : "inbox";
@@ -215,7 +218,7 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
       ) : (
         <main className="adm-main" aria-label={active.label}>
           {tab === "uebernahmen" ? (
-            <ReviewQueue admin />
+            <ReviewQueue admin focus={focusRequest} />
           ) : !loaded ? (
             <div className="adm-card adm-loading" role="status">
               <RefreshCw size={20} className="spin" />
@@ -236,6 +239,7 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
               {loaded.error && <Feedback error={loaded.error} />}
               {tab === "inbox" && (
                 <InboxPanel
+                  focus={focusEntry}
                   items={overview.inbox}
                   unconfirmed={overview.unconfirmed}
                   onChanged={reload}
@@ -337,11 +341,14 @@ function stateInfo(item: InboxItem): {
 }
 
 function InboxPanel({
+  focus,
   items,
   unconfirmed,
   onChanged,
   onGo,
 }: {
+  /** Inbox-Eintrag aus dem Push-Link (?eintrag=), wird angesprungen. */
+  focus: number;
   items: InboxItem[];
   unconfirmed?: Unconfirmed;
   onChanged: () => Promise<void>;
@@ -356,6 +363,19 @@ function InboxPanel({
   const kinds = ["registration", "help", "pause", "review"].filter((k) =>
     items.some((i) => i.kind === k),
   );
+  const focused = items.find((i) => i.id === focus);
+  // Einmal zum Eintrag aus dem Push springen, auch wenn er schon erledigt ist.
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (!focused || jumped.current) return;
+    jumped.current = true;
+    const el = document.getElementById(`inbox-${focused.id}`);
+    if (!el) return;
+    const details = el.closest("details");
+    if (details) details.open = true;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+  }, [focused]);
 
   async function toggle(item: InboxItem) {
     setBusy(item.id);
@@ -375,7 +395,14 @@ function InboxPanel({
   const card = (item: InboxItem) => {
     const s = stateInfo(item);
     return (
-      <li key={item.id} className="adm-item" data-resolved={item.resolved}>
+      <li
+        key={item.id}
+        id={`inbox-${item.id}`}
+        className="adm-item"
+        data-resolved={item.resolved}
+        data-focus={item.id === focus ? "" : undefined}
+        tabIndex={item.id === focus ? -1 : undefined}
+      >
         <div className="adm-item-head">
           <Badge tone="neutral">{KIND[item.kind] ?? item.kind}</Badge>
           <Badge tone={s.tone}>{s.label}</Badge>
@@ -510,6 +537,12 @@ function InboxPanel({
         <ul className="adm-list">{open.map(card)}</ul>
       ) : (
         <p className="adm-empty">Nichts offen.</p>
+      )}
+      {focus > 0 && !focused && (
+        <p className="adm-hint" role="status">
+          Der Eintrag aus der Benachrichtigung ist nicht mehr unter den letzten
+          100 Einträgen.
+        </p>
       )}
       {done.length > 0 && (
         <details className="adm-done">

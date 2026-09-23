@@ -299,6 +299,13 @@
   border-radius: 14px;
   background: #ffffffd9;
 }
+/* Eintrag aus einem Team-Push: hervorgehoben, damit er sofort auffällt. */
+.adm-item[data-focus],
+.review-item[data-focus] {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  scroll-margin-top: 96px;
+}
 .adm-item[data-resolved="true"] {
   background: #f8fafcb8;
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Check,
   Clock,
@@ -53,7 +53,14 @@ const LABEL: Record<string, string> = {
   superseded: "Anderes Konto freigegeben",
 };
 
-export default function ReviewQueue({ admin }: { admin: boolean }) {
+export default function ReviewQueue({
+  admin,
+  focus = "",
+}: {
+  admin: boolean;
+  /** Anfrage aus dem Push-Link (?anfrage=): wird angesprungen und geöffnet. */
+  focus?: string;
+}) {
   const [rows, setRows] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -138,7 +145,28 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
     }
   }
 
+  // Einmal nach dem Laden: zur Anfrage aus dem Push springen und, wenn sie noch
+  // offen ist, direkt die Prüfung aufklappen.
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (!focus || loading || jumped.current) return;
+    const target = rows.find((r) => r.id === focus);
+    if (!target) return;
+    jumped.current = true;
+    const timer = setTimeout(() => {
+      if (["pending", "info_needed"].includes(target.status)) {
+        setOpen(target.id);
+        setNote(target.internal_note || "");
+      }
+      const el = document.getElementById(`anfrage-${target.id}`);
+      el?.scrollIntoView({ block: "start" });
+      el?.focus({ preventScroll: true });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [focus, loading, rows]);
+
   if (!admin) return null;
+  const focusMissing = !!focus && !loading && !rows.some((r) => r.id === focus);
   const waiting = rows.filter((r) =>
     ["pending", "info_needed"].includes(r.status),
   );
@@ -170,6 +198,12 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
           <LoaderCircle className="spin" size={16} /> Anfragen werden geladen …
         </p>
       )}
+      {focusMissing && (
+        <p className="onboarding-hint" role="status">
+          Die Anfrage aus der Benachrichtigung ist nicht mehr in der Liste. Sie
+          wurde vermutlich schon entschieden.
+        </p>
+      )}
       {!loading && waiting.length === 0 && (
         <p className="onboarding-hint">
           <Check size={16} /> Keine offenen Anfragen.
@@ -180,7 +214,13 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
         const competing = Number(r.competing) || 0;
         const decidable = ["pending", "info_needed"].includes(r.status);
         return (
-          <article key={r.id} className="review-item">
+          <article
+            key={r.id}
+            id={`anfrage-${r.id}`}
+            className="review-item"
+            data-focus={r.id === focus ? "" : undefined}
+            tabIndex={r.id === focus ? -1 : undefined}
+          >
             <div className="review-head">
               <div>
                 <strong>{r.full_name}</strong>
