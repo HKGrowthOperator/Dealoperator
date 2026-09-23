@@ -127,6 +127,42 @@ test("submitting needs numbers, a consciously chosen energy, both answers and th
   assert.equal(ok.revision, 1);
 });
 
+/** Eine Einreichung ohne die Bestätigung „wer sieht was“ (Feld fehlt ganz). */
+function unacknowledged(extra: Record<string, unknown> = {}) {
+  const value: Record<string, unknown> = closing(extra);
+  delete value.acknowledged;
+  return value;
+}
+
+test("who sees the closing is confirmed once; later closings need no confirmation, on any day", async () => {
+  const id = await member(alice, "Alice");
+  await db.query("UPDATE participants SET eligible_since=now()-interval '10 days' WHERE id=$1", [id]);
+  const month = today().slice(0, 7);
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  // Ein Tag aus den Gruppenmeldungen ist keine Bestätigung.
+  await db.query(
+    `INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,'{"attempts":5}','wins-import','import')`,
+    [id, dayOffset(-1)],
+  );
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  // Beim ersten Mal ohne Bestätigung: abgelehnt, weggelassen wie verneint.
+  await assert.rejects(submitClosing(db, alice, unacknowledged()), /wer deinen Tagesabschluss sieht/);
+  await assert.rejects(submitClosing(db, alice, closing({ acknowledged: false })), /wer deinen Tagesabschluss sieht/);
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  await submitClosing(db, alice, closing());
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, true);
+  // Danach: Korrektur und ein anderer Tag ohne erneute Bestätigung.
+  const correction = unacknowledged({ expectedRevision: 1, counts: { attempts: 12, settingsBooked: 0, closingsBooked: 0 } });
+  assert.equal((await submitClosing(db, alice, correction)).revision, 2);
+  assert.ok((await submitClosing(db, alice, unacknowledged({ day: dayOffset(-1), expectedRevision: 1 }))).ok);
+  // Auch ein älteres Formular, das die Bestätigung weiter mitschickt, geht.
+  assert.ok((await submitClosing(db, alice, closing({ expectedRevision: 2 }))).ok);
+  // Bob hat noch nie eingereicht: für ihn gilt die Bestätigung weiter.
+  await member(bob, "Bob");
+  assert.equal((await closingState(db, bob, month)).visibilityConfirmed, false);
+  await assert.rejects(submitClosing(db, bob, unacknowledged()), /wer deinen Tagesabschluss sieht/);
+});
+
 test("without a phone number there is no counted closing and no access to the exchange", async () => {
   await member(alice, "Alice", { phone: false });
   await assert.rejects(submitClosing(db, alice, closing()), /Telefonnummer/);
@@ -386,11 +422,34 @@ test("members request pauses from today on; the team decides once", async () => 
 
 test("without Discord credentials nothing is marked as synced", async () => {
   await member(alice, "Alice");
-  await submitClosing(db, alice, closing({ discord: true }));
+  await submitClosing(db, alice, closing());
   const result = await syncDiscord(db);
   assert.equal(result.configured, false);
   const [row] = await db.query("SELECT state FROM sync_outbox");
   assert.equal(row.state, "pending");
+});
+
+test("a closing is never shared on Discord, even when an older form still asks for it", async () => {
+  const id = await member(alice, "Alice");
+  // Ältere Formulare schicken das Feld noch mit: angenommen, nicht beachtet.
+  const first = await submitClosing(db, alice, closing({ discord: true }));
+  assert.equal(first.revision, 1);
+  const share = async () =>
+    (await db.query("SELECT discord_share FROM checkins WHERE participant=$1", [id]))[0].discord_share;
+  assert.equal(await share(), false);
+  // Korrektur mit neuen Zahlen: bleibt aus.
+  await submitClosing(db, alice, closing({ expectedRevision: 1, discord: true, counts: { attempts: 41, settingsBooked: 2, closingsBooked: 1 } }));
+  assert.equal(await share(), false);
+  // Eine alte Freigabe von früher fällt beim nächsten Einreichen weg, auch
+  // ohne inhaltliche Änderung (keine neue Fassung).
+  await db.query("UPDATE checkins SET discord_share=true WHERE participant=$1", [id]);
+  const again = await submitClosing(db, alice, closing({ expectedRevision: 2, counts: { attempts: 41, settingsBooked: 2, closingsBooked: 1 } }));
+  assert.equal(again.unchanged, true);
+  assert.equal(again.revision, 2);
+  assert.equal(await share(), false);
+  // Der Stand für das Formular enthält keine Discord-Angabe mehr.
+  const state = await closingState(db, alice, today().slice(0, 7));
+  assert.equal("discord" in state.closings[0], false);
 });
 
 test("an account signing in without a request gets one inbox entry and no push, never for existing profiles", async () => {

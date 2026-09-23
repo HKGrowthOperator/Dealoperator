@@ -77,7 +77,6 @@ export type ClosingRecord = {
   firstSubmittedAt: string | null;
   submittedAt: string | null;
   shared: boolean;
-  discord: boolean;
   callsDocumentedAt?: string | null;
 };
 export type ClosingDraft = {
@@ -141,6 +140,11 @@ export type ClosingState = {
   /** Frühester Tag, für den ein eigener Abschluss möglich ist. */
   firstClosableDay?: string | null;
   pauses: PauseEntry[];
+  /**
+   * Schon einmal bestätigt, wer den Tagesabschluss sieht (serverseitig aus
+   * dem ersten eigenen Abschluss). Dann entfällt der Abschnitt dazu.
+   */
+  visibilityConfirmed: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -418,7 +422,6 @@ type FormState = {
   values: Values;
   /** Revision des vorhandenen Eintrags für den Tag (0 = keiner). */
   baseRevision: number;
-  discord: boolean;
   acknowledged: boolean;
   /** Vom Nutzer seit dem Laden verändert. */
   dirty: boolean;
@@ -435,7 +438,6 @@ type Confirmation = {
   unchanged: boolean;
   status: DayStatus;
   publicConsent: boolean;
-  discord: boolean;
 };
 type FieldKey = CountKey | "energy" | "win" | "next" | "acknowledged";
 
@@ -480,7 +482,6 @@ function formFor(state: ClosingState, day: string): FormState {
     day,
     values,
     baseRevision: record?.revision ?? 0,
-    discord: record?.origin === "closing" ? record.discord : false,
     acknowledged: false,
     dirty: false,
     draftAt: draft && !locked ? draft.updatedAt : null,
@@ -508,7 +509,10 @@ function draftPayload(form: FormState) {
   };
 }
 
-function validate(form: FormState): Partial<Record<FieldKey, string>> {
+function validate(
+  form: FormState,
+  needsAcknowledgement: boolean,
+): Partial<Record<FieldKey, string>> {
   const errors: Partial<Record<FieldKey, string>> = {};
   const v = form.values;
   for (const k of COUNT_KEYS) {
@@ -524,7 +528,7 @@ function validate(form: FormState): Partial<Record<FieldKey, string>> {
   if (v.next.trim().length < 3)
     errors.next =
       "Bitte beantworte „Was willst du beim nächsten Calling-Tag besser machen?“ in ein paar Worten.";
-  if (!form.acknowledged)
+  if (needsAcknowledgement && !form.acknowledged)
     errors.acknowledged = "Bitte bestätige, dass du gelesen hast, wer deinen Tagesabschluss sieht.";
   return errors;
 }
@@ -562,7 +566,6 @@ const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
 export default function ClosingForm({
   day: requestedDay,
   initial,
-  discordAvailable,
   syncUrl = false,
   onSubmitted,
 }: {
@@ -570,8 +573,6 @@ export default function ClosingForm({
   day?: string;
   /** Vom Server vorgeladener Stand; ohne ihn lädt das Formular selbst. */
   initial?: ClosingState | null;
-  /** Ob die Discord-Anbindung eingerichtet ist; ohne Angabe wird gefragt. */
-  discordAvailable?: boolean;
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
   onSubmitted?: (day: string) => void;
@@ -582,9 +583,6 @@ export default function ClosingForm({
     initial ? formFor(initial, clampDay(initial, requestedDay)) : null,
   );
   const [loadError, setLoadError] = useState("");
-  const [discordReady, setDiscordReady] = useState<boolean | null>(
-    discordAvailable ?? null,
-  );
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Set<FieldKey>>(() => new Set());
   const [busy, setBusy] = useState(false);
@@ -621,17 +619,6 @@ export default function ClosingForm({
       });
     return () => controller.abort();
   }, [initial, requestedDay]);
-
-  useEffect(() => {
-    if (discordAvailable !== undefined) return;
-    let alive = true;
-    getJson<{ postsAvailable: boolean }>("/api/discord/connect")
-      .then((d) => alive && setDiscordReady(!!d.postsAvailable))
-      .catch(() => alive && setDiscordReady(false));
-    return () => {
-      alive = false;
-    };
-  }, [discordAvailable]);
 
   // ---- Entwurf automatisch speichern -------------------------------------
 
@@ -738,7 +725,9 @@ export default function ClosingForm({
   })();
   const deadline = safeDeadline(state, form.day);
   const paused = isPaused(form.day, pauses);
-  const errors = validate(form);
+  // „Wer sieht deinen Tagesabschluss?“ nur bis zur ersten Bestätigung.
+  const needsAcknowledgement = !state.visibilityConfirmed;
+  const errors = validate(form, needsAcknowledgement);
   const visible = (k: FieldKey) =>
     (attempted || touched.has(k)) && errors[k] ? errors[k] : "";
   const otherDrafts = state.drafts
@@ -891,8 +880,8 @@ export default function ClosingForm({
         next: v.next.trim(),
         help: v.help.trim(),
       },
-      discord: form.discord,
-      acknowledged: true,
+      // Nur beim ersten Mal nötig; danach kennt der Server die Bestätigung.
+      ...(needsAcknowledgement ? { acknowledged: true } : {}),
     };
     const hash = JSON.stringify(value);
     const key =
@@ -913,6 +902,9 @@ export default function ClosingForm({
         fresh = null;
       }
       const base = fresh ?? state;
+      // Mit dem ersten Abschluss ist die Bestätigung erteilt, auch wenn das
+      // Neuladen gerade nicht geklappt hat.
+      if (!fresh) setState((s) => (s ? { ...s, visibilityConfirmed: true } : s));
       setForm(
         fresh
           ? formFor(fresh, form.day)
@@ -923,7 +915,6 @@ export default function ClosingForm({
         unchanged: !!result.unchanged,
         status: fresh ? statusOf(fresh, form.day) : "free",
         publicConsent: !!base.eligibility.participant?.publicConsent,
-        discord: form.discord,
       });
       setAttempted(false);
       setTouched(new Set());
@@ -934,6 +925,9 @@ export default function ClosingForm({
     } catch (e) {
       const err = e as ApiError;
       if (err.status === 409 && /neuer/i.test(err.message)) setConflict(true);
+      // Der Server kennt noch keine Bestätigung: Abschnitt wieder zeigen.
+      if (err.data?.field === "acknowledged")
+        setState((s) => (s ? { ...s, visibilityConfirmed: false } : s));
       setServerError(err.message);
     } finally {
       setBusy(false);
@@ -1201,13 +1195,6 @@ export default function ClosingForm({
                   ? " mit deinen Zahlen."
                   : ", ohne deine Zahlen."}
               </li>
-              {confirmation.discord && (
-                <li>
-                  {discordReady
-                    ? "Deine Zustimmung zum Teilen auf Discord ist gespeichert."
-                    : "Deine Zustimmung zum Teilen auf Discord ist gespeichert. Die Discord-Übertragung ist noch nicht eingerichtet und wird erst genutzt, wenn sie läuft."}
-                </li>
-              )}
               <li>Für diesen Tag bekommst du keine Erinnerung mehr.</li>
             </ul>
           )}
@@ -1363,67 +1350,48 @@ export default function ClosingForm({
             )}
           </fieldset>
 
-          <fieldset className="cm-group cm-visibility">
-            <legend>Wer sieht deinen Tagesabschluss?</legend>
-            <p>
-              Mit dem Einreichen zählt dein Tag für deine Serie. Deine Zahlen gehen
-              in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
-              zugestimmt hast. Deine Reflexion erscheint im Austausch unter
-              /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,
-              hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer wird
-              nicht per SMS geprüft; wer neu ist, kann sich selbst registrieren.
-            </p>
-            <p className="cm-muted">
-              {eligibility.participant?.publicConsent
-                ? "Du hast der öffentlichen Anzeige deiner Zahlen zugestimmt."
-                : "Du hast der öffentlichen Anzeige deiner Zahlen nicht zugestimmt. Deine Zahlen erscheinen deshalb nicht öffentlich und nicht auf deiner Karte im Austausch."}
-            </p>
-            <label className={`cm-check ${ackError ? "invalid" : ""}`}>
-              <input
-                id={`${uid}-acknowledged`}
-                type="checkbox"
-                checked={form.acknowledged}
-                disabled={busy}
-                aria-invalid={!!ackError}
-                aria-describedby={ackError ? `${uid}-ack-error` : undefined}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setForm((f) => (f ? { ...f, acknowledged: checked } : f));
-                  blur("acknowledged");
-                }}
-              />
-              <span>
-                Ich habe gelesen, wer meinen Tagesabschluss sieht.
-                <span className="cm-required" aria-hidden="true"> *</span>
-              </span>
-            </label>
-            {ackError && (
-              <p className="cm-field-error" id={`${uid}-ack-error`}>
-                {ackError}
+          {needsAcknowledgement && (
+            <fieldset className="cm-group cm-visibility">
+              <legend>Wer sieht deinen Tagesabschluss?</legend>
+              <p>
+                Mit dem Einreichen zählt dein Tag für deine Serie. Deine Zahlen gehen
+                in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
+                zugestimmt hast. Deine Reflexion erscheint im Austausch unter
+                /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,
+                hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer wird
+                nicht per SMS geprüft; wer neu ist, kann sich selbst registrieren.
               </p>
-            )}
-            <label className="cm-check">
-              <input
-                type="checkbox"
-                checked={form.discord}
-                disabled={busy}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  // Keine Zahl und kein Text: kein Entwurf nötig.
-                  setForm((f) => (f ? { ...f, discord: checked } : f));
-                }}
-              />
-              <span>
-                Zusätzlich im Discord-Channel teilen: Dort liest jede Person mit, die auf
-                dem Server ist (Zugang über den öffentlichen Einladungslink).
-                <small>
-                  {discordReady === false
-                    ? "Die Discord-Übertragung ist noch nicht eingerichtet; deine Zustimmung wird gespeichert und erst genutzt, wenn sie läuft."
-                    : "Freiwillig. Standardmäßig bleibt dein Abschluss auf der Website."}
-                </small>
-              </span>
-            </label>
-          </fieldset>
+              <p className="cm-muted">
+                {eligibility.participant?.publicConsent
+                  ? "Du hast der öffentlichen Anzeige deiner Zahlen zugestimmt."
+                  : "Du hast der öffentlichen Anzeige deiner Zahlen nicht zugestimmt. Deine Zahlen erscheinen deshalb nicht öffentlich und nicht auf deiner Karte im Austausch."}
+              </p>
+              <label className={`cm-check ${ackError ? "invalid" : ""}`}>
+                <input
+                  id={`${uid}-acknowledged`}
+                  type="checkbox"
+                  checked={form.acknowledged}
+                  disabled={busy}
+                  aria-invalid={!!ackError}
+                  aria-describedby={ackError ? `${uid}-ack-error` : undefined}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setForm((f) => (f ? { ...f, acknowledged: checked } : f));
+                    blur("acknowledged");
+                  }}
+                />
+                <span>
+                  Ich habe gelesen, wer meinen Tagesabschluss sieht.
+                  <span className="cm-required" aria-hidden="true"> *</span>
+                </span>
+              </label>
+              {ackError && (
+                <p className="cm-field-error" id={`${uid}-ack-error`}>
+                  {ackError}
+                </p>
+              )}
+            </fieldset>
+          )}
 
           {draftLine && (
             <p className={`cm-draft-line ${draftLine.tone}`} aria-live="polite">
