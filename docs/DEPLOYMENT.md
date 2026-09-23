@@ -24,7 +24,11 @@ Für eine bestehende Installation liegen die Nachträge unter `database/migratio
 1. `0001_onboarding_requests.sql` und danach `0001_onboarding_requests_grants.sql` (neue Tabellen brauchen Rechte und Policy ausdrücklich).
 2. `0002_participant_kind.sql` — fügt `participants.kind` hinzu und markiert die beiden bestehenden gemeinsamen Meldungen. Rein additiv, mit Vorgabewert `person`, deshalb ohne Rechte-Nachtrag: die tabellenweiten Rechte aus `runtime-role.sql` decken neue Spalten ab.
 
+3. `0003_daily_closing.sql` — Tagesabschluss (Zahlen + Reflexion), private Entwürfe, Pausen, Dranbleiben-Regeln, Events (22.09.2026 „Akquise Day“ von akquise.de), Push-Abonnements, Versandprotokoll mit Zustellung je Gerät, Team-Inbox, Discord-Zuordnung, Wins-Import-Prüffälle. Rein additiv; bestehende Tagesstände bekommen `origin='import'`, es werden keine Reflexionen erfunden. Enthält Rechte und Serverpolicy für die neuen Tabellen und Zähler.
+
 `0002` ist am 22.09.2026 auf der produktiven Datenbank angewendet worden.
+
+**Reihenfolge bei 0003:** erst die Migration anwenden, dann den Code ausrollen. `/api/ready` prüft ab dieser Version die neuen Tabellen, Spalten und Zählerrechte und meldet 503, solange die Migration fehlt. Der Erinnerungs-Takt pausiert in diesem Fall von selbst.
 
 ## 2. Coolify-Anwendung
 
@@ -51,6 +55,14 @@ Der Docker-Build nimmt den Ordner `vendor/` mit, weil die Oberfläche daraus ein
 | `DATABASE_SSL`             | In Produktion leer lassen. `disable` ist nur bei einer lokalen Loopback-Datenbank zulässig  |
 | `OPERATOR_ADMIN_IDS`       | Kommagetrennte bestätigte Auth-User-UUIDs der Betreiber; erst nach Registrierung zuweisen   |
 | `DISCORD_INVITE_URL`       | Optionaler Ersatz des bereits hinterlegten offiziellen Links                                |
+| `RESEND_API_KEY`           | Eigener Resend-API-Schlüssel nur für die kurzen Team-E-Mails (Absicherung zum Push). Der Auth-Mailversand über Supabase-SMTP bleibt davon unberührt |
+| `NOTIFY_FROM`              | Absender der Team-E-Mails auf einer in Resend verifizierten Domain, z. B. `Deal Operator <team@…>` |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Optional. Schlüsselpaar für Web-Push. Fehlt es, erzeugt der Server beim ersten Bedarf einmalig ein Paar und legt es im privaten Schema ab (`operator.app_secrets`, nur Serverrolle). Später gesetzte Umgebungswerte ersetzen es — dann müssen alle Geräte neu zustimmen; die Verwaltung zeigt die Anzahl |
+| `CRON_SECRET`              | Optional, mindestens 32 Zeichen. Erlaubt einen externen Takt `POST /api/cron/tick` mit `Authorization: Bearer …` (z. B. Coolify Scheduled Task). Ohne Wert gibt es den Endpunkt nicht; der Takt im Server-Prozess läuft trotzdem |
+| `SCHEDULER_DISABLED`       | `1` schaltet den Takt im Server-Prozess ab (nur für Wartung)                                 |
+| `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` | Kontoverknüpfung (OAuth2 „identify“). Redirect in Discord: `APP_URL/api/discord/callback` |
+| `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_REFLECTION_CHANNEL_ID` | Beiträge freigegebener Tagesabschlüsse im Reflexions-Channel, Rollen-/Channel-Inventar |
+| `DISCORD_PUBLIC_KEY`       | Signaturprüfung für `POST /api/discord/interactions` (Befehle `/tagesabschluss`, `/serie`) |
 
 Der Server erzwingt für externe PostgreSQL-Verbindungen eine Zertifikatsprüfung. Unsichere `sslmode`-Optionen in der URL können diese Prüfung nicht abschalten. Bei Zertifikatsfehlern CA/Host prüfen, nicht `rejectUnauthorized: false` einbauen.
 
@@ -66,7 +78,14 @@ In Supabase Auth:
 6. Link-Tracking des SMTP-Anbieters für Auth-Mails deaktivieren. Den Link im selben Browser öffnen, in dem er angefordert wurde, weil der PKCE-Verifier dort liegt. Bei Gerätewechsel erneut auf dem Zielgerät einen Link anfordern.
 7. Echte Zustellung, Link-Ablauf, ungültige Links und erneute Anmeldung testen. Die Standard-Supabase-Testzustellung ist keine fertig eingerichtete Community-Versandlösung.
 
-Nach bestätigter E-Mail führt `/auth/callback` zu `/start`. Bestehende Mitglieder gehen direkt in den gewünschten Bereich. Neue Mitglieder sehen passende importierte Profile oder legen ihr Profil mit optionaler öffentlicher Ranking-Freigabe an. Telefonnummern sind freiwillig, privat und nicht SMS-verifiziert. Ein Twilio-Konto wird für diesen E-Mail-Ablauf nicht benötigt.
+Nach bestätigter E-Mail führt `/auth/callback` zu `/start`. Bestehende Mitglieder gehen direkt in den gewünschten Bereich. Neue Konten entstehen nur über `/beitreten` („Ich bin neu“ oder „Meine Zahlen sind schon auf der Seite“); `/anmelden` legt keine Konten mehr an. Telefonnummern sind privat und nicht SMS-verifiziert; für den eigenen Tagesabschluss muss eine gültige Nummer mit Ländervorwahl hinterlegt sein. Ein Twilio-Konto wird nicht benötigt.
+
+## 4a. Erinnerungen, Team-Hinweise und Discord
+
+- **Takt:** Der Node-Prozess startet beim Hochfahren einen Minutentakt (`instrumentation.ts`). Planung unter Datenbanksperre; jede Meldung hat einen eindeutigen Schlüssel, und je Gerät wird höchstens einmal zugestellt. Mehrere Instanzen oder ein zusätzlicher Cron-Aufruf erzeugen keine Doppelungen.
+- **Mitglieder:** 20:30 Uhr Erinnerung, wenn der Abschluss eines Pflicht-Tags fehlt; 09:00 Uhr am nächsten Pflicht-Tag nur, wenn eine laufende Serie tatsächlich hängt. Nie am Wochenende, nie in Pausen oder Ruhezeiten, nie nach eingereichtem Abschluss. Push nur nach Zustimmung auf dem Gerät; auf iPhone/iPad erst ab iOS 16.4 und nur als Home-Bildschirm-App.
+- **Team:** Neue bestätigte Registrierung bzw. prüfbereite Übernahme → genau ein Inbox-Eintrag und je Verwaltungskonto ein Push plus eine kurze E-Mail (neutraler Text, keine Kontaktdaten). Unbestätigte Registrierungen erscheinen gesammelt in der Verwaltung, ohne Push. Ohne Gerät bzw. E-Mail-Konfiguration wartet der Hinweis bis zu 48 Stunden.
+- **Discord:** Ohne die oben genannten Werte bleibt alles aus und wird in der Verwaltung als „nicht eingerichtet“ mit den fehlenden Variablen angezeigt. Übertragen werden nur Abschlüsse, bei denen das Mitglied das Teilen auf Discord ausdrücklich angekreuzt hat, und nur aus den letzten sieben Tagen.
 
 ## 5. Prüfung und Freischaltung
 

@@ -1,81 +1,47 @@
 # Discord: geprüfter Stand und konkrete Lücke
 
-Stand: 22. September 2026, gegen die produktive Datenbank und den Code im
-Repository geprüft.
+Stand: 23. September 2026.
 
-## Was tatsächlich existiert
+## Was im Code vorbereitet ist
 
-Der gesamte Discord-Code im Repository ist `server/discord.ts` — 22 Zeilen, die
-den Einladungslink prüfen und zurückgeben. Er lässt ausschließlich `https` auf
-`discord.gg` oder `discord.com` zu und fällt sonst auf den offiziellen Link
-`https://discord.gg/NjkFJtBkZm` zurück. Die Oberfläche verlinkt kontextbezogen
-dorthin.
+Website und Discord haben **eine** Datenquelle: die Tagesabschlüsse in der
+Datenbank. Discord bekommt keine eigene Zählung und kann keine Zahlen ohne
+vollständige Reflexion einreichen.
 
-Das ist der vollständige Umfang. Es gibt **keinen Bot, keine Discord-OAuth-
-Verknüpfung, keinen Worker und keine Synchronisierung in irgendeine Richtung**.
+| Teil | Datei | Braucht |
+| --- | --- | --- |
+| Kontoverknüpfung (OAuth2 „identify“), je Discord-Konto genau ein Website-Konto | `server/discord-admin.ts`, `app/api/discord/connect`, `app/api/discord/callback` | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, Redirect `APP_URL/api/discord/callback` in der Discord-Anwendung |
+| Beiträge freigegebener Tagesabschlüsse im Reflexions-Channel, Korrektur bearbeitet den vorhandenen Beitrag, zurückgenommene Freigabe löscht ihn | `server/discord-sync.ts` (läuft im Minutentakt) | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_REFLECTION_CHANNEL_ID` |
+| „Antworten auf Discord“ auf `/reflexionen` führt zum gespeicherten Beitrag | `server/reflections.ts` | gespeicherte Zuordnung in `discord_posts` |
+| Befehle `/tagesabschluss` (Link zur Website) und `/serie` (eigene Serien, nur für die fragende Person sichtbar) | `app/api/discord/interactions` | `DISCORD_PUBLIC_KEY`, Befehlsregistrierung in der Discord-Anwendung, Interactions-URL `APP_URL/api/discord/interactions` |
+| Rollen und Channels lesen (nur lesend, zur Zuordnung) | Verwaltung → Discord → Inventar | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` |
 
-## Warum eine gefüllte Outbox kein Beweis ist
+Übertragen wird nur, was ein Mitglied beim Einreichen ausdrücklich zum Teilen
+auf Discord angekreuzt hat, nur aus den letzten sieben Tagen und nie Entwürfe,
+Importe, Kontaktdaten, Unterstützungswünsche oder alte private Reflexionen.
+Zahlen stehen im Beitrag nur mit Zustimmung zur öffentlichen Anzeige.
 
-Jede Zahlenänderung schreibt in derselben Transaktion nach `operator.sync_outbox`
-und erhöht dort `revision`. Das funktioniert. In der Produktionsdatenbank stehen
-derzeit **47 Einträge, alle im Zustand `pending`**, der älteste seit dem Import.
+## Was davon läuft
 
-Niemand liest diese Tabelle. Eine Suche über das gesamte Repository findet
-`sync_outbox` an genau drei Stellen: zweimal schreibend (`server/operator.ts`,
-`server/onboarding.ts`) und einmal in der Tabellenliste von
-`server/readiness.ts`. Es gibt keinen Leser und keine Quittierung. Die Spalten
-`state`, `attempts` und `next_attempt_at` sind vorbereitet, werden aber von
-keinem Code ausgewertet.
+**Nichts davon ist aktiv.** Keine der oben genannten Umgebungsvariablen ist
+gesetzt. Ohne sie bleibt die Outbox unverändert (nichts wird als übertragen
+markiert), die Verwaltung zeigt die fehlenden Werte, `/reflexionen` bietet
+statt eines Beitrags ehrlich den Einladungslink an, und
+`/api/discord/interactions` antwortet mit 404. Es wurden keine Nachrichten in
+den Server gesendet.
 
-**Eine gefüllte Outbox belegt also nur, dass die Website ihre Änderungen sauber
-vormerkt — nicht, dass eine Nachricht jemals in Discord angekommen ist.**
+## Was von außen noch nötig ist
 
-## Was konkret fehlt
-
-1. **Kontoverknüpfung.** Es gibt keine Tabelle, die eine Discord-User-ID einem
-   bestätigten Website-Konto zuordnet, und keine OAuth-Route. Ohne diese
-   Zuordnung kann ein Bot keine Meldung einer Person zuschreiben. Anzeigenamen
-   sind ausdrücklich kein Identitätsnachweis.
-2. **Bot-Dienst.** Kein Bot-Token, keine Anwendungs-/Client-ID, keine
-   Slash-Command-Registrierung, kein laufender Prozess. Ein solcher Dienst
-   müsste als eigene Anwendung in Coolify laufen; seine Zugangsdaten gehören
-   ausschließlich serverseitig hinterlegt.
-3. **Worker für Website → Discord.** Niemand liest die Outbox, merkt sich die
-   gelesene `revision` und quittiert genau diese. Ohne das bleibt eine
-   zwischenzeitlich neuere Änderung entweder liegen oder wird fälschlich als
-   erledigt markiert.
-4. **Eingang für Discord → Website.** Die vorhandenen API-Routen setzen eine
-   Website-Sitzung und eine Origin-Prüfung voraus (`server/http.ts`). Für einen
-   Bot ist das keine nutzbare Schnittstelle. Es braucht einen eng begrenzten,
-   eigenständig authentifizierten Endpunkt, der dieselbe Geschäftslogik samt
-   Revisions- und Idempotenzprüfung verwendet.
-5. **Rollenabgleich.** Die Rangstufen der Website (Bronze bis Diamant, je
-   Kennzahl getrennt) sind in `lib/kpis.ts` definiert. Welche Rollen-IDs,
-   Schwellen und Zeiträume der Discord-Server bereits verwendet, ist hier
-   unbekannt. Ohne diese Angaben dürfen vorhandene Rollen nicht überschrieben
-   werden.
-
-## Was dafür von außen nötig ist
-
-Ohne diese Angaben lässt sich Punkt 1 bis 5 nicht bauen:
-
-- Bot-Token sowie Client-ID und Client-Secret der Discord-Anwendung.
-- Server-(Guild-)ID und die IDs der Rollen, die gesetzt werden sollen.
-- Das bereits bestehende Rollenkonzept: welche Schwellen, Zeiträume und
-  Aktivitätsregeln gelten heute im Server?
-- Die gewünschte Kanalzuordnung für Meldungen.
-- Die Entscheidung, wie die Kontoverknüpfung ablaufen soll — von Discord aus
-  oder von der Website aus.
+- Discord-Anwendung mit Bot: Client-ID, Client-Secret, Bot-Token, Public Key.
+- Server-(Guild-)ID und die ID des Reflexions-Channels. Empfehlung: ein
+  Channel, der nur für verknüpfte, berechtigte Mitglieder sichtbar ist.
+- Das bestehende Rollen- und Channelkonzept (welche Rollen gibt es, wer darf
+  was sehen). Vorhandene Rollen werden nicht überschrieben; das Inventar in der
+  Verwaltung liest sie nur.
+- Registrierung der beiden Befehle in der Discord-Anwendung.
 
 ## Slack und Zoom
 
-Die Übernahme der Meldungen aus Slack und Zoom ist bisher ein **kuratierter,
-manueller Import**. Eine laufende automatische Übernahme ist nicht eingerichtet
-und würde eine eigene Anbindung an die jeweiligen Exporte oder APIs brauchen.
-
-## Was nicht behauptet werden darf
-
-Weder Website noch Dokumentation dürfen eine funktionierende
-Discord-Synchronisierung darstellen, solange Punkt 1 bis 5 offen sind. Die
-Oberfläche sagt dazu heute „Discord-Anbindung wird vorbereitet"; das bleibt
-korrekt. Es wurden für diese Prüfung keine Nachrichten in den Server gesendet.
+Die Übernahme der Meldungen aus Slack, Zoom und Chat-Exporten läuft über den
+Wins-Import in der Verwaltung (Text einfügen, Vorschau mit Vergleich,
+übernehmen). Eine automatische Anbindung an diese Dienste gibt es nicht.

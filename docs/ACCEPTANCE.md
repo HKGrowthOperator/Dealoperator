@@ -41,6 +41,23 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | Abmelden                                     | Private Bereiche sind wieder geschützt                                                       |
 | Discord öffnen                               | Offizieller Server `https://discord.gg/NjkFJtBkZm`; Beitritt und Kanalrechte durch Discord   |
 
+## Tagesabschluss, Dranbleiben und Hinweise (ab Migration 0003)
+
+| Prüfung | Erwartetes Ergebnis |
+| --- | --- |
+| Konto ohne Telefonnummer öffnet `/tagesabschluss` | Checkliste nennt die fehlende Nummer; Entwurf speicherbar, Einreichen gesperrt |
+| Entwurf mit Zahlen speichern | Nirgends sichtbar: nicht im Ranking, nicht in der Gruppensumme, nicht in `/reflexionen`, keine Serie |
+| Einreichen ohne Energie oder ohne Antworten | Klare Meldung, nichts gezählt |
+| Vollständig einreichen (Bestätigung gelesen) | Tag zählt im Ranking (öffentlich nur mit Freigabe), Serie steigt, Karte in `/reflexionen` für berechtigte Mitglieder |
+| Korrektur beginnen, nicht einreichen | Weiter gilt die zuletzt eingereichte Fassung |
+| Abschluss mit 0 Anwahlen | Reflexions-Serie läuft, Calling-Serie wird nicht verlängert |
+| Tag mit übernommenem Stand (z. B. 22.09.) | Kein eigener Abschluss möglich; Korrektur über das Team |
+| Wochenende | Keine Erinnerung, kein Fehltag; freiwilliger Abschluss als Bonus |
+| Push auf einem echten Gerät einrichten, Testnachricht | Nachricht kommt bei geschlossener Seite an; iPhone nur als Home-Bildschirm-App |
+| 20:30 ohne Abschluss (Pflicht-Tag, Push aktiv) | Genau eine Erinnerung; nach eingereichtem Abschluss keine |
+| Neue Registrierung über `/beitreten`, E-Mail bestätigt | Genau ein Inbox-Eintrag und ein Push je Verwaltungskonto plus kurze E-Mail (sofern `RESEND_API_KEY`/`NOTIFY_FROM` gesetzt); späteres Anmelden löst nichts aus |
+| Wins-Text zweimal übernehmen | Zweites Mal „unverändert“, keine Doppelzählung |
+
 ## Import und sichere Übernahme
 
 1. Betreiber-UUID in `OPERATOR_ADMIN_IDS` hinterlegen, Anwendung neu starten.
