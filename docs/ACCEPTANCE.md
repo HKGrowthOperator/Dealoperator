@@ -27,7 +27,7 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | Startseite / Ranking ohne Login              | Öffentliche, freigegebene Zahlen; keine E-Mails, Telefonnummern oder Reflexionen             |
 | Eigener Bereich ohne Login                   | Weiterleitung zur Anmeldung, gewünschtes internes Ziel bleibt erhalten                       |
 | E-Mail-Link für Konto A anfordern            | Eine echte Auth-Mail kommt an; kein Newsletter und keine zusätzliche Werbeeinwilligung       |
-| Link im selben Browser öffnen                | Bestätigte Sitzung, anschließend einmalige Profileinrichtung                                 |
+| Link öffnen (nach Umstellung auch anderer Browser) oder Code eingeben | Bestätigte Sitzung, anschließend einmalige Profileinrichtung               |
 | Neues Profil ohne Ranking-Freigabe           | Eigene Zahlen nutzbar; Person erscheint nicht öffentlich                                     |
 | Zwei Tagesmeldungen auf verschiedenen Tagen  | Verlauf und Summen stimmen; Neuladen, Abmelden und erneutes Anmelden erhalten die Daten      |
 | Bestehende Tagesmeldung korrigieren          | Neuer vollständiger Tagesstand ersetzt den alten; keine Addition doppelter Werte             |
@@ -66,17 +66,17 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 2. `/verwaltung` mit dem Betreiberkonto öffnen. Ein gewöhnliches Mitglied erhält keinen Adminzugang.
 3. Vorbereitete Tageszahlen mit stabiler `participantKey` und nachvollziehbarer Zustimmung importieren. Leere Kennzahlen bleiben unbekannt; `0` bedeutet ausdrücklich null. Nicht aus anderen Kennzahlen schätzen.
 4. Vorschau und Änderungen kontrollieren, dann speichern. Wiederholtes Senden darf die Werte nicht verdoppeln.
-5. Übernahme abgemeldet: Profil im Ranking („Das sind meine Zahlen“) oder unter `/starten` wählen, Kontaktdaten eingeben, E-Mail bestätigen. `/status` zeigt „In Prüfung“. Nichts ist freigegeben, bis das Team unter Verwaltung → Übernahmen freigibt.
-6. Übernahme angemeldet ohne Profil: `/profil-uebernehmen` (auch aus Tagesabschluss-Checkliste, Kontoeinstellungen, Profileinrichtung) oder persönlicher Einladungslink `/profil-uebernehmen?profil=…&einladung=…`. Name und Telefon ergänzen, „Übernahme anfragen“, keine zweite Mail. Mehrfaches Absenden: eine Anfrage, ein Team-Hinweis.
-7. Abgemeldet mit bestehendem Konto aus der Profilauswahl „Anmelden“ wählen: nach dem Link zurück zur Übernahme mit derselben Auswahl und Einladung. Link im falschen Browser geöffnet: zurück zu `/anmelden` mit demselben Ziel.
-8. Rückfrage des Teams (Text ist Pflicht): Person sieht die Frage unter `/status`, antwortet dort, das Team sieht die Antwort unter Übernahmen. Ablehnung: `/status` bietet eigenes Profil oder eine andere Anfrage.
+5. Übernahme abgemeldet: Profil im Ranking oder unter `/starten` → „Meine Zahlen sind schon hier“ wählen. Nach der Auswahl stehen Profilkarte, „Anderes Profil wählen“ und das kurze Formular (Name, E-Mail, Telefon mit Ländervorwahl; Hinweis fürs Team optional) auf einer Seite. „Bestätigungsmail senden“ → „Bestätige deine E-Mail“. `/status` zeigt „E-Mail bestätigt. Deine Profilübernahme wird geprüft.“ Nichts ist freigegeben, bis das Team unter Verwaltung → Übernahmen freigibt.
+6. Profil nicht gefunden: „Meine Zahlen müssten schon hier sein“ → Anfrage an das Team mit Suchbegriff als Hinweis. Das Team wählt unter Übernahmen das Profil aus („Zuordnen und freigeben“). „Ich habe noch keine Zahlen“ → neues Profil. Ein bereits vergebenes Profil aus einem Direktlink zeigt „Dieses Profil ist schon vergeben“ mit Anmelden oder Anfrage an das Team, nie stillschweigend ein zweites Profil.
+7. Übernahme angemeldet ohne Profil: `/profil-uebernehmen` oder persönlicher Einladungslink `/profil-uebernehmen?profil=…&einladung=…`. Name und Telefon ergänzen, „Übernahme anfragen“, keine zweite Mail. Mehrfaches Absenden: eine Anfrage, ein Team-Hinweis.
+8. Bestätigung: Link in der Mail oder, nach der Umstellung der Vorlagen und `AUTH_EMAIL_CODE=1`, Code auf der Seite. „Erneut senden“ erst nach der angezeigten Wartezeit; nur die neueste Mail gilt. „E-Mail-Adresse ändern“ behält alle anderen Angaben. Zurück, Neuladen und ein Link-Fehler zeigen den Stand wieder. Rückfrage des Teams (Text ist Pflicht): Person sieht die Frage unter `/status`, antwortet dort; eine offene Statusseite zeigt Rückfrage, Ablehnung und Freigabe ohne Neuladen. Ablehnung: `/status` bietet anderes Profil, Anfrage an das Team oder (klein) ein neues Profil.
 9. Bisherige Tageszahlen bleiben nach der Freigabe erhalten. Ein zugeordnetes Profil lässt sich nicht erneut anfragen; niemand im Team (außer der festen Grundverwaltung) entscheidet über die eigene Anfrage.
 10. Beim bewussten Neustart trotz passender Importdaten bleibt der Import erhalten und wird nicht stillschweigend gelöscht.
 11. Admin-Kontaktansicht prüfen: E-Mail aus bestätigter Sitzung; Telefonnummer freiwillig und nicht SMS-verifiziert. Veröffentlichung im Ranking ist keine Werbeeinwilligung.
 
 ## Darstellung und Bedienung
 
-- Breiten 320, 390, 812 und 1280 px prüfen: Navigation, Rankingfilter, Profilansicht, Formulare, Dialoge, Discord-Hinweise.
+- Breiten 320, 360, 390, 430, 812 und 1280 px prüfen: Navigation, Rankingfilter, Profilansicht, Formulare, Dialoge, Discord-Hinweise.
 - Lange Namen, leere Rankings und noch unbekannte Zahlen prüfen. Bei breiten Tabellen darf nur der dafür vorgesehene Tabellenbereich horizontal scrollen.
 - Tastaturnavigation: Links und Formulare erreichbar, sichtbarer Fokus, Dialog mit Escape schließbar.
 - Systemoption „Bewegung reduzieren“: Animationen und glatte Scrollbewegungen entfallen.
