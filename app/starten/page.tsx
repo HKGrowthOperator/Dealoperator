@@ -78,11 +78,13 @@ export default async function Page({
         kind: found.kind,
         profile: found.profile,
         profileTaken: found.profileTaken,
+        takenName: found.takenName,
+        mailSent: found.mailSent,
         email: found.email,
         fullName: found.fullName,
         phone: found.phone,
         hint: found.hint,
-        resendIn: Math.max(0, Math.ceil(RESEND_SECONDS - found.secondsAgo)),
+        resendIn: found.mailSent ? Math.max(0, Math.ceil(RESEND_SECONDS - found.secondsAgo)) : 0,
       };
     }
   }
@@ -102,6 +104,7 @@ export default async function Page({
           needsInvite={needsInvite}
           pending={pending}
           initialWeg={(search.weg || "").slice(0, 10)}
+          initialSchritt={(search.schritt || "").slice(0, 12)}
         />
       </main>
       <OperatorFooter />

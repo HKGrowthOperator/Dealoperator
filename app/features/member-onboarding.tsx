@@ -16,11 +16,14 @@ export default function MemberOnboarding({
   presetName,
   needsPhone,
   discordUrl,
+  takenProfile = "",
 }: {
   next: string;
   presetName: string;
   needsPhone: boolean;
   discordUrl: string;
+  /** Übernahme lief ins Leere: Profil inzwischen anderweitig zugeordnet. */
+  takenProfile?: string;
 }) {
   const id = useId();
   const [value, setValue] = useState({
@@ -138,6 +141,17 @@ export default function MemberOnboarding({
         <p className="flow-lead">
           Noch dein Anzeigename, dann trägst du deinen ersten Tag ein.
         </p>
+        {takenProfile && (
+          <div className="flow-alert">
+            <p>
+              „{takenProfile}“ wurde inzwischen einem anderen Konto zugeordnet.
+              Wenn es dein Profil ist, klärt das Team die Zuordnung.
+            </p>
+            <Link className="btn secondary" href="/profil-uebernehmen?weg=team">
+              Team um Zuordnung bitten
+            </Link>
+          </div>
+        )}
         {message && (
           <p className="form-error" role="alert">
             {message}

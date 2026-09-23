@@ -179,6 +179,9 @@ export function ProfileSearch({
   const [results, setResults] = useState<Profile[]>([]);
   const [attempt, setAttempt] = useState(0);
   const [showMissing, setShowMissing] = useState(false);
+  // Wofür das angezeigte Ergebnis gilt. „Nicht gefunden“ steht nur da, wenn
+  // genau die aktuelle Eingabe gesucht wurde.
+  const [searchedFor, setSearchedFor] = useState("");
   const latest = useRef(0);
   const trimmed = query.trim();
 
@@ -196,15 +199,17 @@ export function ProfileSearch({
         setState("loading");
         setShowMissing(false);
         try {
+          // POST: der gesuchte Name steht so in keiner Adresse und keinem Log.
           const data = await call<{ ready?: boolean; profiles?: Profile[] }>(
-            `/api/onboarding?q=${encodeURIComponent(q)}`,
-            undefined,
+            "/api/onboarding",
+            { action: "search", q },
             controller.signal,
           );
           if (run !== latest.current) return;
           // Ohne Datenbank ist „nichts gefunden“ keine ehrliche Antwort.
           if (data.ready === false) throw new Error("not ready");
           setResults(data.profiles || []);
+          setSearchedFor(q);
           setState("done");
         } catch {
           if (controller.signal.aborted || run !== latest.current) return;
@@ -299,7 +304,7 @@ export function ProfileSearch({
         </>
       )}
 
-      {state === "done" && results.length === 0 && notFound(trimmed, false)}
+      {state === "done" && results.length === 0 && searchedFor === trimmed && notFound(trimmed, false)}
     </div>
   );
 }
@@ -736,8 +741,8 @@ export function EmailSent({
         )}
       </div>
       <p className="flow-small">
-        Keine Mail da? Schau auch im Spam-Ordner nach. Link und Code gelten nur
-        einmal.
+        Keine Mail da? Schau auch im Spam-Ordner nach.{" "}
+        {codeEnabled ? "Link und Code gelten nur einmal." : "Der Link gilt nur einmal."}
       </p>
     </>
   );

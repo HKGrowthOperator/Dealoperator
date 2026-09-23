@@ -44,6 +44,9 @@ export type PendingStart = {
   kind: "new" | "claim";
   profile: Profile | null;
   profileTaken: boolean;
+  takenName: string;
+  /** Nach dem letzten Absenden wirklich an Supabase übergeben. */
+  mailSent: boolean;
   email: string;
   fullName: string;
   phone: string;
@@ -102,6 +105,7 @@ export default function OnboardingStart({
   needsInvite = "",
   pending,
   initialWeg = "",
+  initialSchritt = "",
 }: {
   ready: boolean;
   codeEnabled: boolean;
@@ -114,6 +118,8 @@ export default function OnboardingStart({
   pending: PendingStart | null;
   /** weg=neu|profil|team aus der Adresse, damit Neuladen im selben Weg bleibt. */
   initialWeg?: string;
+  /** schritt=angaben: Neuladen nach „E-Mail-Adresse ändern“ bleibt im Formular. */
+  initialSchritt?: string;
 }) {
   const fromPending = pending && (linkError || !preselected || pending.profile?.id === preselected.id);
   const urlMode = MODE_OF[initialWeg];
@@ -126,10 +132,14 @@ export default function OnboardingStart({
     : preselected
       ? "claim"
       : (urlMode ?? null);
+  // Ohne belegten Versand keine Bestätigungsansicht: dann steht das Formular
+  // mit den gespeicherten Angaben da.
   const initialStep: Step = fromPending
     ? pending.profileTaken
       ? "choice"
-      : "sent"
+      : pending.mailSent && initialSchritt !== "angaben"
+        ? "sent"
+        : "contact"
     : preselected
       ? "contact"
       : taken
@@ -158,20 +168,41 @@ export default function OnboardingStart({
   const [message, setMessage] = useState(
     fromPending
       ? pending.profileTaken
-        ? "Das gewählte Profil wurde inzwischen einem anderen Konto zugeordnet. Such es noch einmal oder bitte das Team um Zuordnung."
-        : ""
+        ? `„${pending.takenName}“ wurde inzwischen einem anderen Konto zugeordnet. Wenn es dein Profil ist, bitte das Team um Zuordnung; sonst such dein Profil noch einmal.`
+        : initialStep === "contact"
+          ? [
+              linkErrorText(linkError, codeEnabled),
+              pending.mailSent
+                ? "Deine Angaben sind gespeichert."
+                : "Deine Angaben sind gespeichert, die Mail ist aber noch nicht verschickt. Sende sie jetzt ab.",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : ""
       : linkErrorText(linkError, codeEnabled) || problem,
   );
   const [sendError, setSendError] = useState(
-    fromPending && !pending.profileTaken ? linkErrorText(linkError, codeEnabled) : "",
+    initialStep === "sent" ? linkErrorText(linkError, codeEnabled) : "",
   );
   const [busy, setBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const [sentTo, setSentTo] = useState(fromPending ? pending.email : "");
+  const sentBefore = fromPending && pending.mailSent && !pending.profileTaken ? pending : null;
+  const [sentTo, setSentTo] = useState(sentBefore ? sentBefore.email : "");
+  // Angaben, mit denen zuletzt wirklich versendet wurde. „Erneut senden“ nimmt
+  // genau diese, auch wenn im Formular inzwischen etwas anderes steht.
+  const [sentWith, setSentWith] = useState<{
+    mode: Mode;
+    profile: Profile | null;
+    contact: Contact;
+  } | null>(
+    sentBefore && initialMode
+      ? { mode: initialMode, profile: sentBefore.profile, contact: contactFrom(sentBefore) }
+      : null,
+  );
   const [saved, setSaved] = useState(Boolean(fromPending));
-  const [waitFor, setWaitFor] = useState(fromPending ? pending.email : "");
-  const [wait, setWait] = useCountdown(fromPending ? pending.resendIn : 0);
+  const [waitFor, setWaitFor] = useState(sentBefore ? sentBefore.email : "");
+  const [wait, setWait] = useCountdown(sentBefore ? sentBefore.resendIn : 0);
   const inFlight = useRef(false);
   const fields = useRef<Partial<Record<ContactField, HTMLElement | null>>>({});
   const known = useRef<Record<string, Profile>>(
@@ -229,17 +260,20 @@ export default function OnboardingStart({
       const params = new URLSearchParams(window.location.search);
       const nextMode = MODE_OF[params.get("weg") || ""] ?? null;
       const profile = known.current[params.get("profil") || ""] ?? null;
-      let nextStep: Step = STEP_OF[params.get("schritt") || ""] ?? (nextMode ? "search" : "choice");
+      let nextStep: Step =
+        STEP_OF[params.get("schritt") || ""] ??
+        (nextMode ? "search" : taken && params.get("profil") === taken.id ? "taken" : "choice");
       if (nextMode === "claim" && nextStep !== "search" && !profile) nextStep = "search";
       if (nextStep === "sent" && !sentTo) nextStep = "contact";
       setMode(nextMode);
       setSelected(profile);
       setStep(nextStep);
       setErrors({});
+      setMessage("");
     }
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, [sentTo]);
+  }, [sentTo, taken]);
 
   // Eingaben überleben Neuladen in diesem Tab. Nach dem Versand liegen sie
   // auf dem Server; dann wird der Entwurf gelöscht.
@@ -316,21 +350,21 @@ export default function OnboardingStart({
     go("contact", nextMode, null);
   }
 
-  function payload() {
+  function payload(m: Mode | null, profile: Profile | null, c: Contact) {
     const base = {
-      fullName: contact.fullName.trim(),
-      email: contact.email.trim(),
-      phone: contact.phone.trim(),
-      phoneCountry: contact.phoneCountry,
+      fullName: c.fullName.trim(),
+      email: c.email.trim(),
+      phone: c.phone.trim(),
+      phoneCountry: c.phoneCountry,
     };
-    if (mode === "new") return { kind: "new", ...base, hint: "" };
-    if (mode === "assign") return { kind: "claim", ...base, hint: contact.hint.trim() };
+    if (m === "new") return { kind: "new", ...base, hint: "" };
+    if (m === "assign") return { kind: "claim", ...base, hint: c.hint.trim() };
     return {
       kind: "claim",
-      participantId: selected?.id,
-      ...(invite && selected?.id === preselected?.id ? { invite } : {}),
+      participantId: profile?.id,
+      ...(invite && profile?.id === preselected?.id ? { invite } : {}),
       ...base,
-      hint: contact.hint.trim(),
+      hint: c.hint.trim(),
     };
   }
 
@@ -342,12 +376,15 @@ export default function OnboardingStart({
     setMessage("");
     setSendError("");
     setResent(false);
-    const email = contact.email.trim().toLowerCase();
+    const using =
+      resend && sentWith ? sentWith : { mode: mode as Mode, profile: selected, contact };
+    const email = using.contact.email.trim().toLowerCase();
     try {
       const data = await call<{ resendAfter?: number }>("/api/onboarding", {
         action: "start",
-        value: payload(),
+        value: payload(using.mode, using.profile, using.contact),
       });
+      setSentWith(using);
       setSentTo(email);
       setSaved(true);
       setWaitFor(email);
@@ -441,8 +478,8 @@ export default function OnboardingStart({
         {step === "sent" && mode && (
           <EmailSent
             email={sentTo}
-            purpose={mode}
-            profileName={selected?.name}
+            purpose={sentWith?.mode ?? mode}
+            profileName={(sentWith?.profile ?? selected)?.name}
             codeEnabled={codeEnabled}
             next="/tagesabschluss"
             saved={saved}

@@ -7,6 +7,7 @@ import {
   bindConfirmedRequest,
   noteConfirmedAccount,
   ONBOARDING_COOKIE,
+  requestIdFromCookie,
 } from "@/server/onboarding";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberOnboarding from "../features/member-onboarding";
@@ -35,7 +36,7 @@ export default async function Page({
   // Übernahme statt doppelt.
   const target = new URL(next, "https://operator.invalid");
   const toClaim = target.pathname === "/profil-uebernehmen";
-  const requestId = (await cookies()).get(ONBOARDING_COOKIE)?.value;
+  const requestId = requestIdFromCookie((await cookies()).get(ONBOARDING_COOKIE)?.value);
   // Aus der Übernahme heraus nur eine Anfrage für genau das gewählte Profil
   // binden; dann geht es direkt zum Status.
   const bound = await bindConfirmedRequest(
@@ -74,6 +75,18 @@ export default async function Page({
     actor.userId,
   ]);
   const phone = (contact?.phone as string | undefined) || "";
+  // Die Übernahme aus diesem Browser lief ins Leere, weil das Profil
+  // inzwischen jemand anderem zugeordnet wurde: das sagen, statt nur ein
+  // neues Profil anzubieten.
+  const [lost] =
+    !bound && requestId
+      ? await db.query(
+          `SELECT p.name FROM onboarding_requests r JOIN participants p ON p.id=r.participant
+            WHERE r.id=$1 AND lower(r.email)=$2 AND r.status='superseded'
+              AND p.owner IS NOT NULL AND p.owner<>$3`,
+          [requestId, actor.email, actor.userId],
+        )
+      : [];
 
   return (
     <div className="operator-site">
@@ -83,6 +96,7 @@ export default async function Page({
           next={next}
           presetName={bound?.fullName || ""}
           needsPhone={!phone}
+          takenProfile={(lost?.name as string | undefined) || ""}
           discordUrl={discordDestination().url}
         />
       </main>

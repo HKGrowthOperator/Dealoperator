@@ -63,8 +63,14 @@ export default function AuthForm({
   const target = targetLabel(next);
   const startHref = (() => {
     const url = new URL(next, "https://operator.invalid");
-    const profil = url.pathname === "/profil-uebernehmen" ? url.searchParams.get("profil") : null;
-    return profil ? `/starten?profil=${encodeURIComponent(profil)}` : "/starten";
+    if (url.pathname !== "/profil-uebernehmen") return "/starten";
+    const params = new URLSearchParams();
+    for (const key of ["profil", "einladung"]) {
+      const value = url.searchParams.get(key);
+      if (value) params.set(key, value);
+    }
+    const query = params.toString();
+    return `/starten${query ? `?${query}` : ""}`;
   })();
 
   useEffect(() => {
