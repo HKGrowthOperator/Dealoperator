@@ -549,12 +549,6 @@
   accent-color: var(--cm-blue);
   cursor: pointer;
 }
-.cm-check small {
-  display: block;
-  margin-top: 6px;
-  color: var(--cm-muted);
-  font-size: 13px;
-}
 .cm-draft-line {
   display: flex;
   align-items: flex-start;
