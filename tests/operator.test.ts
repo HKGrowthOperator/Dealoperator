@@ -763,31 +763,34 @@ test("private contact inventory is restricted to admins", async () => {
   );
 });
 test("session capacity, ownership and cancellation are guarded inside a transaction", async () => {
-  const { toggleAttendance, editSession } = await import("../server/sessions");
+  const { toggleAttendance, editSession, cancelSession } = await import("../server/sessions");
   const value = {
     title: "Test Session",
+    kind: "Roleplay",
+    date: "2099-01-01",
+    time: "10:00",
+    minutes: 50,
     capacity: 2,
     startsAt: "2099-01-01T10:00:00Z",
   };
   await db.query("INSERT INTO sessions(id,owner,data) VALUES($1,$2,$3)", [
     "session",
     admin.userId,
-    JSON.stringify(value),
+    JSON.stringify({ ...value, host: "Admin", url: "" }),
   ]);
+  const owner = { userId: admin.userId, team: false };
   await toggleAttendance(db, alice.userId, "session");
   await toggleAttendance(db, bob.userId, "session");
   await assert.rejects(toggleAttendance(db, "third", "session"), /voll/);
   await assert.rejects(
-    editSession(db, bob.userId, "session", { ...value, capacity: 10 }),
+    editSession(db, { userId: bob.userId, team: false }, "session", { ...value, capacity: 10 }),
     /eigene/,
   );
-  await assert.rejects(
-    editSession(db, admin.userId, "session", { ...value, capacity: 1 }),
-    /kleiner/,
-  );
+  await assert.rejects(editSession(db, owner, "session", { ...value, capacity: 1 }), /kleiner/);
   await toggleAttendance(db, bob.userId, "session");
   assert.equal((await db.query("SELECT * FROM rsvps")).length, 1);
-  await editSession(db, admin.userId, "session", { ...value, cancelled: true });
+  await assert.rejects(cancelSession(db, { userId: bob.userId, team: false }, "session"), /eigene/);
+  await cancelSession(db, owner, "session");
   await assert.rejects(toggleAttendance(db, bob.userId, "session"), /abgesagt/);
 });
 

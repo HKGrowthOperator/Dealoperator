@@ -1,10 +1,16 @@
-import { toggleAttendance, editSession } from "@/server/sessions";
+import { cancelSession, createSession, editSession, toggleAttendance } from "@/server/sessions";
+import { sessionRoomsReady } from "@/server/discord-sessions";
+import { teamRecipients } from "@/server/roles";
+import { discordDestination } from "@/server/discord";
+import { activeCallerFor } from "@/server/active-caller";
+import { ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
 import { loadWorkflows, handleWorkflow } from "./workflows";
 import { database } from "@/server/database";
 import { loadOwnRecords } from "@/server/records";
 import { body as readBody, errorResponse } from "@/server/http";
 import { AppError, rateLimit } from "@/server/operator";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam, type Actor } from "@/server/auth";
+import type { Database } from "@/server/database";
 import { emptyProfile, resources } from "../../data";
 import { z } from "zod";
 const s = z.string().trim();
@@ -17,7 +23,8 @@ const profileSchema = z.object({
   goal: z.number().int().min(1).max(5000),
   days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
   listed: z.boolean(),
-  channel: z.enum(["WhatsApp", "Telegram", "Discord"]),
+  // Ein früher gespeicherter „bevorzugter Kanal“ wird beim Lesen und Speichern
+  // verworfen: Treffpunkt für Call-Partner und Sessions ist Discord.
 });
 const validDate = z
   .string()
@@ -32,17 +39,23 @@ const sessionSchema = z.object({
   date: validDate,
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   minutes: z.number().int().min(15).max(180),
-  // Kleine Absprachen unter Call-Partnern, keine eigene Call-Runde.
-  capacity: z.number().int().min(2).max(6),
-  url: z.union([
-    z.literal(""),
-    z
-      .string()
-      .url()
-      .refine((v) => v.startsWith("https://")),
-  ]),
+  // Der Host legt die Plätze fest; der Discord-Raum übernimmt die Zahl.
+  capacity: z.number().int().min(2).max(25),
+  // Einen eigenen Raum-Link gibt es nicht mehr: der Raum entsteht im Discord.
   startsAt: z.string().datetime().optional(),
 });
+/**
+ * Sessions & Roleplay sind mit dem Rang „Aktiver Caller“ freigeschaltet. Das
+ * Team (Admins, Moderatoren) legt Sessions an und betreut sie immer.
+ */
+async function requireSessionAccess(database: Database, user: Actor) {
+  if (user.admin || user.moderator) return;
+  if ((await activeCallerFor(database, user.userId)).active) return;
+  throw new AppError(
+    `Sessions & Roleplay schaltest du als aktiver Caller frei: ${ACTIVE_RUN_DAYS} Calling-Tage am Stück mit mindestens ${ACTIVE_MIN_ATTEMPTS} Anwahlen.`,
+    403,
+  );
+}
 function db() {
   return database();
 }
@@ -71,6 +84,7 @@ export async function GET() {
       prefs,
       shared,
       workflows,
+      team,
     ] = await Promise.all([
       database
         .prepare("SELECT data FROM profiles WHERE id = ?")
@@ -97,9 +111,16 @@ export async function GET() {
         )
         .all(),
       loadWorkflows(database, user.userId),
+      teamRecipients(database),
     ]);
+    const active = await activeCallerFor(database, user.userId);
     return json({
       ...workflows,
+      // Treffpunkt für Sessions und Call-Partner ist Discord.
+      discord: { invite: discordDestination().url, rooms: sessionRoomsReady() },
+      viewerTeam: isTeam(user),
+      // Rang „Aktiver Caller“: schaltet Sessions & Roleplay frei.
+      activeCaller: active,
       profile: profile ? JSON.parse(profile.data) : emptyProfile,
       records: records.results.map((r: any) => JSON.parse(r.data)),
       members: crew.results
@@ -119,8 +140,14 @@ export async function GET() {
             };
           })(),
         })),
-      sessions: sessions.results.map((r: any) => ({
-        ...JSON.parse(r.data),
+      sessions: sessions.results.map((r: any) => {
+        const { discord, ...data } = JSON.parse(r.data);
+        return {
+        ...data,
+        // Nur der Link in den Discord-Raum, keine internen Kennungen.
+        room: discord?.url && !discord.closed ? discord.url : "",
+        roomEvent: discord?.eventUrl && !discord.closed ? discord.eventUrl : "",
+        team: team.includes(r.owner),
         id: r.id,
         owner: r.owner,
         mine: r.owner === user.userId,
@@ -140,7 +167,8 @@ export async function GET() {
         joined: rsvps.results.some(
           (x: any) => x.session === r.id && x.owner === user.userId,
         ),
-      })),
+        };
+      }),
       buddies: buddies.results.map((r: any) => ({
         ...JSON.parse(r.data),
         id: r.id,
@@ -210,10 +238,7 @@ export async function POST(request: Request) {
         .run();
     } else if (body.action === "session" || body.action === "editSession") {
       const value = sessionSchema.parse(body.value);
-      if (
-        new Date(value.startsAt || `${value.date}T${value.time}`) < new Date()
-      )
-        return json({ error: "Wähle einen zukünftigen Termin." }, 400);
+      if (body.action === "session") await requireSessionAccess(database, user);
       const profile = await database
         .prepare("SELECT data FROM profiles WHERE id = ?")
         .bind(id)
@@ -225,48 +250,19 @@ export async function POST(request: Request) {
         );
       if (body.action === "editSession") {
         const sid = s.min(1).parse(body.value.id);
-        await editSession(database, id, sid, {
-          ...value,
-          host: JSON.parse(profile.data).name,
-          cancelled: false,
-        });
+        await editSession(database, { userId: id, team: isTeam(user) }, sid, value);
       } else {
-        const sid = crypto.randomUUID();
-        await database.batch([
-          database
-            .prepare("INSERT INTO sessions (id,owner,data) VALUES (?,?,?)")
-            .bind(
-              sid,
-              id,
-              JSON.stringify({
-                ...value,
-                host: JSON.parse(profile.data).name,
-                cancelled: false,
-              }),
-            ),
-          database
-            .prepare("INSERT INTO rsvps (session,owner) VALUES (?,?)")
-            .bind(sid, id),
-        ]);
+        const created = await createSession(database, id, JSON.parse(profile.data).name, value);
+        return json({ ok: true, id: created.id });
       }
     } else if (body.action === "cancelSession") {
       const sid = s.min(1).parse(body.value);
-      const row = await database
-        .prepare("SELECT data FROM sessions WHERE id = ? AND owner = ?")
-        .bind(sid, id)
-        .first<{ data: string }>();
-      if (!row)
-        return json({ error: "Du kannst nur eigene Sessions absagen." }, 403);
-      await database
-        .prepare("UPDATE sessions SET data = ? WHERE id = ? AND owner = ?")
-        .bind(
-          JSON.stringify({ ...JSON.parse(row.data), cancelled: true }),
-          sid,
-          id,
-        )
-        .run();
+      await cancelSession(database, { userId: id, team: isTeam(user) }, sid);
     } else if (body.action === "rsvp") {
       const sid = s.min(1).max(100).parse(body.value);
+      // Absagen geht immer; zusagen nur mit freigeschalteten Sessions.
+      const [present] = await database.query("SELECT 1 FROM rsvps WHERE session=$1 AND owner=$2", [sid, id]);
+      if (!present) await requireSessionAccess(database, user);
       await toggleAttendance(database, id, sid);
     } else if (body.action === "buddy") {
       const value = z

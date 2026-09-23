@@ -13,6 +13,9 @@ import { createPublicKey, verify } from "node:crypto";
  * - DISCORD_BOT_TOKEN, DISCORD_GUILD_ID       Beiträge, Rollen, Channels
  * - DISCORD_REFLECTION_CHANNEL_ID            Ziel-Channel (Text oder Forum)
  * - DISCORD_PUBLIC_KEY                       Signaturprüfung der Interactions
+ * - DISCORD_SESSION_CATEGORY_ID              Kategorie für Session-Räume (optional)
+ * - DISCORD_MODERATOR_ROLE_ID                Rolle für Admins und Moderatoren
+ * - DISCORD_ACTIVE_ROLE_ID                   Rang „Aktiver Caller“
  */
 export type DiscordConfig = {
   clientId: string;
@@ -21,6 +24,9 @@ export type DiscordConfig = {
   guildId: string;
   reflectionChannelId: string;
   publicKey: string;
+  sessionCategoryId: string;
+  moderatorRoleId: string;
+  activeRoleId: string;
 };
 
 const NAMES: Record<keyof DiscordConfig, string> = {
@@ -30,6 +36,9 @@ const NAMES: Record<keyof DiscordConfig, string> = {
   guildId: "DISCORD_GUILD_ID",
   reflectionChannelId: "DISCORD_REFLECTION_CHANNEL_ID",
   publicKey: "DISCORD_PUBLIC_KEY",
+  sessionCategoryId: "DISCORD_SESSION_CATEGORY_ID",
+  moderatorRoleId: "DISCORD_MODERATOR_ROLE_ID",
+  activeRoleId: "DISCORD_ACTIVE_ROLE_ID",
 };
 
 export function discordConfig(env = process.env): Partial<DiscordConfig> {
@@ -42,7 +51,7 @@ export function discordConfig(env = process.env): Partial<DiscordConfig> {
 
 /** Welche Werte für einen Teil der Anbindung fehlen. */
 export function discordMissing(
-  part: "link" | "posts" | "interactions" | "inventory",
+  part: "link" | "posts" | "interactions" | "inventory" | "sessions" | "moderators" | "active",
   env = process.env,
 ): string[] {
   const config = discordConfig(env);
@@ -51,6 +60,10 @@ export function discordMissing(
     posts: ["botToken", "reflectionChannelId", "guildId"] as (keyof DiscordConfig)[],
     interactions: ["publicKey"] as (keyof DiscordConfig)[],
     inventory: ["botToken", "guildId"] as (keyof DiscordConfig)[],
+    // Die Kategorie für Session-Räume ist freiwillig.
+    sessions: ["botToken", "guildId"] as (keyof DiscordConfig)[],
+    moderators: ["botToken", "guildId", "moderatorRoleId"] as (keyof DiscordConfig)[],
+    active: ["botToken", "guildId", "activeRoleId"] as (keyof DiscordConfig)[],
   }[part];
   return need.filter((key) => !config[key]).map((key) => NAMES[key]);
 }
@@ -91,7 +104,7 @@ export function verifyDiscordSignature(
 
 const API = "https://discord.com/api/v10";
 
-async function discordFetch(
+export async function discordFetch(
   path: string,
   init: RequestInit & { token: string },
   fetcher: typeof fetch = fetch,

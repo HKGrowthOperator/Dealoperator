@@ -14,7 +14,7 @@ import {
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
 import { dispatch, enqueue, teamEvent, type Recheck } from "./notify";
 import { markEligibleMembers, toClosings, ownClosings } from "./closing";
-import { syncDiscord } from "./discord-sync";
+import { runDiscordRooms } from "./discord-sessions";
 import { isTeamMember } from "./roles";
 
 /**
@@ -237,8 +237,10 @@ export async function tick(db: Database, now = new Date()) {
     return { skipped: false, reminders, reviews };
   });
   const delivery = await dispatch(db, recheck, now);
-  const discord = await syncDiscord(db).catch((e: Error) => ({ error: e.message }));
-  return { ...plan, ...delivery, discord };
+  // Discord ist für Calls da: Session-Räume und Ränge, höchstens alle 15
+  // Minuten. Tagesabschlüsse werden dort nicht mehr geteilt.
+  const rooms = await runDiscordRooms(db, { now, auto: true }).catch((e: Error) => ({ error: e.message }));
+  return { ...plan, ...delivery, rooms };
 }
 
 // ---------------------------------------------------------------------------

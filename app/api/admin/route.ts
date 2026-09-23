@@ -23,6 +23,7 @@ import {
   reviewCases,
 } from "@/server/wins-import";
 import { discordStatus, discordInventory } from "@/server/discord-admin";
+import { runDiscordRooms } from "@/server/discord-sessions";
 import { setTeamRole, teamList } from "@/server/roles";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,9 @@ export async function POST(request: Request) {
         return json(await commitWins(db, actor, v));
       case "resolveCase":
         return json(await resolveReviewCase(db, actor, v));
+      case "discordRooms":
+        if (!actor.admin) throw new AppError("Nur für Admins.", 403);
+        return json(await runDiscordRooms(db));
       case "discordInventory":
         if (!actor.admin) throw new AppError("Das kann nur ein Admin.", 403);
         return json(await discordInventory());

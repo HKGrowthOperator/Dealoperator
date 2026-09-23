@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Database } from "./database";
 import type { Actor } from "./auth";
 import { AppError } from "./operator";
+import { sessionRoomStatus } from "./discord-sessions";
 import {
   discordConfig,
   discordMissing,
@@ -16,6 +17,7 @@ import {
  * wird als verbunden dargestellt.
  */
 export async function discordStatus(db: Database) {
+  const rooms = await sessionRoomStatus(db);
   const [links] = await db.query("SELECT count(*)::int AS n FROM discord_links");
   const [posts] = await db.query("SELECT count(*)::int AS n FROM discord_posts");
   const [outbox] = await db.query(
@@ -27,7 +29,11 @@ export async function discordStatus(db: Database) {
       posts: discordMissing("posts"),
       interactions: discordMissing("interactions"),
       inventory: discordMissing("inventory"),
+      sessions: discordMissing("sessions"),
+      moderators: discordMissing("moderators"),
+      active: discordMissing("active"),
     },
+    rooms,
     linkedAccounts: links.n as number,
     postedReflections: posts.n as number,
     outbox: { pending: outbox.pending as number, failed: outbox.failed as number },

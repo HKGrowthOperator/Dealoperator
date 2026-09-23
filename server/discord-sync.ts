@@ -12,6 +12,12 @@ import {
 } from "./discord-bridge";
 
 /**
+ * Stillgelegt (23.09.2026): Tagesabschlüsse werden nicht mehr im Discord
+ * geteilt; Discord ist für Sessions, Roleplay und die Ränge da
+ * (server/discord-sessions.ts). Die Funktion wird nicht mehr aufgerufen und
+ * bleibt nur, damit bestehende Beiträge bei Bedarf gezielt abgeräumt werden
+ * können.
+ *
  * Website → Discord. Liest die bestehende Outbox (eine Zeile je Profil mit
  * Revisionszähler) und bringt freigegebene Tagesabschlüsse als Beitrag in den
  * Reflexions-Channel. Korrekturen bearbeiten den vorhandenen Beitrag.
