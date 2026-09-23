@@ -16,8 +16,10 @@ import {
   allowedPushEndpoint,
   dispatch,
   enqueue,
+  pushName,
   subscribe,
   teamEvent,
+  teamPushText,
 } from "../server/notify";
 import { planReminders, recheck } from "../server/scheduler";
 import { commitWins, previewWins, resolveReviewCase } from "../server/wins-import";
@@ -163,7 +165,7 @@ test("a late autosave never revives an older draft over a submitted closing", as
   assert.equal(state.drafts.length, 0);
 });
 
-test("a registration alerts the team exactly once per account, with neutral text", async () => {
+test("a registration alerts the team exactly once per account; push names the person, the email stays neutral", async () => {
   for (let i = 0; i < 3; i++)
     await db.transaction((tx) =>
       teamEvent(tx, {
@@ -173,14 +175,47 @@ test("a registration alerts the team exactly once per account, with neutral text
         state: "confirmed",
         title: "Neue Registrierung bestätigt: Alice Beispiel",
         body: "E-Mail bestätigt.",
-        alert: { key: "signup:alice", kind: "new" },
+        alert: {
+          key: "signup:alice",
+          kind: "new",
+          push: teamPushText({ kind: "new", name: "Alice Beispiel" }),
+        },
       }),
     );
-  const sent = await db.query("SELECT channel,title,body FROM notifications ORDER BY channel");
+  const sent = await db.query("SELECT channel,title,body,url FROM notifications ORDER BY channel");
   assert.deepEqual(sent.map((n) => n.channel), ["email", "push"]);
-  for (const n of sent) {
-    assert.doesNotMatch(`${n.title} ${n.body}`, /Alice|@|\+49/);
+  const [email, push] = sent;
+  assert.doesNotMatch(`${email.title} ${email.body}`, /Alice|@|\+49/);
+  assert.equal(push.title, "Neue Registrierung");
+  assert.equal(push.body, "Alice Beispiel hat sich bei Deal Operator registriert.");
+  // Antippen öffnet genau den Inbox-Eintrag der ersten Registrierung.
+  const [entry] = await db.query("SELECT id FROM team_inbox WHERE dedupe_key='registration:r0'");
+  assert.equal(push.url, `/verwaltung?bereich=inbox&eintrag=${entry.id}`);
+  assert.equal(email.url, push.url);
+});
+
+test("team push texts never carry contact details, whatever was typed into the name", () => {
+  for (const typed of ["alice@example.invalid", "Alice 0170 1234567", "+49 170 12 34 56", "www.example.org", "   "]) {
+    const t = teamPushText({ kind: "new", name: typed });
+    assert.equal(t.body, "Eine Person hat sich bei Deal Operator registriert.");
   }
+  const claim = teamPushText({ kind: "claim", name: "Bob Beispiel", profile: "Alex B.", request: "r1" });
+  assert.deepEqual(claim, {
+    title: "Profilübernahme prüfen",
+    body: "Bob Beispiel möchte das Profil Alex B. übernehmen.",
+    url: "/verwaltung?bereich=uebernahmen&anfrage=r1",
+  });
+  // Profilname aus einem Import, der wie eine Nummer aussieht: nicht zeigen.
+  assert.equal(
+    teamPushText({ kind: "claim", name: "Bob Beispiel", profile: "+49 170 1234567", request: "r1" }).body,
+    "Bob Beispiel möchte ein bestehendes Profil übernehmen.",
+  );
+  assert.match(
+    teamPushText({ kind: "claim", name: "Bob Beispiel", profile: null, request: "r1" }).body,
+    /^Bob Beispiel möchte ein bestehendes Profil übernehmen\. Das Profil wählt ihr/,
+  );
+  assert.equal(pushName("A".repeat(80)).length, 60);
+  assert.equal(pushName("Zeile\neins"), "Zeile eins");
 });
 
 const endpoint = (n: number) => `https://fcm.googleapis.com/fcm/send/device-${n}`;
@@ -234,7 +269,7 @@ test("a team push without a device waits instead of being dropped", async () => 
       state: "confirmed",
       title: "Neue Registrierung",
       body: "",
-      alert: { key: "signup:x", kind: "new" },
+      alert: { key: "signup:x", kind: "new", push: teamPushText({ kind: "new", name: "X" }) },
     }),
   );
   await dispatch(db, recheck, new Date(), (async () => ({})) as any);
@@ -353,12 +388,12 @@ test("without Discord credentials nothing is marked as synced", async () => {
   assert.equal(row.state, "pending");
 });
 
-test("a new account from the sign-in page alerts the team once, never for existing profiles", async () => {
+test("an account signing in without a request gets one inbox entry and no push, never for existing profiles", async () => {
   await noteConfirmedAccount(db, alice);
   await noteConfirmedAccount(db, alice);
   assert.equal((await db.query("SELECT * FROM team_inbox")).length, 1);
-  const sent = await db.query("SELECT channel FROM notifications ORDER BY channel");
-  assert.deepEqual(sent.map((n) => n.channel), ["email", "push"]);
+  // Anmelden ist keine Registrierung: kein Team-Push, keine E-Mail.
+  assert.equal((await db.query("SELECT * FROM notifications")).length, 0);
   await member(bob, "Bob");
   await noteConfirmedAccount(db, bob);
   assert.equal((await db.query("SELECT * FROM team_inbox")).length, 1);

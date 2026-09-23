@@ -252,10 +252,10 @@ export async function enqueue(db: Database, n: NotificationInput): Promise<boole
 export { ownerIds as adminIds } from "./auth";
 
 /**
- * Feste Texte für Team-Meldungen auf Gerät und per E-Mail. Sie enthalten
- * bewusst keine Namen, Kontaktdaten oder Eingaben — die stehen nur in der
- * geschützten Team-Inbox. So landet auf dem Sperrbildschirm und im
- * Postfach nichts Persönliches.
+ * Feste Texte für die E-Mail-Absicherung der Team-Meldungen. Sie enthalten
+ * bewusst keine Namen, Kontaktdaten oder Eingaben; die stehen nur in der
+ * geschützten Team-Inbox und (nur der Name) im Push an die Verwaltungsgeräte.
+ * Einen Team-Push gibt es nur für diese beiden Ereignisse.
  */
 export const TEAM_ALERTS = {
   new: {
@@ -266,18 +266,59 @@ export const TEAM_ALERTS = {
     title: "Profilübernahme prüfbereit",
     body: "Eine bestätigte Profilübernahme wartet auf eure Prüfung. Details in der Verwaltung.",
   },
-  answer: {
-    title: "Antwort auf eine Rückfrage",
-    body: "Jemand hat auf eure Rückfrage zur Profilübernahme geantwortet. Details in der Verwaltung.",
-  },
 } as const;
 export type TeamAlert = keyof typeof TEAM_ALERTS;
 
 /**
+ * Name für den Team-Push: so wie angegeben, aber nie mit Kontaktdaten. Enthält
+ * das Feld eine E-Mail-Adresse, einen Link oder eine Telefonnummer, steht dort
+ * ein neutraler Ersatz. Steuerzeichen raus, auf 60 Zeichen gekürzt.
+ */
+export function pushName(value: string | null | undefined, fallback = "Eine Person") {
+  const name = String(value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const digits = name.replace(/\D/g, "").length;
+  if (!name || digits >= 5 || /@|https?:|www\./i.test(name)) return fallback;
+  return name.length > 60 ? `${name.slice(0, 59)}…` : name;
+}
+
+/**
+ * Push-Text für das Team. Der Name ist die Angabe der Person, nicht geprüft;
+ * der Text sagt deshalb nur, was sie angefragt hat.
+ */
+export function teamPushText(
+  e:
+    | { kind: "new"; name: string }
+    | { kind: "claim"; name: string; profile: string | null; request: string },
+) {
+  const name = pushName(e.name);
+  if (e.kind === "new")
+    return {
+      title: "Neue Registrierung",
+      body: `${name} hat sich bei Deal Operator registriert.`,
+    };
+  const profile = e.profile ? pushName(e.profile, "") : "";
+  return {
+    title: "Profilübernahme prüfen",
+    body: profile
+      ? `${name} möchte das Profil ${profile} übernehmen.`
+      : e.profile
+        ? `${name} möchte ein bestehendes Profil übernehmen.`
+        : `${name} möchte ein bestehendes Profil übernehmen. Das Profil wählt ihr bei der Prüfung aus.`,
+    url: `/verwaltung?bereich=uebernahmen&anfrage=${e.request}`,
+  };
+}
+
+/**
  * Ein Team-Ereignis: genau ein Inbox-Eintrag je dedupeKey. Optional ein Push
- * und eine E-Mail an jedes Verwaltungskonto — genau einmal je `alert.key`
+ * und eine E-Mail an jedes Verwaltungskonto, genau einmal je `alert.key`
  * (für Registrierungen: einmal je Konto, egal wie oft sich jemand später
  * anmeldet, einen neuen Link anfordert oder die Seite neu lädt).
+ * Der Push trägt Titel und Text aus `alert.push` und führt beim Antippen direkt
+ * zum Eintrag (Registrierung) bzw. zur Anfrage (Übernahme). Die E-Mail bleibt
+ * neutral.
  * Wird innerhalb der auslösenden Transaktion aufgerufen, damit Ereignis und
  * Meldung gemeinsam entstehen oder gemeinsam entfallen.
  */
@@ -290,19 +331,26 @@ export async function teamEvent(
     state: string;
     title: string;
     body: string;
-    alert: false | { key: string; kind: TeamAlert };
+    alert:
+      | false
+      | { key: string; kind: TeamAlert; push: { title: string; body: string; url?: string } };
   },
 ) {
-  await tx.query(
+  const [entry] = await tx.query(
     `INSERT INTO team_inbox(dedupe_key,kind,ref,state,title,body) VALUES($1,$2,$3,$4,$5,$6)
      ON CONFLICT(dedupe_key) DO UPDATE SET state=excluded.state,title=excluded.title,
        body=excluded.body,updated_at=now()
-     WHERE team_inbox.resolved_at IS NULL`,
+     WHERE team_inbox.resolved_at IS NULL
+     RETURNING id`,
     [e.dedupeKey, e.kind, e.ref, e.state, e.title, e.body],
   );
   if (!e.alert) return;
   const text = TEAM_ALERTS[e.alert.kind];
-  // Grundverwaltung, Admins und Moderatoren — jede Person genau einmal.
+  const id =
+    entry?.id ??
+    (await tx.query("SELECT id FROM team_inbox WHERE dedupe_key=$1", [e.dedupeKey]))[0]?.id;
+  const url = e.alert.push.url ?? (id ? `/verwaltung?bereich=inbox&eintrag=${id}` : "/verwaltung");
+  // Grundverwaltung, Admins und Moderatoren, jede Person genau einmal.
   for (const admin of await teamRecipients(tx)) {
     for (const channel of ["push", "email"] as const)
       await enqueue(tx, {
@@ -313,9 +361,9 @@ export async function teamEvent(
         // Verweist auf den Inbox-Eintrag, damit die Verwaltung dort den
         // Zustellstand zeigen kann.
         ref: e.dedupeKey,
-        title: text.title,
-        body: text.body,
-        url: "/verwaltung",
+        title: channel === "push" ? e.alert.push.title : text.title,
+        body: channel === "push" ? e.alert.push.body : text.body,
+        url,
         // Wartet bis zu 48 Stunden auf ein Gerät bzw. die E-Mail-Einrichtung.
         notAfter: new Date(Date.now() + 48 * 3600_000),
       });

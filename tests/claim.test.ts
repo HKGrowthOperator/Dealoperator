@@ -163,7 +163,9 @@ test("a question from the team can be answered and goes back into review", async
   assert.equal(mine?.lastAnswer, "Als Ali im Gruppenchat");
   const queue = await reviewQueue(db, admin);
   assert.equal(queue.find((q) => q.id === r.id)?.applicant_answer, "Als Ali im Gruppenchat");
-  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind='team:answer'"), 2);
+  // Die Antwort steht in der Inbox, löst aber keinen Team-Push aus.
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind='team:answer'"), 0);
+  assert.equal(await count("SELECT count(*) AS n FROM notifications"), 2);
   // Die Freigabe bleibt beim Team.
   assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, null);
 });
@@ -463,4 +465,58 @@ test("the waiting browser learns about a confirmation on another device, nobody 
   // Nach der Bindung legt ein Link-Hinweis nichts mehr an.
   await noteLinkOpened(db, r.id);
   assert.equal(await count("SELECT count(*) AS n FROM onboarding_events WHERE request=$1 AND action='link_opened'", [r.id]), 1);
+});
+
+test("team pushes: named, linked to the entry, exactly once, only for registration and takeover", async () => {
+  const pushes = () =>
+    db.query("SELECT kind,title,body,url FROM notifications WHERE channel='push' ORDER BY id");
+  // Neue Registrierung: bestätigt, dann Neuladen, erneuter Link, späteres Anmelden.
+  const reg = await startRequest(db, { kind: "new", email: bob.email, fullName: "Bob Beispiel", phone: "0170 7654321", phoneCountry: "DE" });
+  await bindConfirmedRequest(db, bob, reg.id);
+  await bindConfirmedRequest(db, bob, reg.id);
+  await noteConfirmedAccount(db, bob);
+  const [inbox] = await db.query("SELECT id FROM team_inbox WHERE dedupe_key=$1", [`registration:${reg.id}`]);
+  assert.deepEqual((await pushes()).map((n) => ({ ...n })), [
+    {
+      kind: "team:new",
+      title: "Neue Registrierung",
+      body: "Bob Beispiel hat sich bei Deal Operator registriert.",
+      url: `/verwaltung?bereich=inbox&eintrag=${inbox.id}`,
+    },
+  ]);
+  // Profilübernahme über die Registrierung.
+  const p = await profile("Alice B.");
+  const claim = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" });
+  await bindConfirmedRequest(db, alice, claim.id);
+  await bindConfirmedRequest(db, alice, claim.id);
+  const last = (await pushes()).at(-1)!;
+  assert.deepEqual({ ...last }, {
+    kind: "team:claim",
+    title: "Profilübernahme prüfen",
+    body: "Alice Beispiel möchte das Profil Alice B. übernehmen.",
+    url: `/verwaltung?bereich=uebernahmen&anfrage=${claim.id}`,
+  });
+  // Rückfrage und Antwort: kein weiterer Push.
+  await decideRequest(db, admin, { id: claim.id, decision: "info", applicantMessage: "Unter welchem Namen callst du?" });
+  await answerInfoRequest(db, alice, { message: "Als Ali" });
+  const all = await pushes();
+  assert.equal(all.length, 2);
+  // Nie Kontaktdaten im Push, auch nicht in der E-Mail-Absicherung.
+  const every = await db.query("SELECT title,body FROM notifications");
+  for (const n of every) assert.doesNotMatch(`${n.title} ${n.body}`, /@|\+49|0170|1234567/);
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE channel='email'"), 2);
+});
+
+test("a signed-in takeover pushes once with the requested profile; assignment requests say the profile is open", async () => {
+  const p = await profile("Alice B.");
+  const r = await requestClaimSignedIn(db, alice, details(p));
+  await requestClaimSignedIn(db, alice, details(p));
+  const [push] = await db.query("SELECT title,body,url FROM notifications WHERE channel='push'");
+  assert.equal(push.title, "Profilübernahme prüfen");
+  assert.equal(push.body, "Alice Beispiel möchte das Profil Alice B. übernehmen.");
+  assert.equal(push.url, `/verwaltung?bereich=uebernahmen&anfrage=${r.id}`);
+  const open = await requestClaimSignedIn(db, bob, { fullName: "Bob Beispiel", phone: "+49 171 1234567", hint: "Gruppe Nord" });
+  const [other] = await db.query("SELECT body,url FROM notifications WHERE channel='push' AND ref=$1", [`registration:${open.id}`]);
+  assert.match(other.body, /^Bob Beispiel möchte ein bestehendes Profil übernehmen\./);
+  assert.equal(other.url, `/verwaltung?bereich=uebernahmen&anfrage=${open.id}`);
 });

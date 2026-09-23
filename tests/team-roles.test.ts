@@ -10,7 +10,7 @@ import { requestPause } from "../server/closing";
 import { issueClaim } from "../server/operator";
 import { decidePause, saveCommitmentRules, teamInbox } from "../server/admin";
 import { notificationStatus } from "../server/notify";
-import { dispatch, enqueue, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent } from "../server/notify";
+import { dispatch, enqueue, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent, teamPushText } from "../server/notify";
 import { recheck } from "../server/scheduler";
 import { isTeamMember, setTeamRole, teamList, teamRecipients } from "../server/roles";
 
@@ -52,7 +52,7 @@ const signup = (id: string) =>
       state: "confirmed",
       title: "Neue Anmeldung bestätigt",
       body: "",
-      alert: { key: `signup:${id}`, kind: "new" },
+      alert: { key: `signup:${id}`, kind: "new", push: teamPushText({ kind: "new", name: "Neu" }) },
     }),
   );
 

@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, type Actor } from "./auth";
-import { teamEvent } from "./notify";
+import { teamEvent, teamPushText } from "./notify";
 import { normalisePhone } from "../lib/phone";
 import {
   aggregate,
@@ -275,7 +275,11 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         body: phone
           ? "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer angegeben (nicht geprüft)."
           : "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer fehlt noch.",
-        alert: { key: `signup:${actor.userId}`, kind: "new" },
+        alert: {
+          key: `signup:${actor.userId}`,
+          kind: "new",
+          push: teamPushText({ kind: "new", name: value.name }),
+        },
       });
     return { ok: true, id };
   });

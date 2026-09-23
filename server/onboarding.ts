@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
-import { teamEvent } from "./notify";
+import { teamEvent, teamPushText } from "./notify";
 import { normalisePhone } from "../lib/phone";
 
 /**
@@ -429,6 +429,9 @@ export async function bindConfirmedRequest(
     // Der Übergang awaiting_email → bestätigt passiert unter Sperre genau
     // einmal. Spätere Logins, Magic-Links oder Neuladen finden keine offene
     // awaiting_email-Anfrage mehr und lösen deshalb nichts aus.
+    const [wanted] = request.participant
+      ? await tx.query("SELECT name FROM participants WHERE id=$1", [request.participant])
+      : [];
     await teamEvent(tx, {
       dedupeKey: `registration:${request.id}`,
       kind: "registration",
@@ -449,8 +452,21 @@ export async function bindConfirmedRequest(
       // Einmal je Konto, egal wie viele Anfragen es später noch stellt.
       alert:
         request.kind === "claim"
-          ? { key: `claim:${request.id}`, kind: "claim" }
-          : { key: `signup:${actor.userId}`, kind: "new" },
+          ? {
+              key: `claim:${request.id}`,
+              kind: "claim",
+              push: teamPushText({
+                kind: "claim",
+                name: request.full_name,
+                profile: request.participant ? ((wanted?.name as string) ?? "") : null,
+                request: request.id,
+              }),
+            }
+          : {
+              key: `signup:${actor.userId}`,
+              kind: "new",
+              push: teamPushText({ kind: "new", name: request.full_name }),
+            },
     });
     return {
       id: request.id as string,
@@ -462,9 +478,10 @@ export async function bindConfirmedRequest(
 }
 
 /**
- * Bestätigtes Konto ohne Registrierungsanfrage und ohne Profil (z. B. über
- * „Anmelden“ mit neuer Adresse): das Team erfährt es genau einmal je Konto.
- * Derselbe Schlüssel wie bei der Registrierung, also nie doppelt.
+ * Bestätigtes Konto ohne Registrierungsanfrage und ohne Profil (ältere Konten
+ * aus der Zeit vor der Registrierung mit Passwort): nur ein Inbox-Eintrag,
+ * kein Push. Eine erneute Anmeldung ist keine neue Registrierung; der Push
+ * kommt, wenn daraus ein Profil oder eine Übernahme wird.
  */
 export async function noteConfirmedAccount(
   db: Database,
@@ -488,7 +505,7 @@ export async function noteConfirmedAccount(
       body: silent
         ? "E-Mail bestätigt, die Übernahme eines Profils wird gerade angefragt."
         : "E-Mail bestätigt, Profil wird gerade eingerichtet.",
-      alert: silent ? false : { key: `signup:${actor.userId}`, kind: "new" },
+      alert: false,
     }),
   );
 }
@@ -880,7 +897,18 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
         ? "Angefragt mit einem angemeldeten Konto, E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
         : "Angemeldetes Konto, E-Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte das passende Profil auswählen und freigeben.",
       // Genau einmal je Anfrage, auch bei wiederholtem Absenden.
-      alert: { key: `claim:${id}`, kind: "claim" },
+      alert: {
+        key: `claim:${id}`,
+        kind: "claim",
+        push: teamPushText({
+          kind: "claim",
+          name: v.fullName,
+          profile: p
+            ? (((await tx.query("SELECT name FROM participants WHERE id=$1", [p.id]))[0]?.name as string) ?? "")
+            : null,
+          request: id,
+        }),
+      },
     });
     return { id, status: "pending", repeated: false };
   });
@@ -928,7 +956,9 @@ export async function answerInfoRequest(db: Database, actor: Actor, raw: unknown
       state: "review_ready",
       title: `Antwort auf Rückfrage: ${request.full_name}`,
       body: "Die Person hat auf eure Rückfrage geantwortet. Die Antwort steht unter Übernahmen.",
-      alert: { key: `answer:${event.id}`, kind: "answer" },
+      // Nur Inbox, kein Push: Team-Pushs gibt es nur für neue Registrierungen
+      // und neue Übernahmeanfragen.
+      alert: false,
     });
     return { ok: true, status: "pending" };
   });
