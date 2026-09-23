@@ -103,6 +103,42 @@ test("a complete closing without calls keeps the reflection streak but does not 
   assert.equal(s.closedDays, 3);
 });
 
+test("a reflection with 0 calls never breaks the streak, even over weeks", () => {
+  // Drei Wochen lang jeden Calling-Tag rechtzeitig reflektiert, immer 0 Anwahlen.
+  const days: string[] = [];
+  for (let d = MO; days.length < 15; d = addDays(d, 1)) if (isDueDay(d, S, [])) days.push(d);
+  const last = days.at(-1)!;
+  const s = summarize({
+    closings: days.map((d) => closing(d, 0, at(d, 19))),
+    trackingStart: MO,
+    from: MO,
+    to: last,
+    now: at(last, 22),
+  });
+  assert.equal(s.reflection.current, 15);
+  assert.equal(s.reflection.best, 15);
+  assert.ok(s.days.filter((d) => d.due).every((d) => d.status === "reflected"));
+  assert.equal(s.missingOpen, 0);
+  // Die Calling-Serie ist eine eigene Zusatzzahl und wächst nur mit Anwahlen.
+  assert.equal(s.calling.current, 0);
+});
+
+test("the ranking puts the reflection streak first; calls only break ties", async () => {
+  const { byCommitment } = await import("../server/commitment-public");
+  const row = (name: string, reflection: number, calling: number, activeDays = 0) => ({
+    name,
+    reflection: { current: reflection },
+    calling: { current: calling },
+    activeDays,
+  });
+  const sorted = [
+    row("Viel Calls", 2, 2, 2),
+    row("Immer reflektiert, 0 Calls", 5, 0, 0),
+    row("Gleich, mehr Calls", 2, 1, 5),
+  ].sort(byCommitment);
+  assert.deepEqual(sorted.map((r) => r.name), ["Immer reflektiert, 0 Calls", "Viel Calls", "Gleich, mehr Calls"]);
+});
+
 test("a missed due day breaks both streaks; best streaks are kept", () => {
   const s = summarize({
     closings: [

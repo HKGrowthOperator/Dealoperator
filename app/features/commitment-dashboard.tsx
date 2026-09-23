@@ -131,12 +131,12 @@ export function StreakStrip() {
       {state?.summary && (
         <dl className="cm-strip-stats">
           <div>
-            <dt>Calling-Serie</dt>
-            <dd>{state.summary.calling.current}</dd>
-          </div>
-          <div>
             <dt>Reflexions-Serie</dt>
             <dd>{state.summary.reflection.current}</dd>
+          </div>
+          <div>
+            <dt>Calling-Serie</dt>
+            <dd>{state.summary.calling.current}</dd>
           </div>
         </dl>
       )}
@@ -339,20 +339,23 @@ export default function CommitmentDashboard({
 
       <dl className="cm-stats">
         <div className="accent">
-          <dt>Calling-Serie</dt>
-          <dd>
-            <strong>{summary.calling.current}</strong>
-            <span>Bestwert {summary.calling.best}</span>
-          </dd>
-          <p>Rechtzeitig abgeschlossene Calling-Tage mit Anwahlen in Folge.</p>
-        </div>
-        <div>
           <dt>Reflexions-Serie</dt>
           <dd>
             <strong>{summary.reflection.current}</strong>
             <span>Bestwert {summary.reflection.best}</span>
           </dd>
-          <p>Rechtzeitig abgeschlossene Calling-Tage, auch ohne Anwahlen.</p>
+          <p>
+            Rechtzeitige Tagesabschlüsse mit Reflexion in Folge. Auch ein Tag
+            mit 0 Anwahlen hält sie am Laufen.
+          </p>
+        </div>
+        <div>
+          <dt>Calling-Serie</dt>
+          <dd>
+            <strong>{summary.calling.current}</strong>
+            <span>Bestwert {summary.calling.best}</span>
+          </dd>
+          <p>Zusätzlich: rechtzeitige Calling-Tage mit Anwahlen in Folge.</p>
         </div>
         <div>
           <dt>Aktive Tage</dt>

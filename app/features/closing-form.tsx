@@ -544,9 +544,9 @@ function clampDay(state: ClosingState, requested: string | undefined) {
 
 const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
   called:
-    "Rechtzeitig mit Anwahlen: Der Tag zählt für deine Calling-Serie und deine Reflexions-Serie.",
+    "Rechtzeitig mit Anwahlen: Der Tag zählt für deine Reflexions-Serie und deine Calling-Serie.",
   reflected:
-    "Rechtzeitig ohne Anwahlen: Der Tag hält deine Reflexions-Serie. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
+    "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen: Deine Reflexions-Serie läuft weiter. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
   late: "Später eingereicht: Deine Zahlen zählen, die Serien setzt dieser Tag nicht fort.",
   bonus:
     "Freiwilliger Abschluss an einem freien Tag: Deine Zahlen zählen, deine Serien bleiben davon unberührt.",

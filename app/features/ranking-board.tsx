@@ -133,7 +133,7 @@ function validCommitment(value: unknown): CommitmentRow[] {
  */
 function placeCommitment(rows: CommitmentRow[]) {
   const signature = (row: CommitmentRow) =>
-    `${row.calling.current}|${row.reflection.current}|${row.activeDays}`;
+    `${row.reflection.current}|${row.calling.current}|${row.activeDays}`;
   const places: number[] = [];
   rows.forEach((row, index) => {
     places.push(
@@ -276,7 +276,7 @@ export default function RankingBoard({
   const runningStreaks = commitmentState?.error
     ? null
     : commitmentState
-      ? commitmentState.rows.filter((row) => row.calling.current > 0).length
+      ? commitmentState.rows.filter((row) => row.reflection.current > 0).length
       : null;
   const latestReported =
     !monthly && data && rows.length === 0
@@ -720,9 +720,7 @@ export default function RankingBoard({
                     <button onClick={() => choose(COMMITMENT)}>
                       <Flame size={13} />
                       <strong>{fmt(runningStreaks)}</strong>
-                      {runningStreaks === 1
-                        ? "laufende Calling-Serie"
-                        : "laufende Calling-Serien"}
+                      {runningStreaks === 1 ? "laufende Serie" : "laufende Serien"}
                     </button>
                   )}
                 </div>
@@ -813,8 +811,8 @@ export default function RankingBoard({
                 <div className="rr-ranking-context">
                   {commitmentView ? (
                     <span>
-                      Sortiert nach aktueller <strong>Calling-Serie</strong>,
-                      dann Reflexions-Serie, dann aktiven Tagen.
+                      Sortiert nach aktueller <strong>Reflexions-Serie</strong>,
+                      dann Calling-Serie, dann aktiven Tagen.
                     </span>
                   ) : (
                     <span>
@@ -947,17 +945,6 @@ export default function RankingBoard({
                                 </span>
                                 <dl className="rr-commit-stats">
                                   <div data-lead="true">
-                                    <dt>Calling-Serie</dt>
-                                    <dd>
-                                      <strong>
-                                        {fmt(row.calling.current)}
-                                      </strong>
-                                      <small>
-                                        Bestwert {fmt(row.calling.best)}
-                                      </small>
-                                    </dd>
-                                  </div>
-                                  <div>
                                     <dt>Reflexions-Serie</dt>
                                     <dd>
                                       <strong>
@@ -965,6 +952,17 @@ export default function RankingBoard({
                                       </strong>
                                       <small>
                                         Bestwert {fmt(row.reflection.best)}
+                                      </small>
+                                    </dd>
+                                  </div>
+                                  <div>
+                                    <dt>Calling-Serie</dt>
+                                    <dd>
+                                      <strong>
+                                        {fmt(row.calling.current)}
+                                      </strong>
+                                      <small>
+                                        Bestwert {fmt(row.calling.best)}
                                       </small>
                                     </dd>
                                   </div>
@@ -1131,11 +1129,11 @@ export default function RankingBoard({
                       {commitmentView ? (
                         <>
                           <span>
-                            Serien zählen rechtzeitig eingereichte
-                            Tagesabschlüsse an Calling-Tagen. Wochenenden sind
-                            keine Calling-Tage. Die Calling-Serie wächst nur
-                            mit Anwahlen, die Reflexions-Serie auch an Tagen
-                            ohne Anwahlen.
+                            Die Reflexions-Serie zählt jeden rechtzeitig
+                            eingereichten Tagesabschluss mit Reflexion an
+                            Calling-Tagen, auch mit 0 Anwahlen. Die
+                            Calling-Serie wächst nur an Tagen mit Anwahlen.
+                            Wochenenden sind keine Calling-Tage.
                           </span>
                           <span>
                             Serien: Stand heute. Aktive Tage und Abschlüsse:{" "}

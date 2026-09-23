@@ -50,7 +50,7 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | Einreichen ohne Energie oder ohne Antworten | Klare Meldung, nichts gezählt |
 | Vollständig einreichen (Bestätigung gelesen) | Tag zählt im Ranking (öffentlich nur mit Freigabe), Serie steigt, Karte in `/reflexionen` für berechtigte Mitglieder |
 | Korrektur beginnen, nicht einreichen | Weiter gilt die zuletzt eingereichte Fassung |
-| Abschluss mit 0 Anwahlen | Reflexions-Serie läuft, Calling-Serie wird nicht verlängert |
+| Abschluss mit 0 Anwahlen (rechtzeitig, mit Reflexion) | Reflexions-Serie läuft weiter, auch über viele Tage ohne Anwahlen; sie ist die Hauptserie (Dranbleiben-Rangliste, „laufende Serien“). Calling-Serie wird nicht verlängert |
 | Tag mit übernommenem Stand (z. B. 22.09.) | Kein eigener Abschluss möglich; Korrektur über das Team |
 | Wochenende | Keine Erinnerung, kein Fehltag; freiwilliger Abschluss als Bonus |
 | Push auf einem echten Gerät einrichten, Testnachricht | Nachricht kommt bei geschlossener Seite an; iPhone nur als Home-Bildschirm-App |
