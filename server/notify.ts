@@ -310,7 +310,9 @@ export async function teamEvent(
         recipient: admin,
         channel,
         kind: `team:${e.alert.kind}`,
-        ref: e.ref,
+        // Verweist auf den Inbox-Eintrag, damit die Verwaltung dort den
+        // Zustellstand zeigen kann.
+        ref: e.dedupeKey,
         title: text.title,
         body: text.body,
         url: "/verwaltung",
@@ -568,17 +570,109 @@ async function pushToOwner(
 // ---------------------------------------------------------------------------
 // Diagnose für die Verwaltung
 
+/**
+ * Genauer Zustand eines Hinweises. „Übergeben“ heißt: der Push-Dienst bzw.
+ * Resend hat angenommen. Mehr lässt sich nicht bestätigen; gelesen oder auf
+ * dem Gerät angezeigt meldet uns niemand.
+ */
+export type DeliveryState =
+  | "delivered"
+  | "waiting_config"
+  | "waiting_device"
+  | "waiting_address"
+  | "retrying"
+  | "queued"
+  | "expired"
+  | "skipped"
+  | "failed";
+
+export const DELIVERY_LABEL: Record<DeliveryState, string> = {
+  delivered: "übergeben",
+  waiting_config: "wartet, E-Mail-Versand nicht eingerichtet",
+  waiting_device: "wartet, kein Gerät mit Push eingerichtet",
+  waiting_address: "wartet, keine bestätigte Adresse",
+  retrying: "wartet auf erneuten Versuch",
+  queued: "in der Warteschlange",
+  expired: "abgelaufen, nicht zugestellt",
+  skipped: "nicht gesendet",
+  failed: "fehlgeschlagen",
+};
+
+type DeliveryRow = {
+  status: string;
+  channel: string;
+  detail: string;
+  attempts: number;
+  recipient: string;
+};
+
+export async function deliveryStates<T extends DeliveryRow>(db: Database, rows: T[]) {
+  const recipients = [...new Set(rows.filter((r) => r.channel === "push").map((r) => r.recipient))];
+  const withDevice = new Set(
+    recipients.length
+      ? (
+          await db.query(
+            `SELECT DISTINCT owner FROM push_subscriptions
+              WHERE disabled_at IS NULL AND owner = ANY($1::text[])`,
+            [recipients],
+          )
+        ).map((r) => r.owner as string)
+      : [],
+  );
+  const mailMissing = mailConfigIssues().length > 0;
+  return rows.map((r) => {
+    let state: DeliveryState;
+    if (r.status === "sent") state = "delivered";
+    else if (r.status === "failed") state = "failed";
+    else if (r.status === "skipped")
+      state = (r.detail || "").startsWith("Zu spät") ? "expired" : "skipped";
+    else if (r.channel === "email")
+      state = mailMissing
+        ? "waiting_config"
+        : (r.detail || "").startsWith("Noch keine bestätigte Adresse")
+          ? "waiting_address"
+          : Number(r.attempts) > 0
+            ? "retrying"
+            : "queued";
+    else
+      state = !withDevice.has(r.recipient)
+        ? "waiting_device"
+        : Number(r.attempts) > 0
+          ? "retrying"
+          : "queued";
+    return { ...r, state };
+  });
+}
+
 export async function notificationStatus(db: Database) {
-  const [counts] = await db.query(
+  const [raw] = await db.query(
     `SELECT count(*) FILTER (WHERE status='sent') AS sent,
             count(*) FILTER (WHERE status='skipped') AS skipped,
             count(*) FILTER (WHERE status IN ('pending','sending')) AS open,
+            count(*) FILTER (WHERE status IN ('pending','sending') AND channel='email') AS open_email,
+            count(*) FILTER (WHERE status IN ('pending','sending') AND channel='push'
+              AND NOT EXISTS (SELECT 1 FROM push_subscriptions s
+                               WHERE s.owner=notifications.recipient AND s.disabled_at IS NULL)) AS no_device,
             count(*) FILTER (WHERE status='failed') AS failed
        FROM notifications WHERE created_at > now()-interval '14 days'`,
   );
-  const recent = await db.query(
-    `SELECT kind,channel,status,detail,created_at,sent_at FROM notifications
-      ORDER BY created_at DESC LIMIT 20`,
+  // Wartende getrennt nach Grund, damit „offen“ nicht nach Versand aussieht.
+  const waitingConfig = mailConfigIssues().length ? Number(raw.open_email) : 0;
+  const waitingDevice = Number(raw.no_device);
+  const counts = {
+    sent: Number(raw.sent),
+    waitingConfig,
+    waitingDevice,
+    open: Math.max(0, Number(raw.open) - waitingConfig - waitingDevice),
+    skipped: Number(raw.skipped),
+    failed: Number(raw.failed),
+  };
+  const recent = await deliveryStates(
+    db,
+    (await db.query(
+      `SELECT kind,channel,status,detail,attempts,recipient,created_at,sent_at FROM notifications
+        ORDER BY created_at DESC LIMIT 20`,
+    )) as (DeliveryRow & { kind: string; created_at: string; sent_at: string | null })[],
   );
   const [secret] = await db.query("SELECT 1 FROM app_secrets WHERE key='vapid'");
   const fromEnv = !!(process.env.VAPID_PUBLIC_KEY?.trim() && process.env.VAPID_PRIVATE_KEY?.trim());
@@ -598,11 +692,13 @@ export async function notificationStatus(db: Database) {
       needsReconsent: Number(devices.stale),
     },
     email: { issues: mailConfigIssues() },
-    counts: Object.fromEntries(Object.entries(counts).map(([k, v]) => [k, Number(v)])),
+    counts,
     recent: recent.map((r) => ({
       kind: r.kind,
       channel: r.channel,
       status: r.status,
+      state: r.state,
+      label: DELIVERY_LABEL[r.state],
       detail: r.detail,
       createdAt: new Date(r.created_at).toISOString(),
       sentAt: r.sent_at ? new Date(r.sent_at).toISOString() : null,

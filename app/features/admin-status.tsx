@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Bell, Headphones, Mail, Smartphone } from "lucide-react";
 import {
   Badge,
+  DELIVERY_TONE,
   Feedback,
   adminPost,
   formatDateTime,
@@ -15,6 +16,7 @@ import {
 const KIND_LABEL: Record<string, string> = {
   "team:new": "Team: neue Registrierung",
   "team:claim": "Team: Profilübernahme prüfbereit",
+  "team:answer": "Team: Antwort auf Rückfrage",
   "reminder:evening": "Abenderinnerung",
   "reminder:streak": "Serien-Warnung",
   test: "Testnachricht",
@@ -131,8 +133,10 @@ export function NotificationsPanel({
         {(
           [
             ["sent", "übergeben"],
-            ["open", "offen"],
-            ["skipped", "übersprungen"],
+            ["waitingConfig", "warten auf E-Mail-Einrichtung"],
+            ["waitingDevice", "warten auf ein Gerät mit Push"],
+            ["open", "in der Warteschlange"],
+            ["skipped", "nicht gesendet"],
             ["failed", "fehlgeschlagen"],
           ] as const
         ).map(([key, label]) => (
@@ -148,7 +152,9 @@ export function NotificationsPanel({
       {recent.length ? (
         <ul className="adm-list adm-compact">
           {recent.map((n, index) => {
-            const s = STATUS[n.status] ?? { label: n.status, tone: "neutral" };
+            const s = n.state
+              ? { label: n.label, tone: DELIVERY_TONE[n.state] }
+              : (STATUS[n.status] ?? { label: n.status, tone: "neutral" as Tone });
             return (
               <li className="adm-item" key={`${n.createdAt}-${index}`}>
                 <div className="adm-item-head">

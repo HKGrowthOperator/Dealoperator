@@ -9,6 +9,7 @@ import { defaultCommitmentSettings } from "../lib/commitment";
 import { requestPause } from "../server/closing";
 import { issueClaim } from "../server/operator";
 import { decidePause, saveCommitmentRules, teamInbox } from "../server/admin";
+import { notificationStatus } from "../server/notify";
 import { dispatch, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent } from "../server/notify";
 import { recheck } from "../server/scheduler";
 import { isTeamMember, setTeamRole, teamList, teamRecipients } from "../server/roles";
@@ -180,4 +181,26 @@ test("someone who saved reminders before becoming team still gets team emails", 
   );
   // Wartet nur noch auf die Mail-Konfiguration, statt übersprungen zu werden.
   assert.equal(mail.status, "pending");
+});
+
+test("the team inbox only calls a hint handed over after the push service or Resend took it", async () => {
+  delete process.env.NOTIFY_FROM;
+  await signup("new-4");
+  let [item] = await teamInbox(db, owner);
+  // Ohne Gerät und ohne Mail-Einrichtung: beides wartet, mit Grund.
+  assert.deepEqual(
+    item.delivery.map((d) => [d.channel, d.state]).sort(),
+    [["email", "waiting_config"], ["push", "waiting_device"]],
+  );
+  await subscribe(db, owner, { endpoint: endpoint(7), keys }, "iPhone");
+  await dispatch(db, recheck, new Date(), (async () => ({ statusCode: 201 })) as any);
+  [item] = await teamInbox(db, owner);
+  assert.deepEqual(
+    item.delivery.map((d) => [d.channel, d.state]).sort(),
+    [["email", "waiting_config"], ["push", "delivered"]],
+  );
+  const status = await notificationStatus(db);
+  assert.equal(status.counts.sent, 1);
+  assert.equal(status.counts.waitingConfig, 1);
+  assert.equal(status.counts.waitingDevice, 0);
 });

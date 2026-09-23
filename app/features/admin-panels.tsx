@@ -22,6 +22,7 @@ import ImportConsole from "./import-console";
 import ReviewQueue from "./review-queue";
 import {
   Badge,
+  DELIVERY_TONE,
   Feedback,
   ProfilePicker,
   adminPost,
@@ -388,6 +389,16 @@ function InboxPanel({
         <h3>{item.title}</h3>
         {item.body && <p className="adm-body">{item.body}</p>}
         {s.hint && <p className="adm-hint">{s.hint}</p>}
+        {item.delivery && item.delivery.length > 0 && (
+          <div className="adm-item-head" aria-label="Zustellung der Team-Hinweise">
+            <span className="adm-meta">Team-Hinweis:</span>
+            {item.delivery.map((d) => (
+              <Badge key={`${d.channel}-${d.state}`} tone={DELIVERY_TONE[d.state]}>
+                {d.channel === "email" ? "E-Mail" : "Push"} {d.count}× {d.label}
+              </Badge>
+            ))}
+          </div>
+        )}
         <div className="adm-actions">
           {item.kind === "registration" &&
             item.state === "review_ready" &&

@@ -5,6 +5,7 @@ import { isTeam, type Actor } from "./auth";
 import { AppError } from "./operator";
 import { calendarDaySchema } from "../lib/kpis";
 import { saveCommitmentSettings, loadCommitmentSettings } from "./settings";
+import { DELIVERY_LABEL, deliveryStates, type DeliveryState } from "./notify";
 
 /**
  * Verwaltung: Team-Inbox, Pausen, Akquise Days und die Dranbleiben-Regeln.
@@ -28,9 +29,34 @@ function requireTeam(actor: Actor) {
 export async function teamInbox(db: Database, actor: Actor) {
   requireTeam(actor);
   const rows = await db.query(
-    `SELECT id,kind,ref,state,title,body,created_at,updated_at,resolved_at FROM team_inbox
+    `SELECT id,dedupe_key,kind,ref,state,title,body,created_at,updated_at,resolved_at FROM team_inbox
       ORDER BY (resolved_at IS NULL) DESC, updated_at DESC LIMIT 100`,
   );
+  // Zustellstand der Team-Hinweise je Eintrag. Neue Hinweise verweisen auf den
+  // Inbox-Schlüssel, ältere noch auf die Anfrage bzw. das Konto.
+  const keys = rows.map((r) => r.dedupe_key as string);
+  const refs = rows.filter((r) => !String(r.dedupe_key).startsWith("answer:")).map((r) => r.ref as string);
+  const sent = keys.length
+    ? await deliveryStates(
+        db,
+        (await db.query(
+          `SELECT ref,channel,status,detail,attempts,recipient FROM notifications
+            WHERE kind LIKE 'team:%' AND (ref = ANY($1::text[]) OR ref = ANY($2::text[]))`,
+          [keys, refs],
+        )) as { ref: string; channel: string; status: string; detail: string; attempts: number; recipient: string }[],
+      )
+    : [];
+  const deliveryFor = (key: string, ref: string, legacy: boolean) => {
+    const own = sent.filter((n) => n.ref === key || (legacy && n.ref === ref));
+    const groups = new Map<string, { channel: string; state: DeliveryState; label: string; count: number }>();
+    for (const n of own) {
+      const id = `${n.channel}:${n.state}`;
+      const g = groups.get(id) ?? { channel: n.channel, state: n.state, label: DELIVERY_LABEL[n.state], count: 0 };
+      g.count++;
+      groups.set(id, g);
+    }
+    return [...groups.values()];
+  };
   return rows.map((r) => ({
     id: Number(r.id),
     kind: r.kind as string,
@@ -41,6 +67,11 @@ export async function teamInbox(db: Database, actor: Actor) {
     createdAt: new Date(r.created_at).toISOString(),
     updatedAt: new Date(r.updated_at).toISOString(),
     resolved: !!r.resolved_at,
+    delivery: deliveryFor(
+      r.dedupe_key as string,
+      r.ref as string,
+      !String(r.dedupe_key).startsWith("answer:"),
+    ),
   }));
 }
 

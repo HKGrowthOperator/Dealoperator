@@ -9,6 +9,22 @@ import type { RankingEvent } from "@/lib/ranking-history";
  * /api/admin (nur Verwaltungskonten) und /api/operator (Profilliste).
  */
 
+export type DeliveryState =
+  | "delivered"
+  | "waiting_config"
+  | "waiting_device"
+  | "waiting_address"
+  | "retrying"
+  | "queued"
+  | "expired"
+  | "skipped"
+  | "failed";
+export type DeliveryGroup = {
+  channel: string;
+  state: DeliveryState;
+  label: string;
+  count: number;
+};
 export type InboxItem = {
   id: number;
   kind: string;
@@ -19,6 +35,19 @@ export type InboxItem = {
   createdAt: string;
   updatedAt: string;
   resolved: boolean;
+  /** Zustellstand der Team-Hinweise zu diesem Eintrag, falls es welche gab. */
+  delivery?: DeliveryGroup[];
+};
+export const DELIVERY_TONE: Record<DeliveryState, Tone> = {
+  delivered: "ok",
+  waiting_config: "warn",
+  waiting_device: "warn",
+  waiting_address: "warn",
+  retrying: "neutral",
+  queued: "neutral",
+  expired: "muted",
+  skipped: "muted",
+  failed: "danger",
 };
 export type AdminPause = {
   id: string;
@@ -31,11 +60,15 @@ export type AdminPause = {
 export type NotificationStatus = {
   push: { keys: string; devices: number; needsReconsent?: number };
   email: { issues: string[] };
-  counts: Partial<Record<"sent" | "skipped" | "open" | "failed", number>>;
+  counts: Partial<
+    Record<"sent" | "waitingConfig" | "waitingDevice" | "open" | "skipped" | "failed", number>
+  >;
   recent: {
     kind: string;
     channel: string;
     status: string;
+    state: DeliveryState;
+    label: string;
     detail: string | null;
     createdAt: string;
     sentAt: string | null;
