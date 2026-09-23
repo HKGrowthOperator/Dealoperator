@@ -10,7 +10,7 @@ import { berlinDate, daySchema } from "@/lib/kpis";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import ClosingForm, { type ClosingState } from "../features/closing-form";
 import CommitmentDashboard from "../features/commitment-dashboard";
-import PushSetup from "../features/push-setup";
+import PushSetup, { PushPrompt } from "../features/push-setup";
 import DiscordLink from "../features/discord-link";
 import "../commitment.css";
 
@@ -97,6 +97,7 @@ export default async function Page({
             <Link href="/passwort">Passwort festlegen</Link>
           </p>
         )}
+        <PushPrompt settings={initial?.settings} />
         <ClosingForm
           key={day}
           day={day}

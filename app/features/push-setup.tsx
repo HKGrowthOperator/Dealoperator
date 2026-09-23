@@ -62,12 +62,16 @@ function readEnvironment(): string {
   const permission = "Notification" in window ? Notification.permission : "unknown";
   return `${kind}|${permission}`;
 }
+/** Signal zwischen Hinweiskarte und Einrichtung: ein Gerät wurde eingetragen. */
+const CHANGED = "do-push-changed";
 function subscribeEnvironment(change: () => void) {
   document.addEventListener("visibilitychange", change);
   window.addEventListener("focus", change);
+  window.addEventListener(CHANGED, change);
   return () => {
     document.removeEventListener("visibilitychange", change);
     window.removeEventListener("focus", change);
+    window.removeEventListener(CHANGED, change);
   };
 }
 function useEnvironment(): Environment {
@@ -116,6 +120,30 @@ const dateOf = (iso: string) =>
 const clockText = (c: { hour: number; minute: number }) =>
   `${c.hour}:${String(c.minute).padStart(2, "0")} Uhr`;
 
+/**
+ * Abo für dieses Gerät anlegen (oder das bestehende mit dem aktuellen
+ * Schlüssel weiterverwenden) und beim Server eintragen. Die Erlaubnis muss
+ * vorher im Klick erteilt worden sein.
+ */
+async function registerDevice(publicKey: string) {
+  if (!publicKey) throw new Error("Der Push-Versand ist auf dem Server noch nicht eingerichtet.");
+  const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  await navigator.serviceWorker.ready;
+  const key = keyBytes(publicKey);
+  let sub = await registration.pushManager.getSubscription();
+  if (sub && !sameKey(sub.options.applicationServerKey, key)) {
+    await sub.unsubscribe();
+    sub = null;
+  }
+  sub ??= await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: key,
+  });
+  await postJson("/api/push", { action: "subscribe", value: sub.toJSON() });
+  window.dispatchEvent(new Event(CHANGED));
+  return sub.endpoint;
+}
+
 async function currentSubscription() {
   if (!("serviceWorker" in navigator)) return null;
   const registration = await navigator.serviceWorker.getRegistration("/");
@@ -161,6 +189,16 @@ export default function PushSetup({
     };
   }, []);
 
+  // Über die Hinweiskarte oben eingetragen: Stand neu laden.
+  const [version, setVersion] = useState(0);
+  useEffect(() => {
+    const changed = () => {
+      setVersion((v) => v + 1);
+      void load();
+    };
+    window.addEventListener(CHANGED, changed);
+    return () => window.removeEventListener(CHANGED, changed);
+  }, [load]);
   // Welches Abo hat dieses Gerät, und passt es noch zum Serverschlüssel?
   // Nur lesen, nie ungefragt anlegen oder ändern.
   const publicKey = info?.publicKey ?? "";
@@ -183,7 +221,7 @@ export default function PushSetup({
     return () => {
       alive = false;
     };
-  }, [env.kind, env.permission, publicKey]);
+  }, [env.kind, env.permission, publicKey, version]);
 
   const devices = info?.prefs.devices ?? [];
   const thisDevice = endpoint ? devices.find((d) => d.endpoint === endpoint) : undefined;
@@ -210,21 +248,7 @@ export default function PushSetup({
         );
         return;
       }
-      if (!info.publicKey) throw new Error("Der Push-Versand ist auf dem Server noch nicht eingerichtet.");
-      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-      await navigator.serviceWorker.ready;
-      const key = keyBytes(info.publicKey);
-      let sub = await registration.pushManager.getSubscription();
-      if (sub && !sameKey(sub.options.applicationServerKey, key)) {
-        await sub.unsubscribe();
-        sub = null;
-      }
-      sub ??= await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: key,
-      });
-      await postJson("/api/push", { action: "subscribe", value: sub.toJSON() });
-      setEndpoint(sub.endpoint);
+      setEndpoint(await registerDevice(info.publicKey));
       setKeyMismatch(false);
       await load();
       setMessage({
@@ -374,7 +398,7 @@ export default function PushSetup({
     (keyMismatch || !(permission === "granted" && thisDevice));
 
   return (
-    <section className="cm-card cm-push" aria-labelledby={`${uid}-title`}>
+    <section id="erinnerungen" className="cm-card cm-push" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
           <p className="cm-kicker">ERINNERUNGEN</p>
@@ -436,8 +460,8 @@ export default function PushSetup({
           <li>
             <Smartphone size={17} aria-hidden="true" />
             <span>
-              Öffne Deal Operator über das neue Symbol auf dem Home-Bildschirm, melde dich an und
-              richte hier Push ein.
+              Öffne Deal Operator über das neue Symbol auf dem Home-Bildschirm, melde dich dort
+              einmal mit E-Mail und Passwort an und tippe auf „Erinnerungen einschalten“.
             </span>
           </li>
         </ol>
@@ -599,7 +623,10 @@ export default function PushSetup({
                 <span className="cm-switch-track" aria-hidden="true" />
                 <span>
                   <strong>Team-Pushs</strong>
-                  <small>Bei neuen Anmeldungen und Profilübernahmen, einmal je Person.</small>
+                  <small>
+                    Bei neuen Registrierungen und Profilübernahmen, mit Namen, je Ereignis genau
+                    einmal. Antippen öffnet den Eintrag in der Verwaltung.
+                  </small>
                 </span>
               </label>
               <label className="cm-switch">
@@ -670,6 +697,159 @@ export default function PushSetup({
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+const LATER = "do-push-spaeter";
+const LATER_DAYS = 7;
+
+/**
+ * Kurze Karte oben im Tagesabschluss: Erinnerungen mit einem Tipp einschalten.
+ * Erscheint nur, wenn dieses Gerät Pushs kann, noch nicht eingetragen ist,
+ * die Erinnerungen im Konto an sind und „Später“ nicht in den letzten sieben
+ * Tagen gewählt wurde. Auf dem iPhone im Browser führt sie zu den Schritten
+ * für den Home-Bildschirm. Gefragt wird nur auf ausdrücklichen Tipp.
+ */
+export function PushPrompt({
+  settings = defaultCommitmentSettings,
+}: {
+  settings?: CommitmentSettings;
+}) {
+  const env = useEnvironment();
+  const [info, setInfo] = useState<PushInfo | null>(null);
+  const [registered, setRegistered] = useState<boolean | null>(null);
+  const [later, setLater] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<Message | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    const timer = setTimeout(() => {
+      try {
+        const at = Number(localStorage.getItem(LATER) || 0);
+        if (alive) setLater(Date.now() - at < LATER_DAYS * 86400_000);
+      } catch {
+        if (alive) setLater(false);
+      }
+    }, 0);
+    getJson<PushInfo>("/api/push")
+      .then((data) => alive && setInfo(data))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const devices = info?.prefs.devices;
+  useEffect(() => {
+    if (!devices || env.kind !== "supported") return;
+    let alive = true;
+    const check =
+      env.permission === "granted"
+        ? currentSubscription().then((sub) => !!sub && devices.some((d) => d.endpoint === sub.endpoint))
+        : Promise.resolve(false);
+    check
+      .catch(() => false)
+      .then((known) => alive && setRegistered(known));
+    return () => {
+      alive = false;
+    };
+  }, [devices, env.kind, env.permission]);
+
+  async function enable() {
+    if (!info) return;
+    setBusy(true);
+    try {
+      // Noch im Tipp fragen: Safari verlangt das.
+      const answer = await Notification.requestPermission();
+      if (answer !== "granted") {
+        setDone({
+          tone: "warn",
+          text:
+            answer === "denied"
+              ? "Benachrichtigungen sind für diese Seite blockiert. Du kannst sie in den Einstellungen deines Browsers wieder erlauben."
+              : "Ohne deine Erlaubnis gibt es keine Erinnerungen. Du kannst es unten unter Erinnerungen jederzeit erneut versuchen.",
+        });
+        return;
+      }
+      await registerDevice(info.publicKey);
+      setRegistered(true);
+      setDone({
+        tone: "ok",
+        text: `Erinnerungen sind an. Du bekommst um ${clockText(settings.eveningReminder)} einen Hinweis, wenn dein Tagesabschluss an einem Calling-Tag noch fehlt.`,
+      });
+    } catch (e) {
+      setDone({
+        tone: "error",
+        text:
+          e instanceof ApiError
+            ? e.message
+            : "Das Einschalten hat nicht geklappt. Unten unter Erinnerungen kannst du es noch einmal versuchen.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function postpone() {
+    try {
+      localStorage.setItem(LATER, String(Date.now()));
+    } catch {
+      /* ohne Speicher erscheint die Karte beim nächsten Besuch wieder */
+    }
+    setLater(true);
+  }
+
+  if (done)
+    return (
+      <p className={`cm-alert ${done.tone} cm-push-prompt-done`} role="status">
+        {done.tone === "ok" ? (
+          <CircleCheck size={18} aria-hidden="true" />
+        ) : (
+          <CircleAlert size={18} aria-hidden="true" />
+        )}
+        <span>{done.text}</span>
+      </p>
+    );
+  if (!info || !info.publicKey || !info.prefs.reminders || later) return null;
+  const ios = env.kind === "ios-browser";
+  if (!ios && (env.kind !== "supported" || env.permission === "denied" || registered !== false))
+    return null;
+
+  return (
+    <section className="cm-push-prompt" aria-label="Erinnerungen">
+      <span className="cm-push-prompt-icon" aria-hidden="true">
+        <Bell size={20} />
+      </span>
+      <div>
+        <strong>Erinnerung an deinen Tagesabschluss?</strong>
+        <p>
+          {ios
+            ? "Auf dem iPhone gibt es Erinnerungen in der Web-App vom Home-Bildschirm. So richtest du sie ein:"
+            : `Um ${clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um ${clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.`}
+        </p>
+        <div className="cm-push-prompt-actions">
+          {ios ? (
+            <a className="btn primary" href="#erinnerungen">
+              <SquarePlus size={17} aria-hidden="true" /> Zum Home-Bildschirm
+            </a>
+          ) : (
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
+              {busy ? (
+                <LoaderCircle className="spin" size={17} aria-hidden="true" />
+              ) : (
+                <Bell size={17} aria-hidden="true" />
+              )}
+              Erinnerungen einschalten
+            </button>
+          )}
+          <button type="button" className="btn secondary" onClick={postpone}>
+            Später
+          </button>
+        </div>
+      </div>
     </section>
   );
 }

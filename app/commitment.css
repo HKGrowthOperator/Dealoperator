@@ -1808,3 +1808,50 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Hinweiskarte oben im Tagesabschluss: Erinnerungen mit einem Tipp einschalten. */
+.cm-push-prompt {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 16px;
+  border: 1px solid #b9d1f3;
+  border-radius: 14px;
+  background: #eef5ffe6;
+  color: #10294b;
+}
+.cm-push-prompt-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #0755f5;
+  color: #fff;
+}
+.cm-push-prompt strong {
+  display: block;
+  font-size: 16px;
+  line-height: 1.35;
+}
+.cm-push-prompt p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.cm-push-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cm-push-prompt-actions .btn {
+  min-height: 44px;
+}
+.cm-push-prompt-done {
+  margin: 0 0 16px;
+}
+#erinnerungen {
+  scroll-margin-top: 90px;
+}
