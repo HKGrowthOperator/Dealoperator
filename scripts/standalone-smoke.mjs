@@ -18,6 +18,8 @@ for (const name of [
   "DATABASE_SSL_CA",
   "DATABASE_SSL",
   "OPERATOR_ADMIN_IDS",
+  "CRON_SECRET",
+  "DISCORD_PUBLIC_KEY",
 ])
   delete env[name];
 const child = spawn(process.execPath, [".next/standalone/server.js"], {
@@ -56,12 +58,21 @@ try {
     "/fonts/manrope-400.ttf",
     "/operator-mark-source.png",
     "/favicon.svg",
+    "/manifest.webmanifest",
+    "/sw.js",
+    "/icon-192.png",
   ]) {
     const response = await fetch(base + path);
     assert.equal(response.status, 200, path);
   }
   // Mitgliederbereiche führen zur Anmeldung, nicht durch die Profilauswahl.
-  for (const path of ["/heute", "/zahlen?modus=eigen", "/start", "/status"]) {
+  for (const path of [
+    "/heute",
+    "/zahlen?modus=eigen",
+    "/start",
+    "/status",
+    "/tagesabschluss",
+  ]) {
     const response = await fetch(base + path, { redirect: "manual" });
     assert.equal(response.status, 307, path);
     assert.ok(
@@ -79,8 +90,40 @@ try {
   const search = await (await fetch(base + "/api/onboarding?q=test")).json();
   assert.equal(search.ready, false);
   assert.deepEqual(search.profiles, []);
-  for (const path of ["/api/operator", "/api/community"])
+  for (const path of [
+    "/api/operator",
+    "/api/community",
+    "/api/closing",
+    "/api/push",
+    "/api/reflections",
+    "/api/admin",
+    "/api/discord/connect",
+  ])
     assert.equal((await fetch(base + path)).status, 401, path);
+  // Service Worker nur vom eigenen Ursprung, ohne Cache.
+  const sw = await fetch(base + "/sw.js");
+  assert.equal(sw.headers.get("service-worker-allowed"), "/");
+  assert.match(sw.headers.get("cache-control") || "", /no-cache/);
+  // Ohne gesetzte Geheimnisse gibt es Cron- und Discord-Eingänge nicht.
+  assert.equal(
+    (await fetch(base + "/api/cron/tick", { method: "POST" })).status,
+    404,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/api/discord/interactions", {
+        method: "POST",
+        body: "{}",
+      })
+    ).status,
+    404,
+  );
+  // Öffentlich: Event-Tage und Dranbleiben-Rangliste ehrlich leer ohne Datenbank.
+  assert.deepEqual((await (await fetch(base + "/api/events")).json()).events, []);
+  assert.deepEqual(
+    (await (await fetch(base + "/api/ranking/dranbleiben")).json()).rows,
+    [],
+  );
   assert.equal(
     (await fetch(base + "/api/onboarding?status=eigen")).status,
     401,
@@ -113,9 +156,14 @@ try {
     );
   const html = await (await fetch(base + "/")).text();
   assert.ok(
-    !/kostenlos|dealuno|Beispieldaten|fiktiv/i.test(html),
+    !/kostenlos|dealuno|Beispieldaten|fiktiv|whatsapp|partnerregister/i.test(html),
     "Unexpected public copy",
   );
+  assert.match(html, /Zusammen callen/);
+  assert.match(html, /Gemeinsam dranbleiben/);
+  // /reflexionen ohne Anmeldung: Erklärung statt fremder Reflexionen.
+  const feedPage = await fetch(base + "/reflexionen", { redirect: "manual" });
+  assert.ok([200, 307].includes(feedPage.status), "/reflexionen");
   console.log(
     "Standalone smoke passed: routes, assets, login gates, private API protection and honest readiness. No external services were contacted.",
   );

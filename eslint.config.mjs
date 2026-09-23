@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
       "app/features/shared.tsx",
       "server/database.ts",
       "tests/operator.test.ts",
+      "tests/daily-closing.test.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
