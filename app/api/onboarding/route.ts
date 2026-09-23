@@ -4,6 +4,7 @@ import { authClient, authReady, getCurrentUser } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
 import { AppError } from "@/server/operator";
+import { emailCodeEnabled, emailRedirect, RESEND_SECONDS, sendFailure } from "@/server/email-auth";
 import {
   answerInfoRequest,
   profileForSelection,
@@ -85,34 +86,10 @@ export async function POST(request: Request) {
 
     const db = database();
     const created = await startRequest(db, raw.value);
-
-    // Erst nach erfolgreich gespeicherter Anfrage die Bestätigungsmail
-    // auslösen. Die Auswahl liegt damit serverseitig und überlebt den Link,
-    // ohne dass Kontaktdaten in einer URL stehen.
-    const client = await authClient();
-    const redirect = new URL("/auth/callback", process.env.APP_URL!);
-    const { error } = await client.auth.signInWithOtp({
-      email: z.string().email().parse(raw.value?.email),
-      options: {
-        emailRedirectTo: redirect.toString(),
-        shouldCreateUser: true,
-        // Wird in der Vorlage nur angezeigt, nie für Zugriffsentscheidungen
-        // verwendet. Die Berechtigung entsteht ausschließlich serverseitig.
-        data: created.participant
-          ? { onboarding_kind: "claim" }
-          : { onboarding_kind: "new" },
-      },
-    });
-    if (error)
-      return json(
-        {
-          error:
-            "Der Bestätigungslink konnte gerade nicht versendet werden. Bitte versuche es später erneut.",
-        },
-        429,
-      );
-    // Merkt sich in diesem Browser, welche Anfrage gerade gestellt wurde.
-    // Damit wird beim Bestätigungslink genau diese Anfrage gebunden.
+    // Merkt sich in diesem Browser, welche Anfrage gerade gestellt wurde:
+    // Der Bestätigungslink bindet genau diese Anfrage, und /starten zeigt
+    // ihre Angaben wieder an. Schon vor dem Versand gesetzt, damit die Angaben
+    // auch nach einem abgelehnten Versand (Wartezeit) nicht verloren sind.
     (await cookies()).set(ONBOARDING_COOKIE, created.id, {
       httpOnly: true,
       sameSite: "lax",
@@ -120,7 +97,30 @@ export async function POST(request: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 2,
     });
-    return json({ ok: true, resubmitted: created.resubmitted });
+
+    // Erst nach erfolgreich gespeicherter Anfrage die Bestätigungsmail
+    // auslösen. Die Auswahl liegt damit serverseitig und überlebt den Link,
+    // ohne dass Kontaktdaten in einer URL stehen.
+    const client = await authClient();
+    const { error } = await client.auth.signInWithOtp({
+      email: z.string().trim().toLowerCase().email().parse(raw.value?.email),
+      options: {
+        // Neue Profile landen nach der Einrichtung beim ersten Tagesabschluss;
+        // Übernahmen führt /start zum Prüfstatus.
+        emailRedirectTo: emailRedirect("/tagesabschluss", "starten"),
+        shouldCreateUser: true,
+        // Wird in der Vorlage nur angezeigt, nie für Zugriffsentscheidungen
+        // verwendet. Die Berechtigung entsteht ausschließlich serverseitig.
+        data: { onboarding_kind: created.kind },
+      },
+    });
+    if (error) throw sendFailure(error);
+    return json({
+      ok: true,
+      resubmitted: created.resubmitted,
+      resendAfter: RESEND_SECONDS,
+      code: emailCodeEnabled(),
+    });
   } catch (e) {
     return errorResponse(e);
   }

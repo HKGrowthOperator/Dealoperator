@@ -8,12 +8,27 @@ export function json(value: unknown, status = 200) {
 }
 export function errorResponse(error: unknown) {
   if (error instanceof AppError)
-    return json({ error: error.message }, error.status);
-  if (error instanceof z.ZodError)
     return json(
-      { error: error.issues[0]?.message || "Bitte prüfe die Eingabe." },
+      {
+        error: error.message,
+        ...(error.retryAfter ? { retryAfter: Math.ceil(error.retryAfter) } : {}),
+        ...(error.field ? { field: error.field } : {}),
+      },
+      error.status,
+    );
+  if (error instanceof z.ZodError) {
+    // Das letzte Pfadstück ist der Feldname; so zeigt das Formular die
+    // Meldung direkt am Feld statt nur oben.
+    const issue = error.issues[0];
+    const field = issue?.path.at(-1);
+    return json(
+      {
+        error: issue?.message || "Bitte prüfe die Eingabe.",
+        ...(typeof field === "string" ? { field } : {}),
+      },
       400,
     );
+  }
   // Gleichzeitige Änderung an denselben Daten: kein Ausfall, sondern ein
   // Zustand, den ein Neuladen auflöst.
   const code = (error as { code?: string } | null)?.code;

@@ -1,3 +1,4 @@
+import { emailCodeEnabled } from "./email-auth";
 import type { Database } from "./database";
 import { configurationIssues } from "./config";
 import { mailConfigIssues } from "./mailer";
@@ -81,6 +82,9 @@ export async function readiness(
     teamMail: mailConfigIssues(env as NodeJS.ProcessEnv).length === 0,
     discordLink: discordMissing("link", env as NodeJS.ProcessEnv).length === 0,
     discordPosts: discordMissing("posts", env as NodeJS.ProcessEnv).length === 0,
+    // Code-Eingabe und browserübergreifender Link (Vorlagen mit Code und
+    // token_hash, eingeschaltet über AUTH_EMAIL_CODE=1).
+    emailCode: emailCodeEnabled(env as NodeJS.ProcessEnv),
   };
   try {
     await inspectDatabase(db());

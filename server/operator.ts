@@ -36,6 +36,10 @@ export class AppError extends Error {
   constructor(
     message: string,
     readonly status = 400,
+    /** Sekunden bis zum nächsten erlaubten Versuch (für eine sichtbare Wartezeit). */
+    readonly retryAfter?: number,
+    /** Formularfeld, an dem die Meldung erscheinen soll (z. B. "phone"). */
+    readonly field?: string,
   ) {
     super(message);
   }
@@ -193,9 +197,18 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       company: z.string().trim().max(120),
       role: z.string().trim().max(80),
       publicConsent: z.boolean(),
+      // Nur, wenn noch keine Nummer vorliegt (z. B. über „Anmelden“ gekommen).
+      phone: z.string().trim().max(40).optional(),
+      phoneCountry: z.string().trim().max(4).optional(),
     })
     .strict()
     .parse(raw);
+  let phone = "";
+  if (value.phone) {
+    const checked = normalisePhone(value.phone, value.phoneCountry);
+    if (!checked.ok) throw new AppError(checked.reason, 400, undefined, "phone");
+    phone = checked.value;
+  }
   return db.transaction(async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `owner:${actor.userId}`,
@@ -239,6 +252,11 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       [actor.userId, JSON.stringify(profile)],
     );
     await rememberVerifiedEmail(tx, actor);
+    if (phone)
+      await tx.query(
+        `UPDATE account_private SET phone=$2,updated_at=now() WHERE owner=$1 AND phone=''`,
+        [actor.userId, phone],
+      );
     // Wer über „Anmelden“ ohne Registrierungsanfrage kam, taucht sonst nie im
     // Team auf. Mit Anfrage ist die Meldung bereits bei der E-Mail-Bestätigung
     // entstanden — dann hier nichts Doppeltes.
@@ -513,14 +531,16 @@ export async function rateLimit(
   key: string,
   max: number,
   windowSeconds = 60,
-  message = "Zu viele Versuche in kurzer Zeit. Bitte warte etwa 15 Minuten und probiere es dann erneut. Deine Angaben bleiben gespeichert.",
+  message = "Zu viele Versuche in kurzer Zeit. Bitte warte einen Moment und probiere es dann erneut.",
 ) {
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
   const [r] = await db.query(
     "INSERT INTO rate_limits(key,bucket,hits) VALUES($1,$2,1) ON CONFLICT(key,bucket) DO UPDATE SET hits=rate_limits.hits+1 RETURNING hits",
     [hash(key), bucket],
   );
-  if (r.hits > max) throw new AppError(message, 429);
+  // Feste Zeitfenster: frei wird es mit dem nächsten Fenster.
+  if (r.hits > max)
+    throw new AppError(message, 429, windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds));
 }
 
 /**
