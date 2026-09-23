@@ -210,7 +210,7 @@ export function aggregate(values: Counts[]): Counts {
     metrics.map((k) => {
       const known = values
         .map((v) => v[k])
-        .filter((v): v is number => v !== null);
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
       return [k, known.length ? known.reduce((a, b) => a + b, 0) : null];
     }),
   ) as Counts;
