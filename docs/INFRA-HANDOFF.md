@@ -110,7 +110,9 @@ Absender Deal Operator, deutsche Vorlagen, Site URL und Redirect-Allowlist auf
 `/auth/callback`. Der Resend-Schlüssel liegt in Supabase und gehört **nicht** in
 Coolify.
 
-Anzupassen bleibt nur der Vorlagentext: `deploy/auth-email.html` unterscheidet
-jetzt zwischen bestätigter E-Mail und freigegebenem Profil und nutzt
-`{{ .Data.onboarding_kind }}`. Fehlt die Variable, greift ein neutraler Text.
-Beim ersten echten Versand gegenprüfen.
+Vorlagen (seit 23.09.2026 in Supabase gespeichert): „Confirm sign up“ entspricht
+`deploy/auth-email-confirm-signup.html`, „Magic Link“ entspricht
+`deploy/auth-email-magic-link.html`. Nur die Bestätigungsvorlage nutzt
+`{{ .Data.onboarding_kind }}`; der Anmeldelink verzweigt bewusst nicht, weil
+diese Angabe aus der ersten Registrierung stammt. Maßgeblich ist die in
+Supabase gespeicherte Fassung; vor erneutem Einspielen vergleichen.

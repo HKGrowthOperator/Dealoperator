@@ -1,0 +1,30 @@
+<!doctype html>
+<!--
+  Supabase Auth → E-Mail-Vorlagen → "Confirm sign up"
+  Betreff: E-Mail-Adresse für Deal Operator bestätigen
+
+  Erklärt nur die E-Mail-Bestätigung und, bei einer Übernahme, dass das Team
+  die Zuordnung prüft. Kein Werbetext.
+
+  {{ .Data.onboarding_kind }} setzt /api/onboarding bei der Registrierung
+  ("claim" oder "new"). Supabase übernimmt diese Angabe nur beim Anlegen des
+  Kontos, deshalb wird sie ausschließlich in dieser Vorlage ausgewertet, nie
+  im Anmeldelink und nie für eine Zugriffsentscheidung.
+
+  Maßgeblich ist die in Supabase gespeicherte Fassung. Vor einem erneuten
+  Einspielen damit vergleichen, damit keine älteren Texte zurückkommen.
+-->
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:32px 16px;background:#f0f5fc;font-family:Arial,sans-serif;color:#10294b">
+<table role="presentation" style="max-width:560px;width:100%;margin:auto;background:#fff;border:1px solid #d5e2f4;border-radius:16px"><tr><td style="padding:36px">
+<p style="font-size:22px;font-weight:700;color:#0755f5;margin:0 0 30px">Deal Operator</p>
+<h1 style="font-size:28px;line-height:1.25;margin:0 0 18px">E-Mail-Adresse bestätigen</h1>
+{{ if eq .Data.onboarding_kind "claim" }}
+<p style="font-size:16px;line-height:1.7;color:#52647e">Du hast angefragt, ein vorhandenes Profil bei Deal Operator zu übernehmen. Mit diesem Link bestätigst du deine E-Mail-Adresse. Danach prüft das Deal-Operator-Team die Zuordnung. Der Link allein gibt kein Profil und keine Zahlen frei.</p>
+{{ else }}
+<p style="font-size:16px;line-height:1.7;color:#52647e">Mit diesem Link bestätigst du deine E-Mail-Adresse und meldest dich bei Deal Operator an.</p>
+{{ end }}
+<p style="margin:28px 0"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0755f5;color:#fff;text-decoration:none;padding:15px 22px;border-radius:8px;font-weight:700">E-Mail-Adresse bestätigen</a></p>
+<p style="font-size:13px;line-height:1.7;color:#52647e">Öffne den Link im selben Browser, in dem du ihn angefordert hast. Er ist zeitlich begrenzt und nur einmal verwendbar.</p>
+<p style="font-size:13px;line-height:1.7;color:#52647e">Du hast das nicht angefordert? Dann kannst du diese E-Mail ignorieren.</p>
+</td></tr></table></body></html>
