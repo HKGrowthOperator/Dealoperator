@@ -6061,3 +6061,60 @@ th {
     font-size: 14px;
   }
 }
+
+/* ---- Handy: Kästchen ohne gequetschte Kleinschrift -------------------------
+   Die Wochenwerte stehen als Zeilen statt in drei schmalen Spalten; der
+   erklärende Satz unter den Kennzahlen entfällt, übrig bleibt mindestens 13 px. */
+@media (max-width: 599px) {
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .stats-grid .stat {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "top value" "note value";
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 2px;
+    padding: 14px 16px;
+    text-align: left;
+  }
+  .stats-grid .stat-top {
+    grid-area: top;
+    min-height: 0;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+  .stats-grid .stat strong {
+    grid-area: value;
+    margin: 0;
+    font-size: 28px;
+  }
+  .stats-grid .stat-note {
+    grid-area: note;
+    font-size: 13px;
+  }
+  .stats-grid .stat:not(.stat-accent) .stat-note {
+    display: none;
+  }
+  .kpi-track {
+    padding: 14px;
+  }
+  .kpi-track > span {
+    font-size: 13px;
+  }
+  .kpi-track strong {
+    font-size: 19px;
+  }
+  .kpi-track small {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .week-banner strong {
+    font-size: 15px;
+  }
+  .week-banner p {
+    font-size: 14px;
+  }
+}

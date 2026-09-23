@@ -469,7 +469,8 @@ export default function CommitmentDashboard({
             <li key={s}>
               <span className={`cm-swatch s-${s}`} aria-hidden="true" />
               <span>
-                <strong>{STATUS[s].label}</strong> {STATUS[s].legend}
+                <strong>{STATUS[s].label}</strong>{" "}
+                <span className="cm-legend-text">{STATUS[s].legend}</span>
               </span>
             </li>
           ))}

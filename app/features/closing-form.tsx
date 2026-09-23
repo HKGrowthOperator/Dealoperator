@@ -1045,7 +1045,11 @@ export default function ClosingForm({
             <span className="cm-optional"> (freiwillig)</span>
           )}
         </label>
-        <small id={`${id}-hint`}>{hint}</small>
+        {/* Auf dem Handy stehen die Beispiele schon im Feld; nur der Hinweis
+            zur Sichtbarkeit bleibt dort stehen. */}
+        <small id={`${id}-hint`} className={key === "help" ? undefined : "cm-hint-extra"}>
+          {hint}
+        </small>
         <textarea
           id={id}
           rows={key === "help" ? 2 : 3}

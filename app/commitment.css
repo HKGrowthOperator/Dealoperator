@@ -1610,6 +1610,49 @@
   gap: 14px;
 }
 
+/* ---- Handy: weniger Erklärtext, dafür lesbar ------------------------------
+   Unter den Kästchen stand auf dem Handy zu viel Kleinschrift. Hier bleibt
+   nur, was man zum Ausfüllen braucht, und das in mindestens 14 px. */
+@media (max-width: 599px) {
+  .cm-count label {
+    font-size: 16px;
+  }
+  .cm-count label small,
+  .cm-field > small.cm-hint-extra,
+  .cm-stats > div:not(.accent) > p,
+  .cm-legend-text {
+    display: none;
+  }
+  .cm-group legend small,
+  .cm-field > small,
+  .cm-energy > small,
+  .cm-push small,
+  .cm-draft-line,
+  .cm-small {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  /* Serie als breite Karte, darunter zwei Zahlen nebeneinander. */
+  .cm-stats > div.accent {
+    grid-column: 1 / -1;
+  }
+  .cm-stats dt,
+  .cm-stats dd span {
+    font-size: 14px;
+  }
+  .cm-stats p {
+    font-size: 14px;
+  }
+  .cm-legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 12px;
+  }
+  .cm-legend li {
+    align-items: center;
+    font-size: 14px;
+  }
+}
+
 /* ---- Größere Bildschirme ----------------------------------------------- */
 @media (min-width: 480px) {
   .cm-energy-scale {
