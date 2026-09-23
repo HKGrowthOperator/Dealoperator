@@ -18,6 +18,10 @@ Lies zuerst `README.md`, `docs/DEPLOYMENT.md`, `docs/ACCEPTANCE.md` und `docs/DI
 - Offizieller Discord-Einstieg: https://discord.gg/NjkFJtBkZm.
 - Echte Zahlen werden nie erfunden. Die vorhandenen Beispiele sind ausdrücklich fiktiv.
 - Bereits importierte Personen übernehmen ihr Profil nach Verifizierung; Namen allein sind kein Identitätsnachweis. Bestehende Historie bleibt bei einer Übernahme bestehen.
+- Seit 23.09.2026: Discord ist für Calls da (Sessions, Roleplay, Call-Partner, sich gegenseitig pushen, Ränge). Tagesabschlüsse und Reflexionen bleiben auf der Website und werden nicht im Discord geteilt. Kein „bevorzugter Kanal“ im Profil.
+- Sessions entstehen auf der Website (mindestens 12 Stunden Vorlauf, spätestens am Vortag); der Abgleich legt je Session einen Discord-Raum samt Event an und trägt den Link ein. Plätze wählt der Host frei (2 bis 25).
+- Rang „Aktiver Caller“: 5 Calling-Tage am Stück mit mindestens 50 Anwahlen; weg nach 3 Calling-Tagen in Folge ohne Anwahlen. Schaltet Sessions & Roleplay frei (sichtbar ist die Sektion immer) und ist im Discord eine Rolle. Admins und Moderatoren haben immer Zugang und dürfen alle Sessions bearbeiten und absagen.
+- KPI-Ränge heißen Level (Level 1 ab 100 Anwahlen, 5 Settings, 3 Closings, erstem Deal) mit XP-Leiste. Weitere Ideen stehen in `docs/IDEEN.md`.
 
 ## Arbeitsreihenfolge
 
