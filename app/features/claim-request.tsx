@@ -1,16 +1,41 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LoaderCircle, Search, Send, ShieldCheck } from "lucide-react";
+import { ChevronRight, LoaderCircle, Send, UserPlus, UsersRound } from "lucide-react";
+import { splitPhone } from "@/lib/phone";
+import {
+  call,
+  checkContact,
+  ContactFields,
+  EMPTY_CONTACT,
+  FlowProgress,
+  focusFirstError,
+  isTeamProfile,
+  PrivacyNote,
+  ProfileCard,
+  ProfileSearch,
+  RequestError,
+  useStepHeading,
+  type Contact,
+  type ContactField,
+  type FieldErrors,
+  type Profile,
+} from "./flow-parts";
 
-type Profile = { id: string; name: string; company: string; role: string };
-type Step = "search" | "confirm" | "details";
+type Mode = "claim" | "assign";
+type Step = "search" | "contact";
+const STEPS: Record<Mode, string[]> = {
+  claim: ["Profil finden", "Deine Angaben", "Prüfung durch das Team"],
+  assign: ["Profil suchen", "Deine Angaben", "Zuordnung durch das Team"],
+};
+const FIELDS: ContactField[] = ["fullName", "phone", "hint"];
 
 /**
  * Übernahme mit einem angemeldeten Konto: Profil suchen (oder aus Link bzw.
- * Einladung übernehmen), Angaben für den Abgleich ergänzen, Anfrage senden.
- * Die E-Mail ist bereits bestätigt, deshalb gibt es keinen zweiten Link.
+ * Einladung übernehmen), Angaben ergänzen, Anfrage senden. Die E-Mail ist
+ * bereits bestätigt, deshalb gibt es keine zweite Mail. Freigeben kann nur
+ * das Team.
  */
 export default function ClaimRequest({
   email,
@@ -19,6 +44,8 @@ export default function ClaimRequest({
   invite,
   problem,
   needsInvite = "",
+  assign = false,
+  taken = "",
 }: {
   email: string;
   phone: string;
@@ -26,264 +53,258 @@ export default function ClaimRequest({
   invite: string;
   problem: string;
   needsInvite?: string;
+  /** Direkt „Team um Zuordnung bitten“ (z. B. nach einer Ablehnung). */
+  assign?: boolean;
+  /** Name eines per Link gewählten, aber schon vergebenen Profils. */
+  taken?: string;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState<Step>(preselected ? "confirm" : "search");
+  const known = splitPhone(phone);
+  const [mode, setMode] = useState<Mode>(assign && !preselected ? "assign" : "claim");
+  const [step, setStep] = useState<Step>(preselected || assign ? "contact" : "search");
   const [selected, setSelected] = useState<Profile | null>(preselected);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Profile[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [value, setValue] = useState({ fullName: "", phone, hint: "" });
-  const [busy, setBusy] = useState(false);
+  const [contact, setContact] = useState<Contact>({
+    ...EMPTY_CONTACT,
+    email,
+    fullName: preselected && !isTeamProfile(preselected) ? preselected.name : "",
+    phone: phone ? known.national : "",
+    phoneCountry: phone ? known.country : EMPTY_CONTACT.phoneCountry,
+  });
+  const [suggested, setSuggested] = useState(Boolean(preselected));
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState(problem);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const runSearch = useCallback(async (q: string) => {
-    if (q.trim().length < 2) {
-      setResults([]);
-      setSearched(false);
-      return;
-    }
-    setSearching(true);
-    try {
-      const r = await fetch(`/api/onboarding?q=${encodeURIComponent(q)}`);
-      const d = await r.json();
-      if (!r.ok) throw Error(d.error);
-      setResults(d.profiles || []);
-      setSearched(true);
-    } catch (e) {
-      setMessage((e as Error).message);
-    } finally {
-      setSearching(false);
-    }
-  }, []);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const fields = useRef<Partial<Record<ContactField, HTMLElement | null>>>({});
+  const profiles = useRef<Record<string, Profile>>(preselected ? { [preselected.id]: preselected } : {});
+  const heading = useStepHeading(`${step}:${mode}`);
 
   useEffect(() => {
-    if (step !== "search") return;
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => runSearch(query), 250);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, [query, step, runSearch]);
+    function onPop() {
+      const params = new URLSearchParams(window.location.search);
+      const profile = profiles.current[params.get("profil") || ""] ?? null;
+      const team = params.get("weg") === "team";
+      setMode(team ? "assign" : "claim");
+      setSelected(team ? null : profile);
+      setStep(team || profile ? "contact" : "search");
+      setErrors({});
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  function go(nextStep: Step, nextMode: Mode, profile: Profile | null) {
+    if (profile) profiles.current[profile.id] = profile;
+    setStep(nextStep);
+    setMode(nextMode);
+    setSelected(profile);
+    setErrors({});
+    const params = new URLSearchParams();
+    if (nextMode === "assign") params.set("weg", "team");
+    else if (profile && nextStep === "contact") {
+      params.set("profil", profile.id);
+      if (invite && profile.id === preselected?.id) params.set("einladung", invite);
+    }
+    const q = params.toString();
+    window.history.pushState(null, "", `/profil-uebernehmen${q ? `?${q}` : ""}`);
+  }
+
+  function patch(value: Partial<Contact>) {
+    setContact((c) => ({ ...c, ...value }));
+    if (value.fullName !== undefined) setSuggested(false);
+    const touched = Object.keys(value) as ContactField[];
+    if (touched.some((f) => errors[f]))
+      setErrors((e) => {
+        const rest = { ...e };
+        touched.forEach((f) => delete rest[f]);
+        return rest;
+      });
+  }
+
+  function pick(profile: Profile) {
+    setMessage("");
+    if (!isTeamProfile(profile) && (!contact.fullName.trim() || suggested)) {
+      setContact((c) => ({ ...c, fullName: profile.name }));
+      setSuggested(true);
+    }
+    go("contact", "claim", profile);
+  }
+
+  function toAssign(searched: string, hint = "") {
+    setMessage("");
+    setContact((c) => ({
+      ...c,
+      fullName: suggested ? "" : c.fullName,
+      hint: c.hint || hint || (searched ? `Gesucht nach „${searched}“` : ""),
+    }));
+    setSuggested(false);
+    go("contact", "assign", null);
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!selected || busy) return;
+    if (inFlight.current) return;
+    const found = checkContact(contact, false);
+    setErrors(found);
+    if (Object.keys(found).length) {
+      focusFirstError(found, fields);
+      return;
+    }
+    inFlight.current = true;
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch("/api/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "claim",
-          value: {
-            participantId: selected.id,
-            ...(invite && selected.id === preselected?.id ? { invite } : {}),
-            ...value,
-          },
-        }),
+      await call("/api/onboarding", {
+        action: "claim",
+        value: {
+          ...(mode === "claim" && selected ? { participantId: selected.id } : {}),
+          ...(mode === "claim" && invite && selected?.id === preselected?.id ? { invite } : {}),
+          fullName: contact.fullName.trim(),
+          phone: contact.phone.trim(),
+          phoneCountry: contact.phoneCountry,
+          hint: contact.hint.trim(),
+        },
       });
-      const result = await response.json();
-      if (!response.ok) throw Error(result.error);
       router.replace("/status");
       router.refresh();
-    } catch (e) {
-      setMessage((e as Error).message);
+    } catch (err) {
+      const e = err as RequestError;
+      if (e.field && FIELDS.includes(e.field as ContactField)) {
+        const next = { [e.field]: e.message } as FieldErrors;
+        setErrors(next);
+        focusFirstError(next, fields);
+      } else setMessage(e.message);
+      inFlight.current = false;
       setBusy(false);
     }
   }
 
+  const missing = (searched: string, hadResults: boolean) => (
+    <div className="flow-missing">
+      <strong>
+        {hadResults ? "Dein Profil ist nicht dabei?" : `Kein freies Profil zu „${searched}“ gefunden.`}
+      </strong>
+      <p>Versuch eine andere Schreibweise oder nur deinen Vornamen. Sonst:</p>
+      <button type="button" className="flow-option" onClick={() => toAssign(searched)}>
+        <UsersRound aria-hidden="true" />
+        <span>
+          <strong>Meine Zahlen müssten schon hier sein</strong>
+          <small>Das Team sucht dein Profil heraus und ordnet es dir zu.</small>
+        </span>
+        <ChevronRight size={18} aria-hidden="true" />
+      </button>
+      <Link className="flow-option" href="/start?weiter=eigen">
+        <UserPlus aria-hidden="true" />
+        <span>
+          <strong>Ich habe noch keine Zahlen</strong>
+          <small>Leg ein neues Profil an und trag deinen ersten Tag ein.</small>
+        </span>
+        <ChevronRight size={18} aria-hidden="true" />
+      </Link>
+    </div>
+  );
+
   return (
-    <section className="auth-card card">
-      <span className="icon-tile lime">
-        {step === "search" ? <Search /> : <ShieldCheck />}
-      </span>
-      <h1>Deine Zahlen übernehmen.</h1>
-      <p>
-        {step === "search"
-          ? "Such das Profil, unter dem deine Zahlen schon im Ranking stehen."
-          : "Das Team prüft deine Anfrage und gibt das Profil danach frei."}
-      </p>
-      {message && (
-        <p role="alert" className="form-error">
-          {message}
-        </p>
-      )}
-
-      {step === "search" && needsInvite && (
-        <form className="form-stack" action="/profil-uebernehmen" method="get">
-          <input type="hidden" name="profil" value={needsInvite} />
-          <label>
-            Code aus deiner Einladung
-            <input name="einladung" required maxLength={200} autoComplete="off" />
-          </label>
-          <button className="btn primary full">Profil mit Einladung öffnen</button>
-        </form>
-      )}
-
-      {step === "search" && (
-        <>
-          <div className="form-stack">
-            <label>
-              Dein Name
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Vorname oder Nachname eingeben"
-                aria-label="Profil suchen"
-              />
-              <small>
-                Wir zeigen nur Profile, die noch niemand übernommen hat.
-                Kontaktdaten sind hier nicht sichtbar.
-              </small>
-            </label>
-          </div>
-          {searching && (
-            <p className="onboarding-hint">
-              <LoaderCircle className="spin" size={16} /> Suche läuft …
+    <section className="auth-card card flow">
+      <div className="flow-step" key={`${step}:${mode}`}>
+        <FlowProgress steps={STEPS[mode]} current={step === "search" ? 0 : 1} />
+        {step === "search" ? (
+          <>
+            <h1 ref={heading} tabIndex={-1}>
+              Finde dein Profil.
+            </h1>
+            <p className="flow-lead">
+              Such nach dem Namen, unter dem deine Zahlen im Ranking stehen.
             </p>
-          )}
-          {!searching && searched && results.length === 0 && (
-            <div className="notice">
-              <strong>Kein passendes Profil gefunden.</strong>
-              <p>
-                Versuche eine andere Schreibweise. Ist dein Profil nur über eine
-                persönliche Einladung erreichbar, öffne bitte den Link aus der
-                Einladung.
+            {message && (
+              <p role="alert" className="form-error">
+                {message}
               </p>
-            </div>
-          )}
-          {results.length > 0 && (
-            <div className="onboarding-candidates">
-              {results.map((p) => (
+            )}
+            {taken && (
+              <div className="flow-alert">
+                <p>
+                  „{taken}“ ist bereits einem anderen Konto zugeordnet. Wenn das
+                  dein Profil ist, klärt das Team die Zuordnung. Es entsteht kein
+                  zweites Profil.
+                </p>
                 <button
                   type="button"
-                  key={p.id}
-                  onClick={() => {
-                    setSelected(p);
-                    setMessage("");
-                    setStep("confirm");
-                  }}
+                  className="btn secondary"
+                  onClick={() => toAssign("", `Betrifft das bereits vergebene Profil „${taken}“.`)}
                 >
-                  <strong>{p.name}</strong>
-                  <small>
-                    {[p.company, p.role].filter(Boolean).join(" · ") || "Caller"}
-                  </small>
+                  Team um Zuordnung bitten
                 </button>
-              ))}
-            </div>
-          )}
-          <Link className="btn secondary full" href="/start?weiter=eigen">
-            Stattdessen eigenes Profil anlegen
-          </Link>
-        </>
-      )}
-
-      {step === "confirm" && selected && (
-        <>
-          <div className="onboarding-selected">
-            <span>Du möchtest das Profil von</span>
-            <strong>{selected.name}</strong>
-            {[selected.company, selected.role].filter(Boolean).length > 0 && (
-              <small>{[selected.company, selected.role].filter(Boolean).join(" · ")}</small>
+              </div>
             )}
-            <span>übernehmen.</span>
-          </div>
-          <div className="notice">
-            <strong>Das Team prüft deine Übernahme.</strong>
-            <p>
-              Deine bestätigte E-Mail reicht dafür nicht aus, auch eine
-              Einladung nicht. Das Deal-Operator-Team gleicht deine Angaben mit
-              der bekannten Person ab und gibt das Profil anschließend frei.
+            {needsInvite && (
+              <form className="flow-form" action="/profil-uebernehmen" method="get">
+                <input type="hidden" name="profil" value={needsInvite} />
+                <div className="flow-field">
+                  <label htmlFor="flow-invite">Code aus deiner Einladung</label>
+                  <input id="flow-invite" name="einladung" required maxLength={200} autoComplete="off" />
+                </div>
+                <button className="btn primary full">Profil mit Einladung öffnen</button>
+              </form>
+            )}
+            <ProfileSearch query={query} onQuery={setQuery} onPick={pick} notFound={missing} />
+          </>
+        ) : (
+          <>
+            <h1 ref={heading} tabIndex={-1}>
+              {mode === "assign" ? "Team um Zuordnung bitten." : "Profil übernehmen."}
+            </h1>
+            {mode === "claim" && selected && (
+              <ProfileCard profile={selected} onChange={() => go("search", "claim", null)} />
+            )}
+            <p className="flow-lead">
+              {mode === "assign"
+                ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
+                : "Noch zwei Angaben, dann geht die Anfrage an das Team."}
             </p>
-          </div>
-          <button className="btn primary full" onClick={() => setStep("details")}>
-            Weiter zu meinen Angaben
-          </button>
-          <button
-            type="button"
-            className="text-link"
-            onClick={() => {
-              setSelected(null);
-              setMessage("");
-              setStep("search");
-            }}
-          >
-            Anderes Profil suchen
-          </button>
-        </>
-      )}
-
-      {step === "details" && selected && (
-        <form className="form-stack" onSubmit={submit}>
-          <div className="onboarding-selected compact">
-            <span>Ausgewähltes Profil</span>
-            <strong>{selected.name}</strong>
-            <button type="button" className="text-link" onClick={() => setStep("confirm")}>
-              Auswahl ändern
+            {isTeamProfile(selected) && (
+              <div className="flow-notice">
+                <strong>Das ist ein gemeinsames Teamprofil.</strong>
+                <p>
+                  Die Zahlen darin sind ein gemeinsames Ergebnis. Wer es übernimmt,
+                  verwaltet den gemeinsamen Stand. Klärt vorher im Team, wer das tut.
+                </p>
+              </div>
+            )}
+            {message && (
+              <p role="alert" className="form-error">
+                {message}
+              </p>
+            )}
+            <form className="flow-form" onSubmit={submit} noValidate>
+              <p className="flow-note">
+                Angemeldet als <strong>{email}</strong>
+              </p>
+              <ContactFields
+                value={contact}
+                onChange={patch}
+                errors={errors}
+                fields={fields}
+                email="hidden"
+                hint={mode === "assign" ? "open" : "toggle"}
+                nameSuggested={suggested && mode === "claim"}
+              />
+              <p className="flow-note">
+                Freigeben kann nur das Team. Es gleicht deine Angaben mit der
+                bekannten Person ab.
+              </p>
+              <button className="btn primary full" disabled={busy}>
+                {busy ? <LoaderCircle className="spin" size={18} /> : <Send size={18} />}
+                {mode === "assign" ? "Anfrage an das Team senden" : "Übernahme anfragen"}
+              </button>
+            </form>
+            <PrivacyNote />
+            <button type="button" className="flow-link" onClick={() => go("search", "claim", null)}>
+              {mode === "assign" ? "Doch selbst suchen" : "Zurück zur Suche"}
             </button>
-          </div>
-          <p className="onboarding-hint">
-            Bestätigte E-Mail: <strong>{email}</strong>
-          </p>
-          <label>
-            Vor- und Nachname
-            <input
-              required
-              autoComplete="name"
-              minLength={3}
-              maxLength={120}
-              value={value.fullName}
-              onChange={(e) => setValue({ ...value, fullName: e.target.value })}
-              placeholder="Wie du wirklich heißt"
-            />
-            <small>
-              Dein echter Name hilft dem Team beim Abgleich. Öffentlich bleibt
-              der Anzeigename des Profils.
-            </small>
-          </label>
-          <label>
-            Telefon mit Ländervorwahl
-            <input
-              type="tel"
-              required
-              autoComplete="tel"
-              maxLength={40}
-              value={value.phone}
-              onChange={(e) => setValue({ ...value, phone: e.target.value })}
-              placeholder="+49 170 1234567"
-            />
-            <small>
-              Bleibt privat, erscheint nie im Ranking und wird nicht per SMS
-              geprüft.
-            </small>
-          </label>
-          <label>
-            Zuordnungshilfe (optional)
-            <input
-              maxLength={300}
-              value={value.hint}
-              onChange={(e) => setValue({ ...value, hint: e.target.value })}
-              placeholder="Zum Beispiel dein Name im Gruppenchat"
-            />
-          </label>
-          <button className="btn primary full" disabled={busy}>
-            {busy ? <LoaderCircle className="spin" /> : <Send size={18} />}
-            Übernahme anfragen
-          </button>
-        </form>
-      )}
-
-      <div className="auth-note">
-        <ShieldCheck size={20} />
-        <span>
-          Deine Kontaktdaten sehen nur du und das Deal-Operator-Team. Sie stehen
-          nie im öffentlichen Ranking.
-        </span>
+          </>
+        )}
       </div>
     </section>
   );

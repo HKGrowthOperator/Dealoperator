@@ -29,23 +29,26 @@ export default function ClaimAnswer() {
     }
   }
   return (
-    <form className="form-stack" onSubmit={submit}>
-      <label>
-        Deine Antwort ans Team
+    <form className="flow-form" onSubmit={submit}>
+      <div className="flow-field" data-invalid={error ? "" : undefined}>
+        <label htmlFor="claim-answer">Deine Antwort an das Team</label>
         <textarea
+          id="claim-answer"
           required
           minLength={3}
           maxLength={1000}
           rows={4}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? "claim-answer-error" : undefined}
         />
-      </label>
-      {error && (
-        <p className="form-error" role="alert">
-          {error}
-        </p>
-      )}
+        {error && (
+          <p id="claim-answer-error" className="flow-field-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
       <button className="btn primary full" disabled={busy}>
         {busy ? <LoaderCircle className="spin" /> : <Send size={18} />}
         Antwort senden

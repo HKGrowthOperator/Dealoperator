@@ -50,14 +50,23 @@ export default async function Page({
     null;
   let problem = "";
   let needsInvite = "";
+  let taken = "";
   if (!owned && profil && profil !== "beispiel") {
     try {
       preselected = await profileForSelection(db, profil, invite || undefined);
     } catch (e) {
-      problem =
-        e instanceof AppError
-          ? e.message
-          : "Dieses Profil lässt sich gerade nicht auswählen.";
+      if (e instanceof AppError && e.status === 409) {
+        const [p] = await db.query(
+          "SELECT name FROM participants WHERE id=$1 AND owner IS NOT NULL AND kind='person'",
+          [profil],
+        );
+        taken = (p?.name as string | undefined) || "";
+      }
+      if (!taken)
+        problem =
+          e instanceof AppError
+            ? e.message
+            : "Dieses Profil lässt sich gerade nicht auswählen.";
       if (e instanceof AppError && e.status === 403) needsInvite = profil;
     }
   }
@@ -71,14 +80,14 @@ export default async function Page({
       <OperatorHeader />
       <main className="auth-layout">
         {owned ? (
-          <section className="auth-card card">
+          <section className="auth-card card flow">
             <h1>Dein Konto hat bereits ein Profil.</h1>
-            <p>
+            <p className="flow-lead">
               Jedes Konto gehört zu genau einem Profil. Eine zweite Übernahme
               ist deshalb nicht möglich.
             </p>
             <Link className="btn primary full" href="/heute?modus=eigen">
-              Zu meinem Bereich
+              Zu meinen Zahlen
             </Link>
           </section>
         ) : (
@@ -89,6 +98,8 @@ export default async function Page({
             invite={invite}
             problem={problem}
             needsInvite={needsInvite}
+            taken={taken}
+            assign={search.weg === "team"}
           />
         )}
       </main>

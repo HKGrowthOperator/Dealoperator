@@ -1,52 +1,42 @@
+"use client";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Clock, MessageCircleQuestion, ShieldCheck, XCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import {
+  Check,
+  ChevronRight,
+  Clock,
+  MessageCircleQuestion,
+  PartyPopper,
+  Search,
+  UsersRound,
+  XCircle,
+} from "lucide-react";
+import { formatPhone } from "@/lib/phone";
 import ClaimAnswer from "./claim-answer";
+import { call, useStepHeading } from "./flow-parts";
 
-const VIEW: Record<
-  string,
-  { icon: React.ReactNode; title: string; lead: string; tone: string }
-> = {
-  pending: {
-    icon: <Clock />,
-    tone: "",
-    title: "Deine Anfrage ist in Prüfung.",
-    lead: "Das Deal-Operator-Team gleicht deine Angaben ab und gibt das Profil frei, sobald die Zuordnung eindeutig ist.",
-  },
-  info_needed: {
-    icon: <MessageCircleQuestion />,
-    tone: "",
-    title: "Rückfrage vom Team.",
-    lead: "Damit das Team das Profil sicher zuordnen kann, braucht es noch eine Angabe von dir. Antworte einfach hier.",
-  },
-  rejected: {
-    icon: <XCircle />,
-    tone: "",
-    title: "Diese Übernahme wurde nicht freigegeben.",
-    lead: "Du kannst ein eigenes Profil anlegen oder ein anderes Profil anfragen.",
-  },
-  superseded: {
-    icon: <XCircle />,
-    tone: "",
-    title: "Dieses Profil ist bereits zugeordnet.",
-    lead: "Ein anderes Konto wurde dafür freigegeben. Du kannst ein eigenes Profil anlegen oder ein anderes Profil anfragen.",
-  },
-  approved: {
-    icon: <Check />,
-    tone: "lime",
-    title: "Dein Profil ist freigegeben.",
-    lead: "Deine bisherigen Zahlen stehen dir jetzt zur Verfügung.",
-  },
+export type OwnRequest = {
+  kind: string;
+  status: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  hint: string;
+  message: string;
+  lastAnswer: string;
+  participantName: string;
+  createdAt: string;
 };
 
-/** Schritte der Anfrage, damit der Stand auf einen Blick lesbar ist. */
-function steps(status: string) {
-  const reviewLabel = status === "info_needed" ? "Rückfrage nötig" : "In Prüfung";
-  const done = (s: string[]) => s.includes(status);
+/** Stand der Anfrage in drei Schritten. */
+function steps(status: string, assign: boolean) {
+  const decided = ["approved", "rejected", "superseded"].includes(status);
   return [
-    { label: "Anfrage eingegangen", state: "done" },
+    { label: "E-Mail bestätigt", state: "done" },
     {
-      label: reviewLabel,
-      state: done(["approved", "rejected", "superseded"]) ? "done" : "current",
+      label: status === "info_needed" ? "Rückfrage an dich" : "Prüfung durch das Team",
+      state: decided ? "done" : "current",
     },
     {
       label:
@@ -54,132 +44,235 @@ function steps(status: string) {
           ? "Nicht freigegeben"
           : status === "superseded"
             ? "Anderweitig zugeordnet"
-            : "Freigegeben",
-      state: done(["approved", "rejected", "superseded"]) ? "done" : "open",
+            : assign
+              ? "Zuordnung und Freigabe"
+              : "Freigabe",
+      state: decided ? "done" : "open",
     },
   ] as const;
 }
 
-export default function RequestStatus({
-  request,
-}: {
-  request: {
-    status: string;
-    fullName: string;
-    email: string;
-    phone: string;
-    hint: string;
-    message: string;
-    lastAnswer: string;
-    participantName: string;
-    createdAt: string;
-  };
-}) {
-  const view = VIEW[request.status] ?? VIEW.pending;
+/**
+ * Prüfstatus der eigenen Anfrage. Die Seite fragt selbst nach, solange sie
+ * offen ist: Eine Freigabe, Rückfrage oder Ablehnung erscheint ohne
+ * Neuladen. Keine Versprechen zu Bearbeitungszeiten.
+ */
+export default function RequestStatus({ request }: { request: OwnRequest }) {
+  const router = useRouter();
+  const [status, setStatus] = useState(request.status);
+  const heading = useStepHeading(status);
+  const known = useRef(request.status);
+  const assign = request.kind === "claim" && !request.participantName;
+
+  useEffect(() => {
+    if (!["pending", "info_needed"].includes(request.status)) return;
+    let stopped = false;
+    async function check() {
+      if (stopped || document.visibilityState !== "visible") return;
+      try {
+        const data = await call<{ request: { status: string } | null }>(
+          "/api/onboarding?status=eigen",
+        );
+        const next = data.request?.status;
+        if (!next || next === known.current) return;
+        known.current = next;
+        if (next === "approved") setStatus("approved");
+        // Rückfrage, Ablehnung oder neue Nachricht: frische Angaben vom Server.
+        else router.refresh();
+      } catch {
+        /* nächster Versuch beim nächsten Takt */
+      }
+    }
+    const timer = setInterval(check, 20000);
+    const onVisible = () => void check();
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [request.status, router]);
+
+  // Neue Serverdaten (router.refresh) übernehmen.
+  useEffect(() => {
+    known.current = request.status;
+    const timer = setTimeout(() => setStatus(request.status), 0);
+    return () => clearTimeout(timer);
+  }, [request.status]);
+
+  if (status === "approved")
+    return (
+      <section className="auth-card card flow" aria-live="polite">
+        <div className="flow-step">
+          <span className="icon-tile lime">
+            <PartyPopper />
+          </span>
+          <h1 ref={heading} tabIndex={-1}>
+            Dein Profil ist freigegeben.
+          </h1>
+          <p className="flow-lead">
+            {request.participantName
+              ? `„${request.participantName}“ gehört jetzt zu deinem Konto. Deine bisherigen Zahlen sind da.`
+              : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
+          </p>
+          <div className="flow-actions">
+            <Link className="btn primary full" href="/tagesabschluss">
+              Tagesabschluss eintragen
+            </Link>
+            <Link className="flow-link" href="/heute?modus=eigen">
+              Zu meinen Zahlen
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+
+  const closed = status === "rejected" || status === "superseded";
   const submitted = new Date(request.createdAt).toLocaleDateString("de-DE", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
-  const closed = ["rejected", "superseded"].includes(request.status);
+
   return (
-    <section className="auth-card card">
-      <span className={`icon-tile ${view.tone}`}>{view.icon}</span>
-      <h1>{view.title}</h1>
-      <p>{view.lead}</p>
+    <section className="auth-card card flow">
+      <div className="flow-step" key={status}>
+        <span className="icon-tile lime">
+          {status === "info_needed" ? (
+            <MessageCircleQuestion />
+          ) : closed ? (
+            <XCircle />
+          ) : (
+            <Clock />
+          )}
+        </span>
+        <h1 ref={heading} tabIndex={-1}>
+          {status === "info_needed"
+            ? "Rückfrage vom Team."
+            : status === "rejected"
+              ? "Diese Übernahme wurde nicht freigegeben."
+              : status === "superseded"
+                ? "Dieses Profil ist bereits zugeordnet."
+                : assign
+                  ? "E-Mail bestätigt. Das Team sucht dein Profil heraus."
+                  : "E-Mail bestätigt. Deine Profilübernahme wird geprüft."}
+        </h1>
+        <p className="flow-lead">
+          {status === "info_needed"
+            ? "Beantworte sie hier. Danach geht deine Anfrage zurück in die Prüfung."
+            : status === "rejected"
+              ? "Das Team konnte die Übernahme nicht bestätigen. Hier sind deine Möglichkeiten."
+              : status === "superseded"
+                ? "Ein anderes Konto wurde dafür freigegeben. Hier sind deine Möglichkeiten."
+                : "Freigeben kann nur das Team. Diese Seite zeigt die Entscheidung, sobald sie da ist."}
+        </p>
 
-      <ol className="request-steps" aria-label="Stand deiner Anfrage">
-        {steps(request.status).map((s) => (
-          <li key={s.label} data-state={s.state} aria-current={s.state === "current" ? "step" : undefined}>
-            <span aria-hidden="true">{s.state === "done" ? <Check size={14} /> : null}</span>
-            {s.label}
-          </li>
-        ))}
-      </ol>
+        <ol className="flow-steps" aria-label="Stand deiner Anfrage">
+          {steps(status, assign).map((s) => (
+            <li
+              key={s.label}
+              data-state={s.state}
+              aria-current={s.state === "current" ? "step" : undefined}
+            >
+              <span aria-hidden="true">{s.state === "done" ? <Check size={14} /> : null}</span>
+              {s.label}
+            </li>
+          ))}
+        </ol>
 
-      {request.participantName && (
-        <div className="onboarding-selected compact">
-          <span>Angefragtes Profil</span>
-          <strong>{request.participantName}</strong>
-        </div>
-      )}
-
-      {request.message && (
-        <div className="notice">
-          <strong>Nachricht vom Team</strong>
-          <p>{request.message}</p>
-        </div>
-      )}
-
-      {request.status === "info_needed" && <ClaimAnswer />}
-
-      {request.status === "pending" && request.lastAnswer && (
-        <div className="notice">
-          <strong>Deine Antwort ist beim Team.</strong>
-          <p>{request.lastAnswer}</p>
-        </div>
-      )}
-
-      {request.status === "pending" && (
-        <div className="notice">
-          <strong>Was jetzt passiert.</strong>
-          <p>
-            Das Team gleicht deine Angaben mit der Person ab, die es bereits
-            kennt. Nach der Freigabe trägst du neue Tage selbst ein; Korrekturen
-            an übernommenen Tagen laufen über das Team. Das öffentliche Ranking
-            kannst du schon jetzt ansehen.
-          </p>
-        </div>
-      )}
-
-      {closed && (
-        <div className="request-actions">
-          <Link className="btn primary full" href="/start?weiter=eigen">
-            Eigenes Profil anlegen
-          </Link>
-          <Link className="btn secondary full" href="/profil-uebernehmen">
-            Anderes Profil anfragen
-          </Link>
-        </div>
-      )}
-
-      <dl className="request-summary">
-        <div>
-          <dt>Angefragt am</dt>
-          <dd>{submitted}</dd>
-        </div>
-        <div>
-          <dt>Name</dt>
-          <dd>{request.fullName}</dd>
-        </div>
-        <div>
-          <dt>Bestätigte E-Mail</dt>
-          <dd>{request.email}</dd>
-        </div>
-        <div>
-          <dt>Telefon</dt>
-          <dd>{request.phone}</dd>
-        </div>
-        {request.hint && (
-          <div>
-            <dt>Zuordnungshilfe</dt>
-            <dd>{request.hint}</dd>
+        {request.participantName && (
+          <div className="flow-profile">
+            <div>
+              <span>Angefragtes Profil</span>
+              <strong>{request.participantName}</strong>
+            </div>
           </div>
         )}
-      </dl>
 
-      {!closed && (
-        <Link className="btn secondary full" href="/ranking">
-          Zum öffentlichen Ranking
-        </Link>
-      )}
+        {request.message && (
+          <div className="flow-notice">
+            <strong>Nachricht vom Team</strong>
+            <p>{request.message}</p>
+          </div>
+        )}
 
-      <div className="auth-note">
-        <ShieldCheck size={20} />
-        <span>
-          Eine bestätigte E-Mail allein gibt kein Profil frei. Das schützt die
-          Zahlen der Person, die bereits dahintersteht.
-        </span>
+        {status === "info_needed" && <ClaimAnswer />}
+
+        {status === "pending" && request.lastAnswer && (
+          <div className="flow-notice">
+            <strong>Deine Antwort liegt beim Team.</strong>
+            <p>{request.lastAnswer}</p>
+          </div>
+        )}
+
+        {status === "pending" && (
+          <p className="flow-body">
+            Bis dahin kannst du das öffentliche Ranking ansehen. Nach der Freigabe
+            trägst du neue Tage selbst ein.
+          </p>
+        )}
+
+        {closed && (
+          <div className="flow-choices">
+            <Link className="flow-option" href="/profil-uebernehmen">
+              <Search aria-hidden="true" />
+              <span>
+                <strong>Anderes Profil suchen</strong>
+                <small>Vielleicht stehen deine Zahlen unter einem anderen Namen.</small>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </Link>
+            <Link className="flow-option" href="/profil-uebernehmen?weg=team">
+              <UsersRound aria-hidden="true" />
+              <span>
+                <strong>Team um Zuordnung bitten</strong>
+                <small>Mit einem Hinweis, woran das Team dich erkennt.</small>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </Link>
+          </div>
+        )}
+        {closed && (
+          <p className="flow-small">
+            Du hast noch keine Zahlen hier?{" "}
+            <Link href="/start?weiter=eigen">Neues Profil anlegen</Link>
+          </p>
+        )}
+
+        <dl className="flow-summary">
+          <div>
+            <dt>Angefragt am</dt>
+            <dd>{submitted}</dd>
+          </div>
+          <div>
+            <dt>Name</dt>
+            <dd>{request.fullName}</dd>
+          </div>
+          <div>
+            <dt>Bestätigte E-Mail</dt>
+            <dd>{request.email}</dd>
+          </div>
+          <div>
+            <dt>Telefon (nicht geprüft)</dt>
+            <dd>{formatPhone(request.phone)}</dd>
+          </div>
+          {request.hint && (
+            <div>
+              <dt>Hinweis für das Team</dt>
+              <dd>{request.hint}</dd>
+            </div>
+          )}
+        </dl>
+
+        {!closed && (
+          <div className="flow-actions">
+            <Link className="flow-link" href="/ranking">
+              Zum öffentlichen Ranking
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   );

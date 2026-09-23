@@ -8,7 +8,9 @@ import RequestStatus from "../features/request-status";
 export const dynamic = "force-dynamic";
 
 /**
- * Prüfstatus der eigenen Übernahmeanfrage. Der Antragsteller sieht seine
+ * Prüfstatus der eigenen Übernahmeanfrage. Nach einer Freigabe geht es von
+ * hier direkt in den eigenen Bereich; eine offene Seite erkennt die Freigabe
+ * selbst (siehe RequestStatus). Der Antragsteller sieht seine
  * eigenen Angaben und den Stand, aber keine privaten Daten des ausgewählten
  * Profils — diese gibt erst die Freigabe frei.
  */
@@ -26,6 +28,7 @@ export default async function Page() {
       <main className="auth-layout">
         <RequestStatus
           request={{
+            kind: String(request.kind),
             status: String(request.status),
             fullName: String(request.fullName),
             email: String(request.email),

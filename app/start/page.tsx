@@ -10,6 +10,7 @@ import {
 } from "@/server/onboarding";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberOnboarding from "../features/member-onboarding";
+import { discordDestination } from "@/server/discord";
 export const dynamic = "force-dynamic";
 
 /**
@@ -67,11 +68,23 @@ export default async function Page({
   if (claim && ["rejected", "superseded"].includes(status) && search.weiter !== "eigen")
     redirect("/status");
 
+  // Nur fragen, was fehlt: eine Nummer liegt vor, wenn sie beim Start
+  // angegeben wurde; wer über „Anmelden“ mit neuer Adresse kam, hat keine.
+  const [contact] = await db.query("SELECT phone FROM account_private WHERE owner=$1", [
+    actor.userId,
+  ]);
+  const phone = (contact?.phone as string | undefined) || "";
+
   return (
     <div className="operator-site">
       <OperatorHeader />
       <main className="auth-layout">
-        <MemberOnboarding next={next} presetName={bound?.fullName || ""} />
+        <MemberOnboarding
+          next={next}
+          presetName={bound?.fullName || ""}
+          needsPhone={!phone}
+          discordUrl={discordDestination().url}
+        />
       </main>
       <OperatorFooter />
     </div>

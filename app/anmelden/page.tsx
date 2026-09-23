@@ -2,13 +2,15 @@ import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import AuthForm from "../features/auth-form";
 import { authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { databaseReady } from "@/server/database";
+import { emailCodeEnabled } from "@/server/email-auth";
 import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 /**
  * Anmeldung für bestehende Mitglieder. Bewusst getrennt vom Einstieg unter
  * /starten, damit niemand bei jeder Anmeldung erneut durch die Profilauswahl
- * geführt wird.
+ * geführt wird. Mit gültiger Sitzung gibt es keine Fehlermeldung, auch nicht
+ * nach einem zweiten Klick auf einen Maillink: es geht direkt zum Ziel.
  */
 export default async function Page({
   searchParams,
@@ -26,6 +28,7 @@ export default async function Page({
           ready={authReady() && databaseReady()}
           next={next}
           error={(search.fehler || "").slice(0, 20)}
+          codeEnabled={emailCodeEnabled()}
         />
       </main>
       <OperatorFooter />
