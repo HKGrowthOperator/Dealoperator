@@ -184,7 +184,8 @@ export function splitMessages(
       return;
     }
     m = PLAIN.exec(line);
-    if (m && !/\d/.test(m[1])) {
+    // „Anwahlen: 120“ unter einer Nachricht ist eine Folgezeile, kein Absender.
+    if (m && !/\d/.test(m[1]) && !(messages.length && NOT_A_NAME.test(m[1].trim()))) {
       messages.push({
         author: m[1].trim(),
         messageDay: currentDay,
@@ -274,6 +275,15 @@ const UNCERTAIN =
 const INCREMENT =
   /\b(?:noch|nochmal|weitere[rnms]?|zus(?:ä|ae)tzlich)\s+(?:ein|eine|einen|\d+)\b|\b\d+\.\s*(?:termin|setting|closing|deal)|\+\s*\d+\s*(?:termin|setting|closing|anwahl|call|deal)/i;
 
+const SEGMENT = /\n|(?<!\d),|,(?!\d)|[;|·]|\s+(?:und|sowie|plus)\s+/i;
+const ANY_METRIC = new RegExp(String.raw`(?:^|[\s,;(])(?:${PATTERNS.map((p) => p.words).join("|")})\b`, "iu");
+const ANY_NUMBER = new RegExp(String.raw`(?:^|[\s,;(])${NUMBER}\b`, "iu");
+/** Wörter, die am Zeilenanfang vor einem Doppelpunkt stehen, aber kein Name sind. */
+export const NOT_A_NAME = new RegExp(
+  String.raw`^(?:${PATTERNS.map((p) => p.words).join("|")}|heute|gestern|stand|update|zwischenstand|ergebnis|ergebnisse|zahlen|tagesabschluss|fazit|learning|learnings|wins?|energie|morgen|note|notiz)$`,
+  "iu",
+);
+
 function toNumber(token: string) {
   const lower = token.toLowerCase();
   return /^\d+$/.test(lower) ? Number(lower) : WORDS[lower];
@@ -290,25 +300,42 @@ export function readMetrics(text: string): {
   text = text.replace(/(?<![\d.,])(\d{1,3})((?:\.\d{3})+)(?![\d.,]?\d)/g, (_, head: string, groups: string) =>
     head + groups.replace(/\./g, ""),
   );
-  let rest = ` ${text.toLowerCase().replace(/\s+/g, " ")} `;
   const found = new Map<Metric, number[]>();
-  for (const { metric, words } of PATTERNS) {
-    // „20 Anwahlen“ und „Anwahlen: 20“ beide erkennen.
-    // Keine Zahl direkt nach „Ziffer + Komma/Punkt“ lesen: aus „1,5 Settings“
-    // darf nie „5 Settings“ werden.
-    const before = new RegExp(String.raw`(^|[\s,;(])(?<!\d[.,])${NUMBER}\s*(?:x\s*)?${words}\b`, "giu");
-    const after = new RegExp(String.raw`(^|[\s,;(])${words}\s*[:=]?\s*${NUMBER}\b`, "giu");
-    for (const re of [before, after]) {
-      // In beiden Mustern ist die Zahl die zweite Gruppe; die Wortgruppen
-      // sind bewusst nicht erfassend.
-      rest = rest.replace(re, (whole, lead: string, token: string) => {
-        const value = toNumber(token);
-        if (value === undefined) return whole;
-        found.set(metric, [...(found.get(metric) || []), value]);
-        // Erkannte Stelle entfernen, damit allgemeinere Muster sie nicht
-        // ein zweites Mal zählen.
-        return `${lead} `;
-      });
+  // Jede Zeile bzw. jeder Abschnitt für sich: „Anwahlen 120“ in einer Zeile
+  // und „Settings 2“ in der nächsten dürfen sich nicht vermischen. Kommas
+  // zwischen Ziffern („1,5“) trennen nicht.
+  for (const segment of text.split(SEGMENT)) {
+    let rest = ` ${segment.toLowerCase().replace(/\s+/g, " ")} `;
+    if (!rest.trim()) continue;
+    // Richtung aus dem Abschnittsanfang: beginnt er mit einer Kennzahl
+    // („Anwahlen 120“), steht die Zahl danach; beginnt er mit einer Zahl
+    // („120 Anwahlen“), steht sie davor. Sonst sind beide Formen erlaubt.
+    const firstMetric = rest.search(ANY_METRIC);
+    const firstNumber = rest.search(ANY_NUMBER);
+    const orientation =
+      firstMetric < 0 || firstNumber < 0
+        ? "both"
+        : firstMetric < firstNumber
+          ? "after"
+          : "before";
+    for (const { metric, words } of PATTERNS) {
+      // Keine Zahl direkt nach „Ziffer + Komma/Punkt“ lesen: aus „1,5 Settings“
+      // darf nie „5 Settings“ werden.
+      const before = new RegExp(String.raw`(^|[\s,;(])(?<!\d[.,])${NUMBER}\s*(?:x\s*)?${words}\b`, "giu");
+      const after = new RegExp(String.raw`(^|[\s,;(])${words}\s*[:=\-–]?\s*${NUMBER}\b`, "giu");
+      const forms = orientation === "before" ? [before] : orientation === "after" ? [after] : [before, after];
+      for (const re of forms) {
+        // In beiden Mustern ist die Zahl die zweite Gruppe; die Wortgruppen
+        // sind bewusst nicht erfassend.
+        rest = rest.replace(re, (whole, lead: string, token: string) => {
+          const value = toNumber(token);
+          if (value === undefined) return whole;
+          found.set(metric, [...(found.get(metric) || []), value]);
+          // Erkannte Stelle entfernen, damit allgemeinere Muster sie nicht
+          // ein zweites Mal zählen.
+          return `${lead} `;
+        });
+      }
     }
   }
   const metrics: Partial<Counts> = {};

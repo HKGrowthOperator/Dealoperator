@@ -248,3 +248,22 @@ test("thousand separators are whole numbers, not decimals", () => {
   assert.deepEqual(r.metrics, { attempts: 1200, settingsBooked: 3 });
   assert.equal(readMetrics("1.5 Settings").uncertain, true);
 });
+
+test("each line is read on its own: 'Anwahlen 120' above 'Settings 2' stays apart", () => {
+  assert.deepEqual(readMetrics("Anwahlen 120\nSettings 2").metrics, { attempts: 120, settingsBooked: 2 });
+  assert.deepEqual(readMetrics("Calls 80 Closings 1").metrics, { attempts: 80, closingsBooked: 1 });
+  assert.deepEqual(readMetrics("Anwahlen - 120\nSettings - 2").metrics, { attempts: 120, settingsBooked: 2 });
+  assert.deepEqual(readMetrics("120 Anwahlen 2 Settings").metrics, { attempts: 120, settingsBooked: 2 });
+});
+
+test("metric lines under a message are continuation lines, not new authors", () => {
+  const entries = parseWins({
+    text: ["Emil Test  18:56", "Anwahlen: 120", "Settings: 2"].join("\n"),
+    defaultDay: "2026-09-22",
+    directory,
+  });
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].participantId, "p-emil");
+  assert.deepEqual(entries[0].metrics, { attempts: 120, settingsBooked: 2 });
+  assert.equal(entries[0].status, "ok");
+});
