@@ -52,9 +52,9 @@ export const countsSchema = z.object({
 export type Counts = z.infer<typeof countsSchema>;
 export const emptyCounts = (): Counts =>
   Object.fromEntries(metrics.map((k) => [k, null])) as Counts;
-export function berlinDate() {
+export function berlinDate(now = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(
-    new Date(),
+    now,
   );
 }
 export const daySchema = z
@@ -68,6 +68,14 @@ export const daySchema = z
       v <= berlinDate()
     );
   }, "Wähle ein gültiges Datum, das nicht in der Zukunft liegt.");
+/** Gültiges Kalenderdatum, auch in der Zukunft (Pausen, geplante Events). */
+export const calendarDaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Bitte ein Datum im Format JJJJ-MM-TT angeben.")
+  .refine((v) => {
+    const t = Date.parse(v);
+    return Number.isFinite(t) && new Date(t).toISOString().slice(0, 10) === v;
+  }, "Bitte ein gültiges Datum angeben.");
 export const tracks = [
   {
     id: "dialer",
