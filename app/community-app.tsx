@@ -1064,7 +1064,7 @@ export default function CommunityApp({
         </div>
         <main className="main-content">
           <div className="signup-inline">
-            <p>Dein Fortschritt wird sichtbar.</p>
+            <p>Wo stehst du heute im Vergleich?</p>
             <Link href="/ranking">Ranking ansehen</Link>
           </div>
           {!demo && !signedIn ? (

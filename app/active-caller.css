@@ -50,6 +50,14 @@
   margin: 6px 0 0;
   font-size: 15px;
   line-height: 1.5;
+  color: #33445e;
+}
+.ac-card[data-active] p,
+.ac-card[data-active] strong {
+  color: #fff;
+}
+.ac-card[data-active] p {
+  color: #e3ecff;
 }
 .ac-progress {
   display: flex;
