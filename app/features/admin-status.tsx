@@ -188,11 +188,6 @@ const PARTS: { id: DiscordPart; title: string; text: string }[] = [
     text: "Mitglieder verbinden ihr Discord-Konto mit ihrem Deal-Operator-Konto (OAuth2, nur „identify“). Weiterleitung: /api/discord/callback an eurer Domain (APP_URL).",
   },
   {
-    id: "posts",
-    title: "Reflexionen als Beiträge",
-    text: "Freigegebene, vollständige Reflexionen erscheinen im Reflexions-Channel; Korrekturen aktualisieren den Beitrag.",
-  },
-  {
     id: "interactions",
     title: "Interaktionen aus Discord",
     text: "Befehle und Knöpfe in Discord. Interactions-Endpunkt: /api/discord/interactions an eurer Domain.",
@@ -201,6 +196,21 @@ const PARTS: { id: DiscordPart; title: string; text: string }[] = [
     id: "inventory",
     title: "Rollen und Channels lesen",
     text: "Liest vorhandene Rollen und Channels, damit ihr sie zuordnen könnt. Nur lesend.",
+  },
+  {
+    id: "sessions",
+    title: "Session-Räume",
+    text: "Für jede Session auf der Website entsteht ein Sprachkanal mit Chat und ein Discord-Event; der Link erscheint danach in der Session. Nach Absage oder Ende wird aufgeräumt. Optional DISCORD_SESSION_CATEGORY_ID für die Kategorie. Der Bot braucht „Kanäle verwalten“ und „Events verwalten“.",
+  },
+  {
+    id: "active",
+    title: "Rang „Aktiver Caller“",
+    text: "Wer 5 Calling-Tage am Stück mindestens 50 Anwahlen schafft, bekommt mit verknüpftem Discord-Konto die Rolle aus DISCORD_ACTIVE_ROLE_ID; nach 3 Calling-Tagen in Folge ohne Anwahlen wird sie wieder entzogen. Mit dieser Rolle sind Session-Räume nur für aktive Caller und Moderatoren betretbar.",
+  },
+  {
+    id: "moderators",
+    title: "Moderatorrolle",
+    text: "Admins und Moderatoren mit verknüpftem Discord-Konto bekommen die Rolle aus DISCORD_MODERATOR_ROLE_ID. Der Bot braucht „Rollen verwalten“, und seine Rolle muss über der Moderatorrolle stehen.",
   },
 ];
 const CHANNEL_TYPE: Record<number, string> = {
@@ -330,29 +340,13 @@ export function DiscordPanel({ status }: { status: DiscordStatus }) {
           </strong>{" "}
           verknüpfte Konten
         </span>
-        <span>
-          <strong className="adm-number">
-            {(status.postedReflections ?? 0).toLocaleString("de-DE")}
-          </strong>{" "}
-          Reflexionen mit Discord-Beitrag
-        </span>
-        <span>
-          <strong className="adm-number">
-            {(status.outbox?.pending ?? 0).toLocaleString("de-DE")}
-          </strong>{" "}
-          wartend in der Outbox
-        </span>
-        <span data-tone={status.outbox?.failed ? "danger" : undefined}>
-          <strong className="adm-number">
-            {(status.outbox?.failed ?? 0).toLocaleString("de-DE")}
-          </strong>{" "}
-          fehlgeschlagen
-        </span>
       </div>
       <p className="adm-hint">
-        Die Outbox sammelt Änderungen für Discord. Solange die Zugangsdaten
-        fehlen, wird daraus nichts übertragen.
+        Verknüpfte Konten bekommen im Discord ihre Ränge: „Aktiver Caller“ und,
+        fürs Team, „Moderator“. Tagesabschlüsse werden nicht im Discord geteilt.
       </p>
+
+      <RoomsBlock status={status} />
 
       <h3 className="adm-subhead">Rollen und Channels</h3>
       <div className="adm-actions">
@@ -425,5 +419,86 @@ export function DiscordPanel({ status }: { status: DiscordStatus }) {
         </div>
       )}
     </section>
+  );
+}
+
+type RoomsResult = {
+  configured: boolean;
+  missing?: string[];
+  busy?: boolean;
+  sessions?: { configured: boolean; created?: number; updated?: number; closed?: number; failed?: number };
+  roles?: { configured: boolean; added?: number; removed?: number; waiting?: number } | { error: string };
+  active?: { configured: boolean; added?: number; removed?: number; waiting?: number } | { error: string };
+};
+
+/** Session-Räume im Discord: Stand und Abgleich per Knopf. */
+function RoomsBlock({ status }: { status: DiscordStatus }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState<RoomsResult | null>(null);
+  const missing = status.missing?.sessions ?? [];
+  const rooms = status.rooms;
+  async function run() {
+    setBusy(true);
+    setError("");
+    try {
+      setResult(await adminPost<RoomsResult>("discordRooms"));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const s = result?.sessions;
+  const r = result?.roles && "configured" in result.roles ? result.roles : null;
+  const a = result?.active && "configured" in result.active ? result.active : null;
+  return (
+    <>
+      <h3 className="adm-subhead">Sessions im Discord</h3>
+      {rooms && (
+        <div className="adm-counts">
+          <span>
+            <strong className="adm-number">{rooms.withRoom.toLocaleString("de-DE")}</strong>{" "}
+            kommende Sessions mit Raum
+          </span>
+          <span data-tone={rooms.waiting ? "warn" : undefined}>
+            <strong className="adm-number">{rooms.waiting.toLocaleString("de-DE")}</strong>{" "}
+            warten auf ihren Raum
+          </span>
+          <span>
+            Letzter Abgleich:{" "}
+            <strong>{rooms.lastRun ? formatDateTime(rooms.lastRun) : "noch nie"}</strong>
+          </span>
+        </div>
+      )}
+      <div className="adm-actions">
+        <button className="btn primary" disabled={busy || missing.length > 0} onClick={() => void run()}>
+          {busy ? "Gleicht ab …" : "Jetzt mit Discord abgleichen"}
+        </button>
+        <span className="adm-hint">
+          {missing.length
+            ? `Erst möglich mit ${missing.join(" und ")}.`
+            : "Läuft zusätzlich alle 15 Minuten von selbst."}
+        </span>
+      </div>
+      <Feedback error={error} />
+      {result?.busy && (
+        <p className="adm-feedback" data-tone="warn" role="status">
+          Gerade läuft schon ein Abgleich. Bitte in ein paar Minuten noch einmal.
+        </p>
+      )}
+      {s?.configured && (
+        <p className="adm-feedback" data-tone={s.failed ? "warn" : "ok"} role="status">
+          {s.created ?? 0} Räume angelegt, {s.updated ?? 0} aktualisiert, {s.closed ?? 0} abgeräumt
+          {s.failed ? `, ${s.failed} fehlgeschlagen (Rechte des Bots prüfen)` : ""}.
+          {r?.configured
+            ? ` Moderatorrolle: ${r.added ?? 0} vergeben, ${r.removed ?? 0} entzogen${r.waiting ? `, ${r.waiting} noch nicht auf dem Server` : ""}.`
+            : " Moderatorrolle: DISCORD_MODERATOR_ROLE_ID fehlt."}
+          {a?.configured
+            ? ` Aktiver Caller: ${a.added ?? 0} vergeben, ${a.removed ?? 0} entzogen${a.waiting ? `, ${a.waiting} noch nicht auf dem Server` : ""}.`
+            : " Aktiver Caller: DISCORD_ACTIVE_ROLE_ID fehlt."}
+        </p>
+      )}
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import type { ActiveCaller } from "@/lib/active-caller";
 import type { Counts } from "@/lib/kpis";
 import { demoWorkflows, type WorkflowData } from "./workflow-data";
 export const views = [
@@ -43,7 +44,6 @@ export type Profile = {
   goal: number;
   days: number[];
   listed: boolean;
-  channel: string;
 };
 export type RecordDay = {
   date: string;
@@ -76,7 +76,13 @@ export type Session = {
   time: string;
   minutes: number;
   capacity: number;
-  url: string;
+  /** Früher selbst eingetragener Raum-Link; neue Sessions haben keinen mehr. */
+  url?: string;
+  /** Link in den Discord-Raum, sobald der Abgleich ihn angelegt hat. */
+  room?: string;
+  roomEvent?: string;
+  /** Von Admins oder Moderatoren angelegt. */
+  team?: boolean;
   host: string;
   owner: string;
   attendees: number;
@@ -100,6 +106,12 @@ export type AppData = WorkflowData & {
   bookmarks: string[];
   buddies: Buddy[];
   interest: boolean;
+  /** Treffpunkt Discord: Einladung und ob Session-Räume angelegt werden. */
+  discord?: { invite: string; rooms: boolean };
+  /** Admin oder Moderator: darf alle Sessions bearbeiten und absagen. */
+  viewerTeam?: boolean;
+  /** Rang „Aktiver Caller“ (lib/active-caller.ts). */
+  activeCaller?: ActiveCaller;
 };
 export const emptyProfile: Profile = {
   name: "",
@@ -110,7 +122,6 @@ export const emptyProfile: Profile = {
   goal: 200,
   days: [1, 2, 3, 4, 5],
   listed: false,
-  channel: "Discord",
 };
 export const demoProfile: Profile = {
   ...emptyProfile,
@@ -130,7 +141,6 @@ export const demoMembers: Member[] = [
     goal: 250,
     days: [1, 2, 3, 4, 5],
     listed: true,
-    channel: "Discord",
     color: "peach",
   },
   {
@@ -143,7 +153,6 @@ export const demoMembers: Member[] = [
     goal: 150,
     days: [1, 3, 5],
     listed: true,
-    channel: "Telegram",
     color: "blue",
   },
   {
@@ -156,7 +165,6 @@ export const demoMembers: Member[] = [
     goal: 200,
     days: [1, 2, 4, 5],
     listed: true,
-    channel: "Discord",
     color: "purple",
   },
   {
@@ -169,7 +177,6 @@ export const demoMembers: Member[] = [
     goal: 100,
     days: [2, 3, 4],
     listed: true,
-    channel: "Telegram",
     color: "green",
   },
 ];

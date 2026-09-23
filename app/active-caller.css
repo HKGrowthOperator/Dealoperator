@@ -1,0 +1,185 @@
+/* Rang „Aktiver Caller“ (app/features/active-caller-card.tsx). */
+.ac-card {
+  display: flex;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 16px 18px;
+  border: 1px solid #d5e1f3;
+  border-radius: 16px;
+  background: #ffffffe6;
+  color: #10294b;
+}
+.ac-card[data-active] {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0755f5, #0639bd);
+  color: #fff;
+  box-shadow: 0 10px 30px -18px #0755f5;
+}
+.ac-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: #eef3fb;
+  color: #52627b;
+}
+.ac-card[data-active] .ac-icon {
+  background: #ffffff26;
+  color: #fff;
+}
+.ac-kicker {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6a7a92;
+}
+.ac-card[data-active] .ac-kicker {
+  color: #d6e4ff;
+}
+.ac-card strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+  line-height: 1.3;
+}
+.ac-card p {
+  margin: 6px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.ac-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 10px;
+  font-size: 14px;
+  color: #4b5b73;
+}
+.ac-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+.ac-dots span {
+  width: 22px;
+  height: 8px;
+  border-radius: 99px;
+  background: #e1e8f3;
+}
+.ac-dots span[data-on] {
+  background: #0755f5;
+}
+.ac-warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-weight: 600;
+}
+.ac-card:not([data-active]) .ac-warn {
+  color: #9a5b00;
+}
+.ac-warn svg {
+  flex: none;
+  margin-top: 3px;
+}
+.ac-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 650;
+  color: #0755f5;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ac-card[data-compact] p {
+  font-size: 14px;
+}
+
+/* Sessions: geführter Weg in den Discord-Raum. */
+.session-where,
+.session-guide {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #d5e1f3;
+  border-radius: 14px;
+  background: #f4f8ff;
+  color: #10294b;
+}
+.session-where p {
+  margin: 4px 0 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.session-where > svg {
+  flex: none;
+  margin-top: 2px;
+  color: #0755f5;
+}
+.session-guide {
+  flex-direction: column;
+}
+.session-guide h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.session-guide ol {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+.session-guide li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+  counter-increment: step;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.session-guide li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 99px;
+  background: #0755f5;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+}
+.session-guide li[data-done]::before {
+  content: "✓";
+  background: #1f9d55;
+}
+.session-guide li > div {
+  display: grid;
+  gap: 8px;
+}
+.session-guide .btn {
+  justify-self: start;
+  min-height: 44px;
+}
+.session-locked {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fff7e6;
+  color: #6b4400;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.session-locked svg {
+  flex: none;
+  margin-top: 2px;
+}

@@ -102,12 +102,14 @@ export type ReviewCase = {
   applicable: boolean;
   aliasable: boolean;
 };
-export type DiscordPart = "link" | "posts" | "interactions" | "inventory";
+export type DiscordPart = "link" | "posts" | "interactions" | "inventory" | "sessions" | "moderators" | "active";
 export type DiscordStatus = {
   missing: Record<DiscordPart, string[]>;
   linkedAccounts: number;
   postedReflections: number;
   outbox: { pending: number; failed: number };
+  /** Kommende Sessions mit und ohne Discord-Raum, letzter Abgleich. */
+  rooms?: { withRoom: number; waiting: number; lastRun: string | null };
 };
 /** Registrierungen mit noch unbestätigter E-Mail. Keine Inbox-Einträge. */
 export type Unconfirmed = {
