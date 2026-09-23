@@ -114,8 +114,8 @@ export default function MemberOnboarding({
           <div className="flow-notice">
             <strong>Austausch auf Discord</strong>
             <p>
-              Fragen, Calls und Learnings teilen die Caller auf Discord. Kostenfrei
-              und freiwillig.{" "}
+              Im Discord trefft ihr euch zu Sessions und Roleplay und pusht euch
+              gegenseitig. Kostenfrei und freiwillig.{" "}
               <a href={discordUrl} target="_blank" rel="noopener noreferrer">
                 Discord öffnen
               </a>

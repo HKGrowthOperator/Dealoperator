@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, ExternalLink, LoaderCircle, MessageCircle, RefreshCw } from "lucide-react";
+import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
 import { shortMetricLabels } from "@/lib/kpis";
 import {
   ApiError,
@@ -17,8 +17,8 @@ import "../commitment.css";
 
 /*
  * Austausch der Reflexionen. Nur echte, vollständig eingereichte
- * Tagesabschlüsse. Keine lokale Antwortbox: Antworten laufen auf Discord,
- * und solange es dort keinen passenden Beitrag gibt, sagt die Karte das.
+ * Tagesabschlüsse. Keine Antwortbox und keine Beiträge im Discord: der ist
+ * für Sessions, Roleplay und die Ränge da.
  */
 
 export type ReflectionCard = {
@@ -121,24 +121,6 @@ function Card({ card }: { card: ReflectionCard }) {
         {/* Der Unterstützungswunsch geht nur an das Team, nie in den Austausch. */}
       </div>
 
-      <footer>
-        <a
-          className="btn secondary"
-          href={card.reply.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <MessageCircle size={16} aria-hidden="true" />
-          Antworten auf Discord
-          <ExternalLink size={14} aria-hidden="true" />
-        </a>
-        {card.reply.kind === "invite" && (
-          <small>
-            Zu diesem Abschluss gibt es noch keinen Discord-Beitrag. Über den Einladungslink kommst
-            du auf den Discord-Server und kannst dort antworten.
-          </small>
-        )}
-      </footer>
     </article>
   );
 }

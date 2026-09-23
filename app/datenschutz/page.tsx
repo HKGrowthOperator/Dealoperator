@@ -153,15 +153,14 @@ export default function Page() {
             des Links gilt deren Datenschutzerklärung.
           </p>
           <p>
-            Sobald der Betreiber sie eingerichtet hat, gibt es zwei freiwillige
-            Zusatzfunktionen: Du kannst dein Discord-Konto verknüpfen
-            (gespeichert werden Discord-ID und Discord-Name), und du kannst
-            einen eingereichten Tagesabschluss zusätzlich im Discord-Channel
-            teilen (Anzeigename, Tag, Energie, was gut lief, nächster Schritt,
-            Zahlen nur bei öffentlicher Anzeige, Unterstützungswünsche nie).
-            Dort liest jede Person mit, die auf dem Server ist. Ohne diese
-            ausdrückliche Wahl werden{" "}
-            <strong>keine</strong> Daten an Discord übertragen.
+            Sobald der Betreiber sie eingerichtet hat, gilt: Für jede Session
+            legt die Website im Discord einen Raum und ein Event an (Titel,
+            Format, Zeit, Dauer, Plätze und der Anzeigename der Person, die
+            sie anbietet). Freiwillig kannst du dein Discord-Konto verknüpfen
+            (gespeichert werden Discord-ID und Discord-Name); dann bekommst
+            du im Discord die Ränge „Aktiver Caller“ und, im Team,
+            „Moderator“. Tagesabschlüsse, Reflexionen, Zahlen und Kontaktdaten
+            werden <strong>nicht</strong> an Discord übertragen.
           </p>
         </section>
 

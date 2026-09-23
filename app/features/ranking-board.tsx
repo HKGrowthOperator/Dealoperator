@@ -167,7 +167,7 @@ const steps = [
   {
     icon: HeartHandshake,
     title: "Sich gegenseitig stützen",
-    text: "Lies die Learnings der anderen. Antworten kannst du auf Discord, wenn du magst.",
+    text: "Lies die Learnings der anderen. Im Discord trefft ihr euch zu Sessions und Roleplay und pusht euch gegenseitig.",
     reflections: true,
     discord: "Discord öffnen",
   },
@@ -1193,9 +1193,9 @@ export default function RankingBoard({
                         <p>
                           Angemeldet mit eigenem Profil und hinterlegter
                           Telefonnummer liest du unter Reflexionen, was bei
-                          anderen funktioniert hat. Antworten und die Suche
-                          nach einem Call-Partner gehen auf Discord, wenn du
-                          magst.
+                          anderen funktioniert hat. Im Discord findest du
+                          Call-Partner, Sessions und Roleplay, und du siehst,
+                          wer durchzieht.
                         </p>
                         <div className="rr-exchange-links">
                           <Link href="/reflexionen">Reflexionen lesen</Link>

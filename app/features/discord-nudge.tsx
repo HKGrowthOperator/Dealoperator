@@ -13,13 +13,13 @@ export default function DiscordNudge({
       link: "Discord öffnen",
     },
     reflection: {
-      title: "Ein Learning, das anderen helfen könnte?",
-      text: "Zusätzlich kannst du es auf Discord teilen oder dort auf Reflexionen antworten. Du entscheidest, was du teilst.",
+      title: "Im Discord pusht ihr euch gegenseitig.",
+      text: "Dort trefft ihr euch zu Sessions und Roleplay und seht, wer durchzieht. Deine Reflexion bleibt hier auf der Website.",
       link: "Discord öffnen",
     },
     community: {
-      title: "Zusätzlich kannst du auf Discord Feedback holen.",
-      text: "Frag nach Feedback zu einem Einwand, antworte auf Reflexionen oder such einen Call-Partner.",
+      title: "Im Discord gemeinsam dranbleiben.",
+      text: "Hol dir Feedback zu einem Einwand, triff dich zu Sessions und Roleplay oder such einen Call-Partner.",
       link: "Discord öffnen",
     },
   }[context];

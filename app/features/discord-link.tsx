@@ -111,8 +111,8 @@ export default function DiscordLink({
           <h2 id={`${uid}-title`}>Discord-Konto verknüpfen</h2>
         </div>
         <p className="cm-muted">
-          Optional, falls du Discord nutzt: Damit werden Antworten auf Discord und deine geteilten
-          Abschlüsse deinem Profil zugeordnet. Deine Kontaktdaten gehen dabei nicht an Discord.
+          Damit bekommst du im Discord automatisch deine Ränge, zum Beispiel „Aktiver Caller“,
+          und kommst in die Session-Räume. Deine Kontaktdaten gehen dabei nicht an Discord.
         </p>
       </header>
 
