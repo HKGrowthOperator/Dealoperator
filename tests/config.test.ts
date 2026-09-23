@@ -138,6 +138,7 @@ test("post-login targets prevent external redirects and authentication loops", (
     "https://evil.invalid",
     "/auth/callback",
     "/beitreten",
+    "/starten",
     "/start",
     "/%2f%2fevil.invalid",
     "/\\evil.invalid",

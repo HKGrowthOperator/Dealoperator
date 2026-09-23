@@ -78,7 +78,7 @@ In Supabase Auth:
 6. Link-Tracking des SMTP-Anbieters für Auth-Mails deaktivieren. Den Link im selben Browser öffnen, in dem er angefordert wurde, weil der PKCE-Verifier dort liegt. Bei Gerätewechsel erneut auf dem Zielgerät einen Link anfordern.
 7. Echte Zustellung, Link-Ablauf, ungültige Links und erneute Anmeldung testen. Die Standard-Supabase-Testzustellung ist keine fertig eingerichtete Community-Versandlösung.
 
-Nach bestätigter E-Mail führt `/auth/callback` zu `/start`. Bestehende Mitglieder gehen direkt in den gewünschten Bereich. Neue Konten entstehen nur über `/beitreten` („Ich bin neu“ oder „Meine Zahlen sind schon auf der Seite“); `/anmelden` legt keine Konten mehr an. Telefonnummern sind privat und nicht SMS-verifiziert; für den eigenen Tagesabschluss muss eine gültige Nummer mit Ländervorwahl hinterlegt sein. Ein Twilio-Konto wird nicht benötigt.
+Nach bestätigter E-Mail führt `/auth/callback` zu `/start`. Bestehende Mitglieder gehen direkt in den gewünschten Bereich. Neue Konten entstehen über `/starten` („Ich bin neu“ oder „Meine Zahlen sind schon auf der Seite“). Wer mit einer neuen Adresse „Anmelden“ nutzt, bekommt ebenfalls einen Link; nach der Bestätigung führt `/start` durch die Profileinrichtung, und das Team bekommt genau einen Hinweis. Die frühere Adresse `/beitreten` leitet mit allen Angaben auf `/starten` weiter. Telefonnummern sind privat und nicht SMS-verifiziert; für den eigenen Tagesabschluss muss eine gültige Nummer mit Ländervorwahl hinterlegt sein. Ein Twilio-Konto wird nicht benötigt.
 
 ## 4a. Erinnerungen, Team-Hinweise und Discord
 

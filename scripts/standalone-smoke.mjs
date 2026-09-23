@@ -45,7 +45,7 @@ try {
   for (const path of [
     "/",
     "/ranking",
-    "/beitreten",
+    "/starten",
     "/anmelden",
     "/verwaltung",
     "/heute?modus=demo",
@@ -87,6 +87,8 @@ try {
     ["/community?modus=eigen", "/so-funktionierts?modus=eigen"],
     ["/community", "/so-funktionierts"],
     ["/partnerregister?modus=eigen", "/so-funktionierts?modus=eigen#discord"],
+    ["/beitreten", "/starten"],
+    ["/beitreten?profil=abc&einladung=x&next=%2Fheute", "/starten?profil=abc&einladung=x&next=%2Fheute"],
   ]) {
     const response = await fetch(base + from, { redirect: "manual" });
     assert.equal(response.status, 307, from);
@@ -98,7 +100,7 @@ try {
     redirect: "manual",
   });
   assert.equal(retired.status, 307);
-  assert.ok(retired.headers.get("location")?.includes("/beitreten?profil=abc"));
+  assert.ok(retired.headers.get("location")?.includes("/starten?profil=abc"));
   // Öffentliche Profilsuche ohne Konfiguration: ehrlich leer statt Fehler.
   const search = await (await fetch(base + "/api/onboarding?q=test")).json();
   assert.equal(search.ready, false);

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Anmeldung für bestehende Mitglieder. Bewusst getrennt vom Einstieg unter
- * /beitreten, damit niemand bei jeder Anmeldung erneut durch die Profilauswahl
+ * /starten, damit niemand bei jeder Anmeldung erneut durch die Profilauswahl
  * geführt wird.
  */
 export default async function Page({

@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 /**
  * Altbestand: die direkte Profilübernahme gibt es nicht mehr. Alte Links —
  * auch aus früheren Einladungen — führen in den geprüften Ablauf unter
- * /beitreten, damit niemand die Teamfreigabe umgeht.
+ * /starten, damit niemand die Teamfreigabe umgeht.
  */
 export default async function Page({
   searchParams,
@@ -17,5 +17,5 @@ export default async function Page({
     params.set("profil", search.profil);
   if (search.einladung) params.set("einladung", search.einladung);
   const query = params.toString();
-  redirect(`/beitreten${query ? `?${query}` : ""}`);
+  redirect(`/starten${query ? `?${query}` : ""}`);
 }

@@ -23,7 +23,7 @@ import { authClient, authReady, getCurrentUser, safeNext } from "@/server/auth";
  */
 function back(base: string, reason: string) {
   const response = NextResponse.redirect(
-    new URL(`/beitreten?fehler=${reason}`, base),
+    new URL(`/starten?fehler=${reason}`, base),
   );
   response.headers.set("Cache-Control", "private, no-store");
   return response;
