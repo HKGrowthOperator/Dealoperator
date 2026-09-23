@@ -643,6 +643,22 @@
   margin-top: 12px;
   max-width: 560px;
 }
+.adm-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 8px;
+}
+.adm-days legend {
+  width: 100%;
+  margin-bottom: 4px;
+}
+.adm-days label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
 
 /* Wins-Vorschau */
 .adm-preview {
@@ -660,6 +676,7 @@
   border-left: 3px solid #e09a2d;
 }
 .adm-win[data-action="unverändert"],
+.adm-win[data-action="bekannt"],
 .adm-win[data-action="ersetzt"],
 .adm-win[data-action="übersprungen"] {
   background: #fafbfdcc;
