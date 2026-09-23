@@ -156,7 +156,8 @@ export type WinsAction =
   | "übersprungen"
   | "prüffall"
   | "bekannt"
-  | "ersetzt";
+  | "ersetzt"
+  | "ignoriert";
 export type WinsRow = {
   key: string | null;
   author: string;

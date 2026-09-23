@@ -101,7 +101,8 @@ export type WinsEntry = {
    * einer Person für einen Tag die Werte aller ihrer Meldungen für diesen Tag.
    */
   observations: Observation[];
-  status: "ok" | "review" | "superseded";
+  /** ignored: keine Kennzahl (Plaudern, Medien) — kein Prüffall, nichts übernommen. */
+  status: "ok" | "review" | "superseded" | "ignored";
   /** Art des Prüffalls; null, wenn kein Prüffall. */
   review: ReviewKind | null;
   /** Wählbare Leistungstage bei „Vortag oder heute?“; der erste ist der Vorschlag. */
@@ -829,7 +830,11 @@ export function parseWins({
       notes.push("„gestern“ steht nur im Text, nicht als Tagesangabe. Die Zahlen zählen für den Tag der Nachricht.");
     const key = m.author && aliasKeyOf ? aliasKeyOf(m.author) : null;
     const matches = m.author ? resolveAuthor(m.author, directory, key) : [];
-    if (!Object.keys(metrics).length) reasons.push("Keine Kennzahl erkannt.");
+    // Ohne Kennzahl (Plaudern, „Top!“, Medien) kein Prüffall — außer bei
+    // unsicheren Angaben wie „½ Termin“.
+    const chatter = !Object.keys(metrics).length && !uncertain && !increment;
+    if (chatter) notes.push("Keine Kennzahl erkannt — nicht übernommen.");
+    else if (!Object.keys(metrics).length) reasons.push("Keine Kennzahl erkannt.");
     if (conflicts.length)
       reasons.push(
         `Widersprüchliche Werte in einer Nachricht: ${conflicts.map(metricLabel).join(", ")}.`,
@@ -883,8 +888,8 @@ export function parseWins({
         line: m.line,
         correction,
       })),
-      status: reasons.length ? "review" : "ok",
-      review: !reasons.length
+      status: chatter ? "ignored" : reasons.length ? "review" : "ok",
+      review: chatter || !reasons.length
         ? null
         : !applicable
           ? "unclear"
@@ -898,7 +903,7 @@ export function parseWins({
       correction,
       identified: !personProblem,
       conflicts: [],
-      reasons,
+      reasons: chatter ? [] : reasons,
       notes,
       excerpt: m.text.replace(/\s*\n\s*/g, " · ").slice(0, 160),
       text: m.text,

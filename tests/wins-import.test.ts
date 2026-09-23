@@ -256,6 +256,8 @@ test("full chat re-paste: profiles stay, numbers land on the right day, late rep
     wa(d1, "18:30", "Emil Test", "Zahlen von heute:\nAnwahlen: 60"),
     wa(d1, "19:00", "Anna Beispiel", "20 Anwahlen"),
     wa(d1, "19:30", "+49 170 0000000", "10 Anwahlen"),
+    // Plaudern ohne Zahlen: kein Prüffall.
+    wa(d1, "19:45", "Anna Beispiel", "Top, weiter so! 💪"),
   ];
   const chatB = [
     wa(d1, "20:30", "Alex B.", "Korrektur: 40 Anwahlen, 1 Setting"),
@@ -347,4 +349,27 @@ test("duplicate display names: the alias decides, every time", async () => {
   assert.equal(next.preview.rows[0].participantId, second);
   assert.deepEqual(await counts(second, d1), { attempts: 45 });
   assert.equal(await counts(first, d1), null);
+});
+
+test("a dismissed conflict stays dismissed; a genuinely new conflict creates a new case", async () => {
+  const alex = await person("Alex B.");
+  const d1 = dayOffset(-2);
+  const chat = [
+    wa(d1, "18:00", "Alex B.", "50 Anwahlen"),
+    wa(d1, "21:00", "Alex B.", "30 Anwahlen"),
+    wa(d1, "21:05", "Anna Beispiel", "Top, weiter so!"),
+  ];
+  const first = await importChat(chat);
+  assert.equal(first.result.cases, 1);
+  assert.equal(first.preview.rows.find((r) => r.author === "Anna Beispiel")?.action, "ignoriert");
+  const [c] = await reviewCases(db, admin);
+  await resolveReviewCase(db, admin, { id: c.id, decision: "dismiss" });
+  const again = await importChat(chat);
+  assert.equal(again.result.cases, 0);
+  assert.equal(again.preview.rows.find((r) => r.review?.kind === "value")?.action, "bekannt");
+  assert.deepEqual(await counts(alex, d1), { attempts: 50 });
+  const newer = await importChat([...chat, wa(d1, "22:00", "Alex B.", "25 Anwahlen")]);
+  assert.equal(newer.result.cases, 1);
+  const open = (await reviewCases(db, admin)).filter((x) => x.status === "open");
+  assert.deepEqual(open.map((x) => [x.from, x.values]), [[{ attempts: 50 }, { attempts: 25 }]]);
 });

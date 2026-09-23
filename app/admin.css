@@ -678,6 +678,7 @@
 .adm-win[data-action="unverändert"],
 .adm-win[data-action="bekannt"],
 .adm-win[data-action="ersetzt"],
+.adm-win[data-action="ignoriert"],
 .adm-win[data-action="übersprungen"] {
   background: #fafbfdcc;
 }

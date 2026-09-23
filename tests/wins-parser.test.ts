@@ -112,7 +112,7 @@ test("the latest message per person and day wins; earlier interim states are not
   assert.equal(entries.find((e) => e.participantId === "p-anna")?.status, "ok");
 });
 
-test("review cases: unknown, ambiguous, joint, increment, no metric", () => {
+test("review cases: unknown, ambiguous, joint, increment; chatter without numbers is ignored", () => {
   const entries = parseWins({
     text: [
       "22.09.26, 10:00 - Niemand Bekannt: 10 Anwahlen",
@@ -124,12 +124,15 @@ test("review cases: unknown, ambiguous, joint, increment, no metric", () => {
     defaultDay: "2026-09-22",
     directory,
   });
-  assert.ok(entries.every((e) => e.status === "review"));
+  assert.ok(entries.slice(0, 4).every((e) => e.status === "review"));
   assert.match(entries[0].reasons.join(), /keinem Profil/);
   assert.match(entries[1].reasons.join(), /mehreren Profilen/);
   assert.match(entries[2].reasons.join(), /gemeinsame Meldung/);
   assert.match(entries[3].reasons.join(), /Zuwachs/);
-  assert.match(entries[4].reasons.join(), /Keine Kennzahl/);
+  // Plaudern ohne Zahlen ist kein Prüffall.
+  assert.equal(entries[4].status, "ignored");
+  assert.deepEqual(entries[4].reasons, []);
+  assert.match(entries[4].notes.join(" "), /Keine Kennzahl/);
 });
 
 test("performance day: a message after midnight belongs to the previous day", () => {
@@ -431,6 +434,18 @@ test("morning reports and 'Nachtrag' without a day are review cases with the pre
   assert.deepEqual([alexToday.day, alexToday.status, alexToday.metrics], ["2026-09-24", "ok", { attempts: 50 }]);
   assert.ok(alexToday.observations.every((o) => o.stamp !== "2026-09-24 08:10"));
   assert.deepEqual([emilNoon.day, emilNoon.status, emilNoon.metrics.attempts], ["2026-09-24", "ok", 45]);
+});
+
+test("chatter is ignored; unclear halves still become a review case", () => {
+  const entries = parse([
+    "[19:00, 23.9.2026] Anna Beispiel: Top, weiter so! 💪",
+    "[19:01, 23.9.2026] Emil Test: <Medien ausgeschlossen>",
+    "[19:02, 23.9.2026] Ben Muster: ½ Termin",
+  ]);
+  assert.deepEqual(
+    entries.map((e) => e.status),
+    ["ignored", "ignored", "review"],
+  );
 });
 
 test("an explicit alias beats duplicate display names", () => {

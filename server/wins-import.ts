@@ -71,7 +71,8 @@ export type WinsAction =
   | "übersprungen"
   | "prüffall"
   | "bekannt"
-  | "ersetzt";
+  | "ersetzt"
+  | "ignoriert";
 
 /** Was ein Prüffall trägt und was sich damit tun lässt. */
 export type CaseInfo = {
@@ -440,6 +441,12 @@ async function build(db: Database, text: string, day: string, now = new Date()):
     excerpt: redact(e.excerpt),
   });
   for (const e of entries) {
+    if (e.status === "ignored") {
+      built.push({
+        row: { ...base(e), key: null, action: "ignoriert", revision: 0, before: null, after: null, changed: [], reasons: [], review: null },
+      });
+      continue;
+    }
     if (e.status === "superseded") {
       built.push({
         row: { ...base(e), key: null, action: "ersetzt", revision: 0, before: null, after: pick(e.metrics), changed: [], reasons: e.reasons, review: null },
@@ -575,7 +582,7 @@ async function build(db: Database, text: string, day: string, now = new Date()):
   return built;
 }
 
-const ACTIONS: WinsAction[] = ["neu", "korrektur", "unverändert", "übersprungen", "prüffall", "bekannt", "ersetzt"];
+const ACTIONS: WinsAction[] = ["neu", "korrektur", "unverändert", "übersprungen", "prüffall", "bekannt", "ersetzt", "ignoriert"];
 
 export async function previewWins(db: Database, actor: Actor, raw: unknown) {
   requireAdmin(actor);

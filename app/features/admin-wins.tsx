@@ -59,6 +59,12 @@ const ACTIONS: { id: WinsAction; label: string; tone: Tone; hint: string }[] =
       hint: "Früherer Zwischenstand derselben Person. Eine spätere Meldung gilt, nichts wird addiert.",
     },
     {
+      id: "ignoriert",
+      label: "Ohne Zahlen",
+      tone: "muted",
+      hint: "Keine Kennzahl erkannt (Plaudern, Medien). Wird nicht übernommen und ist kein Prüffall.",
+    },
+    {
       id: "unverändert",
       label: "Unverändert",
       tone: "neutral",
@@ -101,8 +107,11 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
       )
     : [];
   const newCases = preview?.summary.prüffall ?? 0;
+  // „Alle“ ohne Nachrichten ohne Zahlen; die zeigt ihr eigener Filter.
   const shown = preview
-    ? preview.rows.filter((r) => filter === "alle" || r.action === filter)
+    ? preview.rows.filter((r) =>
+        filter === "alle" ? r.action !== "ignoriert" : r.action === filter,
+      )
     : [];
 
   async function runPreview(keepResult = false) {
@@ -252,7 +261,10 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
               aria-pressed={filter === "alle"}
               onClick={() => setFilter("alle")}
             >
-              Alle <strong>{fmt(preview.rows.length)}</strong>
+              Alle{" "}
+              <strong>
+                {fmt(preview.rows.filter((r) => r.action !== "ignoriert").length)}
+              </strong>
             </button>
             {ACTIONS.map((a) => (
               <button
@@ -266,7 +278,7 @@ export function WinsImport({ onCommitted }: { onCommitted: () => void }) {
               </button>
             ))}
           </div>
-          {preview.rows.length === 0 ? (
+          {preview.rows.every((r) => r.action === "ignoriert") && filter !== "ignoriert" ? (
             <p className="adm-empty">
               Im Text wurde keine Meldung erkannt. Prüfe, ob Name und Zahlen in
               einer Zeile stehen.
