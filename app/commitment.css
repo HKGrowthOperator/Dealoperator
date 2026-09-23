@@ -371,9 +371,17 @@
   font-size: 13.5px;
   font-weight: 500;
 }
+/* Alle Zahlenkästen einer Gruppe sind gleich hoch, egal wie ihre Texte
+   umbrechen: untereinander über gleich hohe Zeilen (1fr), nebeneinander
+   (ab 720 px) über ein gemeinsames Zeilenraster (subgrid, siehe unten). */
 .cm-counts {
   display: grid;
+  grid-auto-rows: 1fr;
   gap: 10px;
+}
+/* Eine Fehlermeldung verlängert nur ihren eigenen Kasten. */
+.cm-counts:has(.cm-field-error) {
+  grid-auto-rows: auto;
 }
 .cm-counts[hidden] {
   display: none;
@@ -1697,12 +1705,28 @@
   .cm-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  /* Nebeneinander: Jeder Kasten belegt drei gemeinsame Zeilen (Beschriftung,
+     Eingabe, Fehlermeldung). Die längste Beschriftung bestimmt die erste
+     Zeile für alle, so stehen die Eingaben auf einer Höhe und die Kästen
+     sind gleich hoch. Je Gruppe gibt es genau eine Reihe Kästen; die
+     Abstände innerhalb eines Kastens kommen deshalb aus Außenabständen. */
   .cm-counts {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    row-gap: 0;
   }
   .cm-count {
+    grid-row: span 3;
     grid-template-columns: minmax(0, 1fr);
-    align-content: start;
+    grid-template-rows: subgrid;
+    align-items: start;
+    row-gap: 0;
+  }
+  .cm-count label {
+    margin-bottom: 6px;
+  }
+  .cm-count .cm-field-error {
+    margin-top: 6px;
   }
   .cm-card .cm-count input {
     text-align: left;
