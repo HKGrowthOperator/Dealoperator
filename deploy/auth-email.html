@@ -22,16 +22,16 @@
 <p style="font-size:22px;font-weight:700;color:#0755f5;margin:0 0 30px">Deal Operator</p>
 {{ if eq .Data.onboarding_kind "claim" }}
 <h1 style="font-size:28px;line-height:1.25;margin:0 0 18px">Bestätige zuerst deine E-Mail.</h1>
-<p style="font-size:16px;line-height:1.7;color:#52647e">Du möchtest ein vorbereitetes Profil übernehmen. Bestätige mit einem Klick deine E-Mail-Adresse. <strong>Anschließend prüft das Deal-Operator-Team deine Anfrage</strong> und gibt dein Profil frei, sobald die Zuordnung eindeutig ist.</p>
+<p style="font-size:16px;line-height:1.7;color:#52647e">Du möchtest deine Zahlen aus dem Ranking übernehmen. Bestätige mit einem Klick deine E-Mail-Adresse. <strong>Anschließend prüft das Deal-Operator-Team deine Anfrage kurz</strong> und gibt die Zahlen frei, sobald die Zuordnung eindeutig ist.</p>
 <p style="margin:28px 0"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0755f5;color:#fff;text-decoration:none;padding:15px 22px;border-radius:8px;font-weight:700">E-Mail bestätigen</a></p>
 <p style="font-size:13px;line-height:1.7;color:#52647e">Dieser Link bestätigt ausschließlich deine E-Mail-Adresse. Er gibt noch kein Profil und keine Zahlen frei. Nach der Bestätigung siehst du den Stand deiner Anfrage auf der Website.</p>
 {{ else if eq .Data.onboarding_kind "new" }}
 <h1 style="font-size:28px;line-height:1.25;margin:0 0 18px">Willkommen bei Deal Operator.</h1>
-<p style="font-size:16px;line-height:1.7;color:#52647e">Bestätige deine E-Mail-Adresse und richte danach dein eigenes Profil ein. Deine Zahlen, deine Reflexionen und deine Call-Partner an einem Ort. Alles kostenfrei.</p>
+<p style="font-size:16px;line-height:1.7;color:#52647e">Bestätige deine E-Mail-Adresse und richte danach dein Profil ein. Dort hältst du deine Zahlen und Reflexionen fest.</p>
 <p style="margin:28px 0"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0755f5;color:#fff;text-decoration:none;padding:15px 22px;border-radius:8px;font-weight:700">E-Mail bestätigen</a></p>
 {{ else }}
 <h1 style="font-size:28px;line-height:1.25;margin:0 0 18px">Deine Zahlen. Dein nächster Schritt.</h1>
-<p style="font-size:16px;line-height:1.7;color:#52647e">Bestätige deine E-Mail und öffne deinen persönlichen Bereich. Dort hältst du deine Zahlen fest und bleibst mit deinen Call-Partnern dran.</p>
+<p style="font-size:16px;line-height:1.7;color:#52647e">Bestätige deine E-Mail und öffne deinen persönlichen Bereich. Dort hältst du deine Zahlen und Reflexionen fest.</p>
 <p style="margin:28px 0"><a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#0755f5;color:#fff;text-decoration:none;padding:15px 22px;border-radius:8px;font-weight:700">Bei Deal Operator anmelden</a></p>
 {{ end }}
 <p style="font-size:13px;line-height:1.7;color:#52647e">Öffne den Link im selben Browser, in dem du ihn angefordert hast. Der Link ist zeitlich begrenzt und nur einmal verwendbar. Deine Auswahl bleibt gespeichert, auch wenn der Link abläuft.</p>

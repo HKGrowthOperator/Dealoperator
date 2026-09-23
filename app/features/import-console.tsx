@@ -179,7 +179,7 @@ export default function ImportConsole({
             ein freigeschaltetes Verwaltungskonto nötig.
           </p>
           {!signedIn && (
-            <Link className="text-link" href="/beitreten?next=/verwaltung">
+            <Link className="text-link" href="/starten?next=/verwaltung">
               Als Verwaltung anmelden
             </Link>
           )}
@@ -367,7 +367,7 @@ export default function ImportConsole({
                           id: p.id,
                         });
                         setInvitation(
-                          `Dein Deal-Operator-Profil: ${window.location.origin}/profil-uebernehmen?profil=${p.id}\nPersönlicher Einmalcode: ${d.token}\nGültig für 7 Tage. Bitte nicht in der Gruppe teilen.`,
+                          `Deine Zahlen aus dem gemeinsamen Callen stehen im Ranking von Deal Operator. Wenn du sie selbst eintragen und korrigieren möchtest (freiwillig): ${window.location.origin}/profil-uebernehmen?profil=${p.id}\nDein persönlicher Code: ${d.token}, 7 Tage gültig. Der Code gilt nur für dich, bitte nicht weitergeben.`,
                         );
                       } catch (e) {
                         setMessage((e as Error).message);

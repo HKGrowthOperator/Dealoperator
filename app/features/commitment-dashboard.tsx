@@ -37,9 +37,9 @@ import "../commitment.css";
 const STATUS: Record<DayStatus, { label: string; legend: string }> = {
   called: { label: "Gecallt", legend: "Rechtzeitig mit Anwahlen" },
   reflected: { label: "Reflektiert", legend: "Rechtzeitig, ohne Anwahlen" },
-  late: { label: "Verspätet", legend: "Nach der Frist: Zahlen zählen, Serie nicht" },
-  missed: { label: "Fehlt", legend: "Frist vorbei, kein Abschluss" },
-  open: { label: "Offen", legend: "Frist läuft noch" },
+  late: { label: "Später", legend: "Später eingereicht: Zahlen zählen, Serie nicht" },
+  missed: { label: "Ohne Abschluss", legend: "Nachtragen geht jederzeit" },
+  open: { label: "Offen", legend: "Noch rechtzeitig möglich" },
   bonus: { label: "Bonus", legend: "Freiwillig am freien Tag" },
   free: { label: "Frei", legend: "Kein Calling-Tag" },
   paused: { label: "Pause", legend: "Bestätigte Pause" },
@@ -394,14 +394,15 @@ export default function CommitmentDashboard({
         <div className="cm-alert info">
           <Users size={18} aria-hidden="true" />
           <p>
-            Dir fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team fragt
-            kurz nach, ob alles passt. Nachtragen oder pausieren geht jederzeit.
+            Noch offen: {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team
+            fragt kurz nach, ob alles passt. Nachtragen geht jederzeit. Eine Pause meldest du
+            ab heute, für zurückliegende Tage sprich das Team an.
           </p>
         </div>
       ) : summary.missingOpen > 0 ? (
         <p className="cm-muted">
-          Es fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")} nach der Frist.
-          Nachgetragen zählen die Zahlen, die Serie beginnt mit dem nächsten rechtzeitig
+          Noch offen: {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Nachgetragen
+          zählen die Zahlen, die Serie beginnt mit dem nächsten rechtzeitig
           abgeschlossenen Tag neu.
         </p>
       ) : null}
@@ -498,7 +499,7 @@ export default function CommitmentDashboard({
                     {formatShortDay(d.day)} ·{" "}
                     {d.status === "open" && d.deadline
                       ? `rechtzeitig bis ${formatMoment(d.deadline, tz)}`
-                      : "Frist vorbei, Nachtragen zählt für die Zahlen"}
+                      : "Nachtragen zählt für die Zahlen"}
                   </span>
                   <Link className="btn secondary" href={`/tagesabschluss?tag=${d.day}`}>
                     {d.status === "open" ? "Abschließen" : "Nachtragen"}

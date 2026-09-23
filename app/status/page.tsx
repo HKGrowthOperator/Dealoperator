@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
 import { requestForActor } from "@/server/onboarding";
@@ -39,7 +39,7 @@ export default async function Page() {
           }}
         />
       </main>
-      <OperatorFooter />
+      <OperatorFooter showAdmin={isTeam(actor)} />
     </div>
   );
 }

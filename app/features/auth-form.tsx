@@ -104,7 +104,7 @@ export default function AuthForm({
         <span>
           Noch kein Konto?
           <br />
-          <Link href="/beitreten">Kostenfrei starten.</Link>
+          <Link href="/starten">Kostenfrei starten.</Link>
         </span>
       </div>
       <Link className="text-link" href="/ranking">

@@ -20,9 +20,9 @@ Vorschau: http://localhost:5173. Ohne Konfiguration bleibt die Anmeldung deaktiv
 - Öffentliche Rangliste: Zeitraum, Kennzahl, Suche, Profilfenster und gleiche Ränge bei gleichen Werten. Ausschließlich freigegebene Angaben, keine Kontaktfelder oder Reflexionen.
 - E-Mail-Anmeldung über Supabase Auth mit PKCE, bestätigter E-Mail und serverseitig erneuerter Sitzung. Abmeldung funktioniert unabhängig von der Datenbankverfügbarkeit.
 - Einstieg nach Bestätigung: vorbereitetes Profil übernehmen oder eigenes Profil anlegen. Zur E-Mail passende Importprofile werden angeboten; ein bewusster Neustart überschreibt sie nicht.
-- Eigene Zahlen, Reflexionen, persönliche Ziele, sichtbares Profil, Buddy-Anfragen und Nachrichten, Sessions und Wissensaustausch benötigen ein bestätigtes Konto. `?modus=demo` ist eine eigenständige Vorschau ohne echte Konten.
+- Eigene Zahlen, Reflexionen, persönliche Ziele, sichtbares Profil, Anfragen an Call-Partner und Nachrichten, Sessions und Wissensaustausch benötigen ein bestätigtes Konto.
 - Sieben getrennte KPIs, vier unabhängige Rangreihen, Korrekturen mit Revisionsprüfung und wiederholbare Speichervorgänge ohne Doppelzählung.
-- CSV-/JSON-Importvorschau, atomarer Betreiberimport und private Kontaktübersicht. Verwaltungsrechte stammen ausschließlich aus `OPERATOR_ADMIN_IDS`.
+- CSV-/JSON-Importvorschau, atomarer Betreiberimport und private Kontaktübersicht. Die feste Grundverwaltung kommt aus `OPERATOR_ADMIN_IDS` und lässt sich in der App nicht ändern. Weitere Admins und Moderatoren vergibt ein Admin unter Verwaltung → Team & Rollen (Tabelle `team_roles`, Migration 0004). Moderatoren bearbeiten Team-Inbox, Wins-Import, Prüffälle, Pausen und Übernahmen, aber keine Einstellungen, Rollen oder Kontaktliste. Team-Hinweise zu neuen Anmeldungen gehen als Push und E-Mail an alle Admins und Moderatoren.
 - Profilübernahme über bestätigte passende E-Mail oder einen zufälligen, einmal verwendbaren Code. Codes werden gehasht gespeichert, sind sieben Tage gültig und werden bei Neuausstellung widerrufen.
 - Kontextbezogene Links zum offiziellen Discord-Server: https://discord.gg/NjkFJtBkZm.
 - Blaues Erscheinungsbild, Original-D-Ausschnitt des bereitgestellten Logos, lokale Manrope-Schriften, Glaseffekte und dezente Animationen mit Unterstützung für reduzierte Bewegung. Sichtbarer Name ausschließlich Deal Operator; Wortwahl „kostenfrei“.
@@ -46,13 +46,13 @@ Das Repository ist vorbereitet; **eine erfolgreiche echte Anmeldung ist erst nac
 | Bereich                                 | Adresse                                                                                               |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Einstieg / Ranking                      | `/`, `/ranking`                                                                                       |
-| E-Mail-Anmeldung / Callback             | `/beitreten`, `/auth/callback`                                                                        |
+| E-Mail-Anmeldung / Callback             | `/starten`, `/auth/callback`                                                                        |
 | Profil einrichten / übernehmen          | `/start`, `/profil-uebernehmen`                                                                       |
 | Persönlicher Bereich                    | `/heute`, `/zahlen`, `/reflexion`, `/partner`, `/sessions`, `/wissen`, `/profil`, `/so-funktionierts` |
 | Verwaltung                              | `/verwaltung`                                                                                         |
 | Prozessstatus / Verbindungsbereitschaft | `/api/health`, `/api/ready`                                                                           |
 
-Frühere Adressen des persönlichen Bereichs leiten auf die neuen Pfade weiter. Routen des persönlichen Bereichs ohne `modus=demo` führen zur Anmeldung und anschließend in den eigenen Bereich. Kontaktinformationen sind weder im öffentlichen Ranking noch in der Website-Ausgabe der Startseite enthalten. Eine bestätigte E-Mail verifiziert die Kontrolle über diese Adresse, nicht die bürgerliche Identität; Telefonnummern sind freiwillig und nicht SMS-verifiziert.
+Frühere Adressen des persönlichen Bereichs leiten auf die neuen Pfade weiter. Routen des persönlichen Bereichs führen ohne Anmeldung zur Anmeldung und anschließend in den eigenen Bereich. Kontaktinformationen sind weder im öffentlichen Ranking noch in der Website-Ausgabe der Startseite enthalten. Eine bestätigte E-Mail verifiziert die Kontrolle über diese Adresse, nicht die bürgerliche Identität; Telefonnummern sind freiwillig und nicht SMS-verifiziert.
 
 ## Prüfen
 

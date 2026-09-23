@@ -13,6 +13,7 @@ const eslintConfig = defineConfig([
       "server/database.ts",
       "tests/operator.test.ts",
       "tests/daily-closing.test.ts",
+      "tests/team-roles.test.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },

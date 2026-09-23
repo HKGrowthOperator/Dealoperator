@@ -101,7 +101,7 @@ export default async function Page({
           <DiscordLink initial={link} result={one(search.discord)} />
         </div>
       </main>
-      <OperatorFooter />
+      <OperatorFooter showAdmin={isTeam(actor)} />
     </div>
   );
 }

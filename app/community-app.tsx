@@ -364,7 +364,7 @@ export default function CommunityApp({
     date: offset(1),
     time: "09:00",
     minutes: 50,
-    capacity: 8,
+    capacity: 2,
     url: "",
   });
   const [recordPeriod, setRecordPeriod] = useState("7");
@@ -567,7 +567,7 @@ export default function CommunityApp({
   }
   function own() {
     if (!signedIn) {
-      router.push("/beitreten");
+      router.push("/starten");
       return;
     }
     router.push("/heute?modus=eigen");
@@ -591,7 +591,7 @@ export default function CommunityApp({
       date: offset(1),
       time: "09:00",
       minutes: 50,
-      capacity: 8,
+      capacity: 2,
       url: "",
     });
     setModal("create-session");
@@ -1709,8 +1709,8 @@ export default function CommunityApp({
                   />
                   <div className="bottom-note">
                     <ShieldCheck size={17} />
-                    Deine Kontaktdaten bleiben bei dir. Ein Buddy-Kontakt
-                    startet mit einer bewussten Anfrage.
+                    Deine Kontaktdaten bleiben bei dir. Ein Kontakt zu einem
+                    Call-Partner startet mit einer bewussten Anfrage.
                   </div>
                 </>
               )}
@@ -1823,8 +1823,8 @@ export default function CommunityApp({
                       <Headphones size={23} />
                       <h3>Call-Block</h3>
                       <p>
-                        Mit Call-Partnern kurz einchecken. Danach führt jeder
-                        seine eigenen Calls.
+                        Zu zweit oder im kleinen Kreis zusätzlich callen. Den
+                        Ablauf stimmt ihr selbst ab.
                       </p>
                     </div>
                     <div>
@@ -1839,8 +1839,8 @@ export default function CommunityApp({
                       <Sparkles size={23} />
                       <h3>Reflexion</h3>
                       <p>
-                        Learnings teilen. Schwierigkeiten ansprechen. Den
-                        nächsten Schritt planen.
+                        Kurzer Rückblick mit deinem Call-Partner: Was lief gut,
+                        was probiert ihr als Nächstes?
                       </p>
                     </div>
                   </div>
@@ -1850,9 +1850,9 @@ export default function CommunityApp({
               {initialView === "wissen" && (
                 <>
                   <PageHeading
-                    eyebrow="WAS EINEM HILFT, BRINGT ALLE WEITER."
+                    eyebrow="AUS DEM CALL-ALLTAG."
                     title="Besser werden. Wissen teilen."
-                    text="Echte Erfahrungen anderer Caller und kurze Impulse für deinen nächsten Call-Block."
+                    text="Echte Erfahrungen anderer Caller und kurze Impulse für deine nächsten Calls."
                   />
                   <Tabs value={knowledgeTab} onValueChange={setKnowledgeTab}>
                     <TabsList>
@@ -2017,7 +2017,7 @@ export default function CommunityApp({
                         </p>
                       </section>
                       <section className="card padded requests">
-                        <h3>Deine Buddy-Anfragen</h3>
+                        <h3>Deine Call-Partner-Anfragen</h3>
                         {!data.buddies.length ? (
                           <p>
                             Noch keine Anfragen. Schau bei den Call-Partnern
@@ -2029,7 +2029,7 @@ export default function CommunityApp({
                               <strong>
                                 {b.incoming
                                   ? b.name
-                                  : `An ${b.peerName || "deinen Buddy"}`}
+                                  : `An ${b.peerName || "deinen Call-Partner"}`}
                               </strong>
                               <p>{b.message}</p>
                               <Tag>
@@ -2133,7 +2133,7 @@ export default function CommunityApp({
                       ],
                       [
                         "Austausch",
-                        "Lies die Reflexionen der anderen. Antworten kannst du zusätzlich auf Discord.",
+                        "Lies die Reflexionen der anderen. Antworten kannst du auf Discord, wenn du magst.",
                       ],
                     ].map(([title, text], i) => (
                       <div className="card padded" key={title}>
@@ -2154,8 +2154,8 @@ export default function CommunityApp({
                       <p>
                         <Check />
                         Urlaub, Krankheit und Pausen sind okay. Melde eine Pause
-                        im Tagesabschluss, dann zählen die Tage nicht für deine
-                        Serie. Das Team bestätigt sie kurz.
+                        im Tagesabschluss. Sobald das Team sie bestätigt, zählen
+                        diese Tage nicht, und deine Serie wartet so lange.
                       </p>
                       <p>
                         <Check />
@@ -2164,8 +2164,10 @@ export default function CommunityApp({
                       </p>
                       <p>
                         <Check />
-                        Fehlen einmal drei Abschlüsse, fragt das Team kurz nach,
-                        ob alles passt. Nachtragen oder pausieren geht jederzeit.
+                        Fehlen mehrere Abschlüsse, fragt das Team kurz nach, ob
+                        alles passt. Nachtragen geht jederzeit. Eine Pause
+                        meldest du ab heute, für zurückliegende Tage sprich das
+                        Team an.
                       </p>
                     </div>
                   </section>
@@ -2507,7 +2509,7 @@ export default function CommunityApp({
               </p>
               <button className="btn primary" disabled={saving}>
                 <Send size={17} />
-                {demo ? "Demo-Anfrage vormerken" : "Buddy-Anfrage senden"}
+                {demo ? "Demo-Anfrage vormerken" : "Anfrage senden"}
               </button>
             </form>
           ) : (
@@ -2587,7 +2589,7 @@ export default function CommunityApp({
                 onClick={() => setModal("buddy")}
               >
                 <MessageCircle size={17} />
-                Buddy-Anfrage starten
+                Call-Partner anfragen
               </button>
               <p className="privacy-note">
                 <ShieldCheck size={16} />
@@ -2630,10 +2632,10 @@ export default function CommunityApp({
               </div>
               <p>
                 {session.kind === "Call-Block"
-                  ? "Zum Start ein kurzer Check-in. Danach arbeitet jeder fokussiert an den eigenen Calls, zum Schluss teilt jeder ein Learning."
+                  ? "Ein zusätzlicher Block mit deinem Call-Partner. Wie ihr ihn gestaltet, stimmt ihr selbst ab."
                   : session.kind === "Roleplay"
                     ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Geübt wird im kleinen Kreis, mit konkretem und respektvollem Feedback."
-                    : "Was lief gut? Was war schwer? Teile einen Gedanken und nimm einen konkreten nächsten Schritt mit."}
+                    : "Kurzer Rückblick mit deinem Call-Partner: Was lief gut, was probiert ihr als Nächstes?"}
               </p>
               <button
                 className="btn primary full"

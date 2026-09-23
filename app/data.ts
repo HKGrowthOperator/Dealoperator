@@ -327,8 +327,8 @@ export const resources = [
     icon: "timer",
     content: [
       "Vorher: Lege deine Kontakte bereit, schließe Ablenkungen und entscheide dich für einen einzigen Übungsfokus.",
-      "5 Minuten Check-in: Was hast du dir vorgenommen? Danach 40 Minuten konzentriert arbeiten. Jeder führt seine eigenen Gespräche.",
-      "5 Minuten Rückblick: Wie viele Anwahlen und Termine waren es? Was hat funktioniert? Was änderst du beim nächsten Mal?",
+      "Leg kurz fest, was du dir vornimmst. Dann callst du 40 Minuten konzentriert.",
+      "Danach hältst du im Tagesabschluss Zahlen und ein Learning fest: Wie viele Anwahlen und Termine waren es? Was hat funktioniert? Was änderst du beim nächsten Mal?",
       "Ein schwieriger Tag zählt auch. Trage ehrlich ein, was passiert ist, und plane den nächsten realistischen Schritt. Kontinuität entsteht aus einer passenden Routine.",
     ],
   },

@@ -54,7 +54,7 @@ export default function BuddyInbox({
         <div>
           <span className="eyebrow">DEINE VERBINDUNGEN</span>
           <h2>
-            Buddys & Nachrichten{" "}
+            Call-Partner & Nachrichten{" "}
             {incoming > 0 && (
               <span className="count-badge">{incoming} neu</span>
             )}
@@ -163,7 +163,7 @@ export default function BuddyInbox({
           <Users size={25} />
           <h3>
             {filter === "Buddys"
-              ? "Deinen nächsten Buddy findest du unter Call-Partner."
+              ? "Weitere Call-Partner findest du im Bereich Call-Partner."
               : "Hier bist du auf dem aktuellen Stand."}
           </h3>
           <p>

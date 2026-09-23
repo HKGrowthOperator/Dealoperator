@@ -368,7 +368,7 @@ export function EligibilityChecklist({
     <div className="cm-checklist" role="region" aria-label="Voraussetzungen">
       <p className="cm-checklist-lead">
         {purpose === "feed"
-          ? "Die Reflexionen liest, wer diese Punkte erfüllt:"
+          ? "Zum Lesen der Reflexionen brauchst du:"
           : "Für einen eigenen Tagesabschluss fehlt noch:"}
       </p>
       <ol>
@@ -547,7 +547,7 @@ const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
     "Rechtzeitig mit Anwahlen: Der Tag zählt für deine Calling-Serie und deine Reflexions-Serie.",
   reflected:
     "Rechtzeitig ohne Anwahlen: Der Tag hält deine Reflexions-Serie. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
-  late: "Nach der Frist eingereicht: Deine Zahlen zählen, die Serien setzt dieser Tag nicht fort.",
+  late: "Später eingereicht: Deine Zahlen zählen, die Serien setzt dieser Tag nicht fort.",
   bonus:
     "Freiwilliger Abschluss an einem freien Tag: Deine Zahlen zählen, deine Serien bleiben davon unberührt.",
   "before-start":
@@ -968,7 +968,7 @@ export default function ClosingForm({
     if (deadline && nowMs < deadline.getTime())
       return `Calling-Tag. Rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
     if (deadline)
-      return `Die Frist für diesen Tag ist am ${formatMoment(deadline.toISOString(), tz)} abgelaufen. Deine Zahlen zählen trotzdem, für die Serien zählt der Tag nicht mehr.`;
+      return `Rechtzeitig war bis ${formatMoment(deadline.toISOString(), tz)}. Deine Zahlen zählen trotzdem, nur für die Serien zählt der Tag nicht mehr.`;
     return null;
   })();
 
@@ -1099,7 +1099,7 @@ export default function ClosingForm({
               <Lock size={14} aria-hidden="true" /> Übernommen
             </>
           ) : due ? (
-            status === "missed" ? "Frist vorbei" : status === "open" ? "Frist läuft" : "Calling-Tag"
+            status === "missed" ? "Nachtragen möglich" : status === "open" ? "Noch offen" : "Calling-Tag"
           ) : paused ? (
             "Pause"
           ) : (

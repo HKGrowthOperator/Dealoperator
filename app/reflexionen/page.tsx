@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Eye, PenLine, MessageCircle } from "lucide-react";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { reflectionFeed } from "@/server/reflections";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
@@ -66,8 +66,8 @@ export default async function Page() {
               Team.
             </p>
             <p>
-              <MessageCircle size={15} aria-hidden="true" /> Antworten kannst du zusätzlich auf
-              Discord, über den Knopf an jeder Karte. Hier gibt es bewusst kein Antwortfeld.
+              <MessageCircle size={15} aria-hidden="true" /> Antworten ist optional und geht über
+              Discord, mit dem Knopf an jeder Karte. Hier gibt es bewusst kein Antwortfeld.
             </p>
           </section>
         </div>
@@ -90,7 +90,7 @@ export default async function Page() {
               <Link className="btn primary" href="/anmelden?next=%2Freflexionen">
                 Anmelden
               </Link>
-              <Link className="btn secondary" href="/beitreten">
+              <Link className="btn secondary" href="/starten">
                 Registrieren
               </Link>
             </div>
@@ -104,7 +104,7 @@ export default async function Page() {
           </section>
         )}
       </main>
-      <OperatorFooter />
+      <OperatorFooter showAdmin={isTeam(actor)} />
     </div>
   );
 }

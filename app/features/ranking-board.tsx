@@ -169,7 +169,7 @@ const steps = [
   {
     icon: HeartHandshake,
     title: "Sich gegenseitig stützen",
-    text: "Lies die Learnings der anderen. Antworten kannst du zusätzlich auf Discord.",
+    text: "Lies die Learnings der anderen. Antworten kannst du auf Discord, wenn du magst.",
     reflections: true,
     discord: "Discord öffnen",
   },
@@ -455,7 +455,7 @@ export default function RankingBoard({
                 </a>
               </div>
               <p className="rr-intro-note">
-                Neu hier? <Link href="/beitreten">Kostenfrei starten</Link>
+                Neu hier? <Link href="/starten">Kostenfrei starten</Link>
               </p>
             </div>
             <ol
@@ -1041,10 +1041,7 @@ export default function RankingBoard({
                                   )}
                                 </strong>
                                 <small>
-                                  {row.company ||
-                                    (row.claimed
-                                      ? "Caller"
-                                      : "Profil vorbereitet")}
+                                  {row.company || "Caller"}
                                 </small>
                               </span>
                               <span className="rr-rank-value">
@@ -1210,10 +1207,11 @@ export default function RankingBoard({
                         </span>
                         <h3>Learnings teilen, Call-Partner finden.</h3>
                         <p>
-                          Mit eigenem Profil liest du unter Reflexionen, was
-                          bei anderen funktioniert hat. Antworten und die Suche
-                          nach einem Call-Partner sind zusätzlich auf Discord
-                          möglich.
+                          Angemeldet mit eigenem Profil und hinterlegter
+                          Telefonnummer liest du unter Reflexionen, was bei
+                          anderen funktioniert hat. Antworten und die Suche
+                          nach einem Call-Partner gehen auf Discord, wenn du
+                          magst.
                         </p>
                         <div className="rr-exchange-links">
                           <Link href="/reflexionen">Reflexionen lesen</Link>
@@ -1236,15 +1234,15 @@ export default function RankingBoard({
                   <ShieldCheck size={27} />
                 </div>
                 <div>
-                  <h2>Das sind deine Zahlen?</h2>
+                  <h2>Deine Zahlen stehen schon im Ranking?</h2>
                   <p>
-                    Wähle dein vorbereitetes Profil aus. Nach E-Mail-Bestätigung
-                    und Freigabe durch das Team machst du mit deiner
-                    bisherigen Historie weiter.
+                    Wenn du sie selbst eintragen und korrigieren möchtest,
+                    kannst du sie übernehmen, nach E-Mail-Bestätigung und
+                    kurzer Prüfung durch das Team.
                   </p>
                 </div>
-                <Link className="btn primary" href="/beitreten">
-                  Mein Profil auswählen
+                <Link className="btn primary" href="/starten">
+                  Zahlen übernehmen
                 </Link>
               </section>
             </>
@@ -1340,7 +1338,7 @@ export default function RankingBoard({
                 !selected.claimed && (
                   <Link
                     className="btn primary"
-                    href={`/beitreten?profil=${encodeURIComponent(selected.id)}`}
+                    href={`/starten?profil=${encodeURIComponent(selected.id)}`}
                   >
                     <Check size={17} />
                     Das sind meine Zahlen

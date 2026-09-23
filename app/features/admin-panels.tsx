@@ -316,8 +316,8 @@ function stateInfo(item: InboxItem): {
   }
   if (item.kind === "pause") {
     if (item.state === "requested")
-      return { label: "Beantragt", tone: "action" };
-    if (item.state === "approved") return { label: "Freigegeben", tone: "ok" };
+      return { label: "Gemeldet", tone: "action" };
+    if (item.state === "approved") return { label: "Bestätigt", tone: "ok" };
     if (item.state === "rejected") return { label: "Abgelehnt", tone: "muted" };
   }
   if (item.kind === "help")
@@ -403,7 +403,7 @@ function InboxPanel({
             item.state === "requested" &&
             !item.resolved && (
               <button className="btn primary" onClick={() => onGo("pausen")}>
-                Antrag entscheiden
+                Pause entscheiden
               </button>
             )}
           {item.kind === "review" && !item.resolved && (
@@ -514,8 +514,8 @@ function InboxPanel({
 // Pausen
 
 const PAUSE_STATUS: Record<string, { label: string; tone: Tone }> = {
-  requested: { label: "Beantragt", tone: "action" },
-  approved: { label: "Freigegeben", tone: "ok" },
+  requested: { label: "Gemeldet", tone: "action" },
+  approved: { label: "Bestätigt", tone: "ok" },
   rejected: { label: "Abgelehnt", tone: "muted" },
 };
 
@@ -620,7 +620,7 @@ function PausesPanel({
         <div>
           <h2 id="adm-pauses-title">Pausen</h2>
           <p>
-            Freigegebene Pausen zählen nicht als Calling-Tage: keine
+            Bestätigte Pausen zählen nicht als Calling-Tage: keine
             Erinnerung, kein Serienverlust, keine Teamprüfung. Die Frist
             verschiebt sich auf den nächsten Calling-Tag danach.
           </p>
