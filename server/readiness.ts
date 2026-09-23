@@ -1,5 +1,7 @@
 import type { Database } from "./database";
 import { configurationIssues } from "./config";
+import { mailConfigIssues } from "./mailer";
+import { discordMissing } from "./discord-bridge";
 
 export const requiredTables = [
   "profiles",
@@ -22,6 +24,21 @@ export const requiredTables = [
   "entitlements",
   "relationships",
   "intro_requests",
+  // Migration 0003: Tagesabschluss, Dranbleiben, Benachrichtigungen, Discord.
+  "checkin_drafts",
+  "pauses",
+  "app_settings",
+  "events",
+  "app_secrets",
+  "push_subscriptions",
+  "notification_prefs",
+  "notifications",
+  "notification_deliveries",
+  "team_inbox",
+  "discord_links",
+  "discord_posts",
+  "participant_aliases",
+  "import_review_cases",
 ];
 
 export async function inspectDatabase(db: Database) {
@@ -37,7 +54,16 @@ export async function inspectDatabase(db: Database) {
   if (missing.length)
     throw Error("Datenbankschema oder Serverberechtigungen fehlen.");
   // Also verify access through RLS and the runtime search path without reading member data.
-  await db.query("SELECT id FROM participants LIMIT 0");
+  await db.query("SELECT id,eligible_since FROM participants LIMIT 0");
+  // Spalten aus Migration 0003, ohne Inhalte zu lesen.
+  await db.query(
+    "SELECT origin,first_submitted_at,submitted_at,shared,discord_share,calls_documented_at FROM checkins LIMIT 0",
+  );
+  const [seq] = await db.query<{ ok: boolean }>(
+    `SELECT has_sequence_privilege(current_user,'operator.notifications_id_seq','USAGE')
+        AND has_sequence_privilege(current_user,'operator.team_inbox_id_seq','USAGE') AS ok`,
+  );
+  if (!seq?.ok) throw Error("Serverberechtigungen für Zähler fehlen.");
   return true;
 }
 
@@ -47,10 +73,17 @@ export async function readiness(
 ) {
   if (configurationIssues(env).length)
     return { ready: false, configuration: false, database: false };
+  // Nur ja/nein, keine Werte: ob Zusatzdienste eingerichtet sind. Sie
+  // entscheiden nicht über die Bereitschaft der Website.
+  const services = {
+    teamMail: mailConfigIssues(env as NodeJS.ProcessEnv).length === 0,
+    discordLink: discordMissing("link", env as NodeJS.ProcessEnv).length === 0,
+    discordPosts: discordMissing("posts", env as NodeJS.ProcessEnv).length === 0,
+  };
   try {
     await inspectDatabase(db());
-    return { ready: true, configuration: true, database: true };
+    return { ready: true, configuration: true, database: true, services };
   } catch {
-    return { ready: false, configuration: true, database: false };
+    return { ready: false, configuration: true, database: false, services };
   }
 }
