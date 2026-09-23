@@ -359,6 +359,7 @@ type Row = {
   attempts: number;
   claimed_at: string;
   created_at: string;
+  detail: string;
 };
 
 const DEFER_MINUTES = 15;
@@ -388,7 +389,7 @@ export async function dispatch(
              OR (status='sending' AND claimed_at < now()-interval '10 minutes'))
            AND attempts < 5
          ORDER BY created_at LIMIT 20 FOR UPDATE SKIP LOCKED)
-      RETURNING id,dedupe_key,recipient,channel,kind,ref,title,body,url,not_after,attempts,claimed_at,created_at`,
+      RETURNING id,dedupe_key,recipient,channel,kind,ref,title,body,url,not_after,attempts,claimed_at,created_at,detail`,
   )) as Row[];
   let sent = 0;
   for (const n of claimed) {
@@ -407,7 +408,12 @@ export async function dispatch(
     const team = n.kind.startsWith("team:");
     try {
       if (n.not_after && new Date(n.not_after) < now) {
-        await finish("skipped", "Zu spät für diesen Hinweis — nicht mehr zugestellt.");
+        // Den letzten Wartegrund behalten, damit sichtbar bleibt, warum der
+        // Hinweis nie hinausging (z. B. E-Mail-Versand nicht eingerichtet).
+        await finish(
+          "skipped",
+          `Zu spät für diesen Hinweis — nicht mehr zugestellt.${n.detail ? ` Zuletzt: ${n.detail}` : ""}`,
+        );
         continue;
       }
       const reason = await recheck(db, n);
@@ -442,7 +448,7 @@ export async function dispatch(
         await finish("sent", outcome.detail);
         sent++;
       } else if (team && outcome.noDevice) await defer(outcome.detail);
-      else await finish("skipped", outcome.detail);
+      else await finish(outcome.failed ? "failed" : "skipped", outcome.detail);
     } catch (error) {
       const message = (error as Error).message;
       if (n.attempts >= 5) await finish("failed", message);
@@ -494,14 +500,21 @@ async function pushToOwner(
     [n.recipient, vapid.publicKey],
   );
   if (!subs.length)
-    return { delivered: false, noDevice: true, detail: "Kein Gerät mit Push-Zustimmung hinterlegt." };
+    return {
+      delivered: false,
+      noDevice: true,
+      failed: false,
+      detail: "Kein Gerät mit Push-Zustimmung hinterlegt.",
+    };
   // Nicht länger beim Push-Dienst liegen lassen, als der Hinweis sinnvoll ist.
   const ttl = Math.max(
     60,
     Math.min(6 * 3600, n.not_after ? Math.floor((new Date(n.not_after).getTime() - now.getTime()) / 1000) : 6 * 3600),
   );
   let delivered = 0,
-    already = 0;
+    already = 0,
+    unclear = 0,
+    gone = 0;
   const errors: string[] = [];
   for (const s of subs) {
     // Vor dem Senden festschreiben. Gibt es die Zeile schon, wurde an dieses
@@ -512,7 +525,15 @@ async function pushToOwner(
       [n.id, s.id],
     );
     if (!fresh.length) {
-      already++;
+      // Nur ein bestätigter früherer Versand zählt. Ein abgebrochener Versuch
+      // wird nicht wiederholt (höchstens einmal je Gerät), gilt aber auch
+      // nicht als übergeben.
+      const [prior] = await db.query(
+        "SELECT status FROM notification_deliveries WHERE notification_id=$1 AND subscription_id=$2",
+        [n.id, s.id],
+      );
+      if (prior?.status === "sent") already++;
+      else unclear++;
       continue;
     }
     try {
@@ -540,13 +561,14 @@ async function pushToOwner(
       );
     } catch (error) {
       const status = (error as { statusCode?: number }).statusCode;
-      const gone = status === 404 || status === 410;
+      const ended = status === 404 || status === 410;
+      if (ended) gone++;
       await db.query(
         "UPDATE notification_deliveries SET status=$3 WHERE notification_id=$1 AND subscription_id=$2",
-        [n.id, s.id, gone ? "gone" : "failed"],
+        [n.id, s.id, ended ? "gone" : "failed"],
       );
       // 404/410: das Gerät hat das Abonnement beendet.
-      if (gone)
+      if (ended)
         await db.query("UPDATE push_subscriptions SET disabled_at=now() WHERE id=$1", [s.id]);
       else
         await db.query(
@@ -556,14 +578,20 @@ async function pushToOwner(
       errors.push(String(status || (error as Error).message).slice(0, 60));
     }
   }
+  const anyDelivered = delivered > 0 || already > 0;
   return {
-    delivered: delivered > 0 || already > 0,
-    noDevice: false,
+    delivered: anyDelivered,
+    // Alle Geräte haben ihr Abo beendet: wie „kein Gerät“ behandeln, damit
+    // ein Team-Hinweis auf ein neu eingerichtetes Gerät warten kann.
+    noDevice: !anyDelivered && gone > 0 && gone === subs.length,
+    failed: !anyDelivered,
     detail: delivered
       ? `${delivered} Gerät(e)`
       : already
         ? "Bereits zugestellt; kein zweiter Versand."
-        : `Zustellung fehlgeschlagen: ${errors.join(", ")}`,
+        : unclear && !errors.length
+          ? "Zustellung unklar: der Versand wurde unterbrochen, kein zweiter Versand."
+          : `Zustellung fehlgeschlagen: ${errors.join(", ") || "unklar"}`,
   };
 }
 
@@ -582,6 +610,8 @@ export type DeliveryState =
   | "waiting_address"
   | "retrying"
   | "queued"
+  | "expired_config"
+  | "expired_device"
   | "expired"
   | "skipped"
   | "failed";
@@ -593,6 +623,8 @@ export const DELIVERY_LABEL: Record<DeliveryState, string> = {
   waiting_address: "wartet, keine bestätigte Adresse",
   retrying: "wartet auf erneuten Versuch",
   queued: "in der Warteschlange",
+  expired_config: "abgelaufen, E-Mail-Versand war nicht eingerichtet",
+  expired_device: "abgelaufen, kein Gerät mit Push eingerichtet",
   expired: "abgelaufen, nicht zugestellt",
   skipped: "nicht gesendet",
   failed: "fehlgeschlagen",
@@ -606,55 +638,80 @@ type DeliveryRow = {
   recipient: string;
 };
 
+/**
+ * Öffentlicher VAPID-Schlüssel, ohne einen neuen zu erzeugen. Geräte zählen
+ * nur, wenn sie diesem Schlüssel zugestimmt haben (wie beim Versand).
+ */
+async function currentVapidKey(db: Database) {
+  if (process.env.VAPID_PUBLIC_KEY?.trim() && process.env.VAPID_PRIVATE_KEY?.trim())
+    return process.env.VAPID_PUBLIC_KEY.trim();
+  const [stored] = await db.query("SELECT 1 FROM app_secrets WHERE key='vapid'");
+  return stored ? (await vapidKeys(db)).publicKey : "";
+}
+/** Dieselbe Bedingung wie in pushToOwner. */
+const USABLE_DEVICE = "disabled_at IS NULL AND (vapid_key=$1 OR vapid_key='')";
+
+export function deliveryState(
+  r: DeliveryRow,
+  ctx: { mailMissing: boolean; hasDevice: boolean },
+): DeliveryState {
+  const detail = r.detail || "";
+  if (r.status === "sent") return "delivered";
+  if (r.status === "failed" || detail.startsWith("Zustellung fehlgeschlagen")) return "failed";
+  if (r.status === "skipped") {
+    if (!detail.startsWith("Zu spät")) return "skipped";
+    if (/RESEND_API_KEY|NOTIFY_FROM/.test(detail)) return "expired_config";
+    if (detail.includes("Kein Gerät")) return "expired_device";
+    return "expired";
+  }
+  if (r.channel === "email")
+    return ctx.mailMissing
+      ? "waiting_config"
+      : detail.startsWith("Noch keine bestätigte Adresse")
+        ? "waiting_address"
+        : Number(r.attempts) > 0
+          ? "retrying"
+          : "queued";
+  return !ctx.hasDevice ? "waiting_device" : Number(r.attempts) > 0 ? "retrying" : "queued";
+}
+
 export async function deliveryStates<T extends DeliveryRow>(db: Database, rows: T[]) {
   const recipients = [...new Set(rows.filter((r) => r.channel === "push").map((r) => r.recipient))];
+  const key = recipients.length ? await currentVapidKey(db) : "";
   const withDevice = new Set(
     recipients.length
       ? (
           await db.query(
             `SELECT DISTINCT owner FROM push_subscriptions
-              WHERE disabled_at IS NULL AND owner = ANY($1::text[])`,
-            [recipients],
+              WHERE ${USABLE_DEVICE} AND owner = ANY($2::text[])`,
+            [key, recipients],
           )
         ).map((r) => r.owner as string)
       : [],
   );
   const mailMissing = mailConfigIssues().length > 0;
-  return rows.map((r) => {
-    let state: DeliveryState;
-    if (r.status === "sent") state = "delivered";
-    else if (r.status === "failed") state = "failed";
-    else if (r.status === "skipped")
-      state = (r.detail || "").startsWith("Zu spät") ? "expired" : "skipped";
-    else if (r.channel === "email")
-      state = mailMissing
-        ? "waiting_config"
-        : (r.detail || "").startsWith("Noch keine bestätigte Adresse")
-          ? "waiting_address"
-          : Number(r.attempts) > 0
-            ? "retrying"
-            : "queued";
-    else
-      state = !withDevice.has(r.recipient)
-        ? "waiting_device"
-        : Number(r.attempts) > 0
-          ? "retrying"
-          : "queued";
-    return { ...r, state };
-  });
+  return rows.map((r) => ({
+    ...r,
+    state: deliveryState(r, { mailMissing, hasDevice: withDevice.has(r.recipient) }),
+  }));
 }
 
 export async function notificationStatus(db: Database) {
   const [raw] = await db.query(
     `SELECT count(*) FILTER (WHERE status='sent') AS sent,
-            count(*) FILTER (WHERE status='skipped') AS skipped,
+            count(*) FILTER (WHERE status='skipped' AND detail NOT LIKE 'Zu spät%'
+                               AND detail NOT LIKE 'Zustellung fehlgeschlagen%') AS skipped,
+            count(*) FILTER (WHERE status='skipped' AND detail LIKE 'Zu spät%') AS expired,
             count(*) FILTER (WHERE status IN ('pending','sending')) AS open,
             count(*) FILTER (WHERE status IN ('pending','sending') AND channel='email') AS open_email,
             count(*) FILTER (WHERE status IN ('pending','sending') AND channel='push'
               AND NOT EXISTS (SELECT 1 FROM push_subscriptions s
-                               WHERE s.owner=notifications.recipient AND s.disabled_at IS NULL)) AS no_device,
-            count(*) FILTER (WHERE status='failed') AS failed
+                               WHERE s.owner=notifications.recipient AND s.disabled_at IS NULL
+                                 AND (s.vapid_key=$1 OR s.vapid_key=''))) AS no_device,
+            count(*) FILTER (WHERE status='failed'
+                               OR (status='skipped' AND detail LIKE 'Zustellung fehlgeschlagen%')) AS failed
        FROM notifications WHERE created_at > now()-interval '14 days'`,
+    [await currentVapidKey(db)],
   );
   // Wartende getrennt nach Grund, damit „offen“ nicht nach Versand aussieht.
   const waitingConfig = mailConfigIssues().length ? Number(raw.open_email) : 0;
@@ -664,6 +721,7 @@ export async function notificationStatus(db: Database) {
     waitingConfig,
     waitingDevice,
     open: Math.max(0, Number(raw.open) - waitingConfig - waitingDevice),
+    expired: Number(raw.expired),
     skipped: Number(raw.skipped),
     failed: Number(raw.failed),
   };

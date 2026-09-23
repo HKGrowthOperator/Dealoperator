@@ -204,3 +204,28 @@ test("the team inbox only calls a hint handed over after the push service or Res
   assert.equal(status.counts.waitingConfig, 1);
   assert.equal(status.counts.waitingDevice, 0);
 });
+
+test("a rejected push counts as failed, an expired hint keeps its reason, old-key devices do not count", async () => {
+  delete process.env.NOTIFY_FROM;
+  await signup("new-5");
+  // Gerät mit einem früheren Schlüssel: zählt wie kein Gerät.
+  await subscribe(db, owner, { endpoint: endpoint(8), keys }, "iPhone");
+  await db.query("UPDATE push_subscriptions SET vapid_key='ALT' WHERE owner='owner'");
+  let [item] = await teamInbox(db, owner);
+  assert.ok(item.delivery.some((d) => d.channel === "push" && d.state === "waiting_device"));
+  // Push-Dienst lehnt ab: fehlgeschlagen, nicht „nicht gesendet“.
+  await db.query("UPDATE push_subscriptions SET vapid_key=''");
+  await dispatch(db, recheck, new Date(), (async () => {
+    throw Object.assign(new Error("boom"), { statusCode: 500 });
+  }) as any);
+  [item] = await teamInbox(db, owner);
+  assert.ok(item.delivery.some((d) => d.channel === "push" && d.state === "failed"));
+  // E-Mail wartet auf die Einrichtung; nach Ablauf bleibt der Grund sichtbar.
+  await db.query("UPDATE notifications SET next_attempt_at=now(),not_after=now()-interval '1 minute' WHERE channel='email'");
+  await dispatch(db, recheck, new Date(), (async () => ({ statusCode: 201 })) as any);
+  [item] = await teamInbox(db, owner);
+  assert.ok(item.delivery.some((d) => d.channel === "email" && d.state === "expired_config"));
+  const status = await notificationStatus(db);
+  assert.equal(status.counts.failed, 1);
+  assert.equal(status.counts.expired, 1);
+});

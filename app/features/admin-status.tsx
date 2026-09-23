@@ -136,7 +136,8 @@ export function NotificationsPanel({
             ["waitingConfig", "warten auf E-Mail-Einrichtung"],
             ["waitingDevice", "warten auf ein Gerät mit Push"],
             ["open", "in der Warteschlange"],
-            ["skipped", "nicht gesendet"],
+            ["expired", "abgelaufen"],
+            ["skipped", "bewusst nicht gesendet"],
             ["failed", "fehlgeschlagen"],
           ] as const
         ).map(([key, label]) => (

@@ -34,20 +34,29 @@ export async function teamInbox(db: Database, actor: Actor) {
   );
   // Zustellstand der Team-Hinweise je Eintrag. Neue Hinweise verweisen auf den
   // Inbox-Schlüssel, ältere noch auf die Anfrage bzw. das Konto.
+  // Nur diese Einträge haben vor dem Umbau Hinweise ausgelöst; nur für sie
+  // gilt der Abgleich über die alte ref.
+  const legacy = (r: { kind: string; dedupe_key: string }) =>
+    r.kind === "registration" && /^(registration|account|member):/.test(r.dedupe_key);
   const keys = rows.map((r) => r.dedupe_key as string);
-  const refs = rows.filter((r) => !String(r.dedupe_key).startsWith("answer:")).map((r) => r.ref as string);
+  const refs = rows
+    .filter((r) => legacy(r as { kind: string; dedupe_key: string }))
+    .map((r) => r.ref as string);
   const sent = keys.length
     ? await deliveryStates(
         db,
         (await db.query(
-          `SELECT ref,channel,status,detail,attempts,recipient FROM notifications
-            WHERE kind LIKE 'team:%' AND (ref = ANY($1::text[]) OR ref = ANY($2::text[]))`,
+          `SELECT ref,kind,channel,status,detail,attempts,recipient FROM notifications
+            WHERE kind LIKE 'team:%'
+              AND (ref = ANY($1::text[]) OR (ref = ANY($2::text[]) AND kind IN ('team:new','team:claim')))`,
           [keys, refs],
-        )) as { ref: string; channel: string; status: string; detail: string; attempts: number; recipient: string }[],
+        )) as { ref: string; kind: string; channel: string; status: string; detail: string; attempts: number; recipient: string }[],
       )
     : [];
   const deliveryFor = (key: string, ref: string, legacy: boolean) => {
-    const own = sent.filter((n) => n.ref === key || (legacy && n.ref === ref));
+    const own = sent.filter(
+      (n) => n.ref === key || (legacy && n.ref === ref && ["team:new", "team:claim"].includes(n.kind)),
+    );
     const groups = new Map<string, { channel: string; state: DeliveryState; label: string; count: number }>();
     for (const n of own) {
       const id = `${n.channel}:${n.state}`;
@@ -70,7 +79,7 @@ export async function teamInbox(db: Database, actor: Actor) {
     delivery: deliveryFor(
       r.dedupe_key as string,
       r.ref as string,
-      !String(r.dedupe_key).startsWith("answer:"),
+      legacy(r as { kind: string; dedupe_key: string }),
     ),
   }));
 }

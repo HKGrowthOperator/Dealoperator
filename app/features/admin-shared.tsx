@@ -16,6 +16,8 @@ export type DeliveryState =
   | "waiting_address"
   | "retrying"
   | "queued"
+  | "expired_config"
+  | "expired_device"
   | "expired"
   | "skipped"
   | "failed";
@@ -45,6 +47,8 @@ export const DELIVERY_TONE: Record<DeliveryState, Tone> = {
   waiting_address: "warn",
   retrying: "neutral",
   queued: "neutral",
+  expired_config: "warn",
+  expired_device: "warn",
   expired: "muted",
   skipped: "muted",
   failed: "danger",
@@ -61,7 +65,10 @@ export type NotificationStatus = {
   push: { keys: string; devices: number; needsReconsent?: number };
   email: { issues: string[] };
   counts: Partial<
-    Record<"sent" | "waitingConfig" | "waitingDevice" | "open" | "skipped" | "failed", number>
+    Record<
+      "sent" | "waitingConfig" | "waitingDevice" | "open" | "expired" | "skipped" | "failed",
+      number
+    >
   >;
   recent: {
     kind: string;
