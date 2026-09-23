@@ -26,7 +26,7 @@ Für eine bestehende Installation liegen die Nachträge unter `database/migratio
 
 3. `0003_daily_closing.sql` — Tagesabschluss (Zahlen + Reflexion), private Entwürfe, Pausen, Dranbleiben-Regeln, Events (22.09.2026 „Akquise Day“ von akquise.de), Push-Abonnements, Versandprotokoll mit Zustellung je Gerät, Team-Inbox, Discord-Zuordnung, Wins-Import-Prüffälle. Rein additiv; bestehende Tagesstände bekommen `origin='import'`, es werden keine Reflexionen erfunden. Enthält Rechte und Serverpolicy für die neuen Tabellen und Zähler.
 
-`0002` ist am 22.09.2026 auf der produktiven Datenbank angewendet worden.
+`0002` ist am 22.09.2026, `0003` am 23.09.2026 auf der produktiven Datenbank angewendet worden.
 
 **Reihenfolge bei 0003:** erst die Migration anwenden, dann den Code ausrollen. `/api/ready` prüft ab dieser Version die neuen Tabellen, Spalten und Zählerrechte und meldet 503, solange die Migration fehlt. Der Erinnerungs-Takt pausiert in diesem Fall von selbst.
 
