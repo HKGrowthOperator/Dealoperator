@@ -269,6 +269,31 @@ export async function bindConfirmedRequest(
   });
 }
 
+/**
+ * Bestätigtes Konto ohne Registrierungsanfrage und ohne Profil (z. B. über
+ * „Anmelden“ mit neuer Adresse): das Team erfährt es genau einmal je Konto.
+ * Derselbe Schlüssel wie bei der Registrierung, also nie doppelt.
+ */
+export async function noteConfirmedAccount(db: Database, actor: Actor) {
+  const [known] = await db.query(
+    `SELECT 1 FROM participants WHERE owner=$1
+     UNION ALL SELECT 1 FROM onboarding_requests WHERE owner=$1 LIMIT 1`,
+    [actor.userId],
+  );
+  if (known) return;
+  await db.transaction((tx) =>
+    teamEvent(tx, {
+      dedupeKey: `account:${actor.userId}`,
+      kind: "registration",
+      ref: actor.userId,
+      state: "confirmed",
+      title: `Neue Anmeldung bestätigt: ${actor.email}`,
+      body: "E-Mail bestätigt, Profil wird gerade eingerichtet.",
+      alert: { key: `signup:${actor.userId}`, kind: "new" },
+    }),
+  );
+}
+
 /** Status und eigene Angaben für den Antragsteller. Nur die eigene Anfrage. */
 export async function requestForActor(db: Database, actor: Actor) {
   const [r] = await db.query(

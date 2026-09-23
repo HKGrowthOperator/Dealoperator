@@ -22,6 +22,7 @@ import {
 import { planReminders, recheck } from "../server/scheduler";
 import { commitWins, previewWins, resolveReviewCase } from "../server/wins-import";
 import { decidePause } from "../server/admin";
+import { noteConfirmedAccount } from "../server/onboarding";
 import { syncDiscord } from "../server/discord-sync";
 import { berlinDate } from "../lib/kpis";
 import { defaultCommitmentSettings, zonedTime } from "../lib/commitment";
@@ -350,4 +351,15 @@ test("without Discord credentials nothing is marked as synced", async () => {
   assert.equal(result.configured, false);
   const [row] = await db.query("SELECT state FROM sync_outbox");
   assert.equal(row.state, "pending");
+});
+
+test("a new account from the sign-in page alerts the team once, never for existing profiles", async () => {
+  await noteConfirmedAccount(db, alice);
+  await noteConfirmedAccount(db, alice);
+  assert.equal((await db.query("SELECT * FROM team_inbox")).length, 1);
+  const sent = await db.query("SELECT channel FROM notifications ORDER BY channel");
+  assert.deepEqual(sent.map((n) => n.channel), ["email", "push"]);
+  await member(bob, "Bob");
+  await noteConfirmedAccount(db, bob);
+  assert.equal((await db.query("SELECT * FROM team_inbox")).length, 1);
 });

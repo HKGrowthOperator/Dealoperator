@@ -55,7 +55,7 @@ export default function AuthForm({
       </h1>
       <p>
         {sent
-          ? `Wenn es für ${email} ein Konto gibt, ist der Anmeldelink unterwegs. Öffne ihn in diesem Browser. Noch nicht registriert? Dann starte unten mit „Kostenfrei starten“.`
+          ? `Wir haben den Anmeldelink an ${email} gesendet. Öffne ihn in diesem Browser. Der Link bestätigt deine E-Mail und meldet dich an. Nichts angekommen? Schau bitte auch im Spam-Ordner nach.`
           : "Ein Konto für deine Zahlen, deine Reflexionen und deine Call-Partner."}
       </p>
       {!ready && (
