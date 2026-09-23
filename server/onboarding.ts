@@ -4,6 +4,7 @@ import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
 import { teamEvent, teamPushText } from "./notify";
+import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
 
 /**
@@ -558,12 +559,15 @@ export async function reviewQueue(db: Database, actor: Actor) {
               ORDER BY e.created_at DESC LIMIT 1) AS applicant_answer,
             (SELECT count(*) FROM onboarding_requests o
               WHERE o.participant=r.participant AND o.id<>r.id
-                AND o.status IN (${OPEN_LIST})) AS competing
+                AND o.status IN (${OPEN_LIST})) AS competing,
+            (SELECT s.value->r.participant->>'role' FROM app_settings s
+              WHERE s.key=$1 AND jsonb_typeof(s.value)='object') AS designated_role
      FROM onboarding_requests r
      LEFT JOIN participants p ON p.id=r.participant
      LEFT JOIN account_private a ON a.owner=p.owner
      WHERE r.status IN (${OPEN_LIST}) OR r.decided_at > now() - interval '30 days'
      ORDER BY (r.status IN ('pending','info_needed')) DESC, r.created_at`,
+    [DESIGNATIONS_KEY],
   );
   return rows;
 }
@@ -724,6 +728,11 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
          updated_at=now()`,
       [request.owner, request.email, request.phone],
     );
+    // Eine für dieses Profil vorgemerkte Team-Rolle gilt ab jetzt, genau für
+    // das Konto, dessen Übernahme das Team gerade freigibt. Das ist die einzige
+    // Stelle, an der ein vorhandenes Profil einen Eigentümer bekommt.
+    const role = await activateDesignation(tx, p.id, request.owner);
+    if (role) await log(tx, request.id, actor.userId, "role_granted", role);
     // Konkurrierende offene Anfragen für dasselbe Profil sind damit erledigt.
     await tx.query(
       `UPDATE onboarding_requests SET status='superseded',updated_at=now()
@@ -747,7 +756,7 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       [p.id],
     );
     await log(tx, request.id, actor.userId, "approved", v.internalNote);
-    return { ok: true, status: "approved", name: p.name };
+    return { ok: true, status: "approved", name: p.name, role };
   });
 }
 

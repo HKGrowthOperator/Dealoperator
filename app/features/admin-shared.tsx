@@ -124,9 +124,21 @@ export type TeamMember = {
   fixed: boolean;
   grantedAt: string | null;
 };
+/** Für ein Profil ohne Konto vorgemerkte Rolle; gilt nach freigegebener Übernahme. */
+export type RoleDesignation = {
+  participantId: string;
+  role: "admin" | "moderator";
+  name: string | null;
+  company: string;
+  /** Profil ist noch frei und persönlich. */
+  available: boolean;
+  designatedAt: string;
+  designatedBy: string;
+};
 export type TeamOverview = {
   members: TeamMember[];
   accounts: { owner: string; email: string; name: string | null }[];
+  designations: RoleDesignation[];
 };
 /** Moderatoren bekommen Einstellungen, Diagnose und Rollen nicht (null). */
 export type AdminOverview = {
@@ -150,6 +162,8 @@ export type Participant = {
   claimed: boolean;
   public_consent: boolean;
   searchable: boolean;
+  /** Vorgemerkte Team-Rolle (nur für Profile ohne Konto). */
+  designated_role?: "admin" | "moderator" | null;
 };
 export type WinsAction =
   | "neu"
