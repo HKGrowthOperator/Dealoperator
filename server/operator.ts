@@ -182,6 +182,7 @@ export async function ownState(db: Database, actor: Actor) {
     request: request || null,
     contact: contact || { phone: "", contact_opt_in: false },
     email: actor.email,
+    hasPassword: !!actor.hasPassword,
     admin: actor.admin,
     team: isTeam(actor),
     syncStatus: "Discord-Anbindung wird vorbereitet",

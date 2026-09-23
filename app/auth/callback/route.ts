@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { authClient, authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { linkFailureReason } from "@/server/email-auth";
+import { database, databaseReady } from "@/server/database";
+import { noteLinkOpened } from "@/server/onboarding";
 
 /**
  * Rücksprung aus der Bestätigungsmail. Zwei Linkformen:
@@ -17,6 +19,10 @@ import { linkFailureReason } from "@/server/email-auth";
  *   abgelaufen — Supabase meldet einen abgelaufenen Link
  *   verwendet  — Link bereits eingelöst
  *   browser    — PKCE-Link in einem anderen Browser geöffnet (kein Verifier)
+ *   bestaetigt — dasselbe bei der Registrierung: Supabase hat die Adresse
+ *                bestätigt (sonst gäbe es keinen code), nur dieses Gerät
+ *                bekommt keine Sitzung. Das Gerät, auf dem registriert wurde,
+ *                meldet sich dann selbst an (siehe /starten).
  *   technik    — Supabase gerade nicht erreichbar
  *   link       — unvollständig oder unbekannt
  * Ist bereits eine gültige Sitzung da, gibt es keinen Fehler, sondern es geht
@@ -52,6 +58,7 @@ export async function GET(request: Request) {
   const type = url.searchParams.get("type") as EmailOtpType | null;
   const next = url.searchParams.get("next");
   const via = url.searchParams.get("via");
+  const requestId = url.searchParams.get("anfrage");
 
   if (!authReady()) return back(base, "technik", next, via);
 
@@ -96,5 +103,9 @@ export async function GET(request: Request) {
   if (await getCurrentUser()) return forward(base, next);
 
   if ((error.status || 0) >= 500) return back(base, "technik", next, via);
+  if (!hasVerifier && via === "starten") {
+    if (databaseReady()) await noteLinkOpened(database(), requestId).catch(() => undefined);
+    return go(base, "/starten?bestaetigt=1");
+  }
   return back(base, hasVerifier ? "verwendet" : "browser", next, via);
 }

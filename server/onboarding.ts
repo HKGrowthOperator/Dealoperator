@@ -272,6 +272,53 @@ export async function pendingForBrowser(db: Database, cookie: string | undefined
   };
 }
 
+/**
+ * Für das Gerät, das auf die Bestätigung wartet: ist die Adresse bestätigt?
+ * „bestätigt“ heißt: die Anfrage wurde an ein Konto gebunden (Link auf einem
+ * anderen Gerät geöffnet und angemeldet) oder der Rücksprung aus der Mail kam
+ * mit gültigem Einmalcode an („link_opened“). Das wartende Gerät meldet sich
+ * dann mit dem Passwort an, das es noch im Speicher hat; ob die Adresse
+ * wirklich bestätigt ist, entscheidet dabei Supabase. Nur mit passendem
+ * Browser-Geheimnis, sonst „none“.
+ */
+export async function browserRequestState(db: Database, cookie: string | undefined) {
+  const [id, secret] = (cookie || "").split(".");
+  if (!requestIdFromCookie(id) || !secret || secret.length > 100) return "none" as const;
+  const [r] = await db.query(
+    `SELECT r.status,
+            (SELECT e.note FROM onboarding_events e
+              WHERE e.request=r.id AND e.action IN ('submitted','resubmitted')
+              ORDER BY e.id DESC LIMIT 1) AS proof,
+            EXISTS(SELECT 1 FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='link_opened'
+                AND e.id > (SELECT max(x.id) FROM onboarding_events x
+                             WHERE x.request=r.id AND x.action IN ('submitted','resubmitted'))) AS opened
+       FROM onboarding_requests r WHERE r.id=$1 AND r.updated_at > now() - interval '2 days'`,
+    [id],
+  );
+  if (!r || r.proof !== `browser:${sha256(secret)}`) return "none" as const;
+  if (r.status !== "awaiting_email" || r.opened) return "confirmed" as const;
+  return "waiting" as const;
+}
+
+/**
+ * Rücksprung aus der Bestätigungsmail auf einem anderen Gerät (ohne PKCE-
+ * Verifier): Supabase hat die Adresse bestätigt, dieses Gerät bekommt aber
+ * keine Sitzung. Der Hinweis weckt das wartende Gerät. Höchstens ein Eintrag
+ * je Anfrage und Minute; unbekannte IDs werden still ignoriert.
+ */
+export async function noteLinkOpened(db: Database, requestId: string | null) {
+  if (!requestId || !/^[0-9a-f-]{36}$/i.test(requestId)) return;
+  await db.query(
+    `INSERT INTO onboarding_events(request,actor,action,note)
+     SELECT r.id,'link','link_opened','' FROM onboarding_requests r
+      WHERE r.id=$1 AND r.status='awaiting_email'
+        AND NOT EXISTS(SELECT 1 FROM onboarding_events e WHERE e.request=r.id
+                        AND e.action='link_opened' AND e.created_at > now() - interval '1 minute')`,
+    [requestId],
+  );
+}
+
 /** Nach erfolgreicher Übergabe an Supabase: Beleg für „Mail geschickt“. */
 export async function markMailSent(db: Database, id: string, email: string) {
   await log(db, id, email, "mail_sent", "");

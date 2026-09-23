@@ -51,6 +51,8 @@ export type Actor = {
   email: string;
   admin: boolean;
   moderator?: boolean;
+  /** Konto hat ein Passwort (Anmeldung ohne Mail möglich). */
+  hasPassword?: boolean;
 };
 
 /** Gehört zum Team (Admin oder Moderator). */
@@ -79,6 +81,9 @@ export async function getCurrentUser(): Promise<Actor | null> {
     userId: user.id,
     email: user.email.toLowerCase(),
     admin: ownerIds().includes(user.id),
+    // Gesetzt, wenn das Passwort über diese Website festgelegt wurde
+    // (Registrieren oder „Passwort festlegen“). Nur für Hinweise, nie für Rechte.
+    hasPassword: user.user_metadata?.has_password === true,
   };
   if (!actor.admin && databaseReady()) {
     // In der Verwaltung vergebene Rolle. Fehlt die Tabelle noch (vor

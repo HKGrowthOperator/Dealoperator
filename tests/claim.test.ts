@@ -433,3 +433,34 @@ test("sign-in errors become clear messages with a real waiting time", async () =
   assert.equal(linkFailureReason({ status: 503 }), "technik");
   assert.equal(linkFailureReason({ status: 400, code: "validation_failed" }), "link");
 });
+
+test("the waiting browser learns about a confirmation on another device, nobody else does", async () => {
+  const { browserSecret, browserRequestState, noteLinkOpened } = await import("../server/onboarding");
+  const mine = browserSecret();
+  const r = await startRequest(db, { kind: "new", email: alice.email, fullName: "Alice Beispiel", phone: "0170 1234567", phoneCountry: "DE" }, mine.proof);
+  const cookie = `${r.id}.${mine.secret}`;
+  assert.equal(await browserRequestState(db, cookie), "waiting");
+  // Ohne oder mit falschem Geheimnis: nichts zu erfahren.
+  assert.equal(await browserRequestState(db, undefined), "none");
+  assert.equal(await browserRequestState(db, r.id), "none");
+  assert.equal(await browserRequestState(db, `${r.id}.${browserSecret().secret}`), "none");
+  // Link auf dem Handy geöffnet (Supabase hat bestätigt, dort ohne Sitzung).
+  await noteLinkOpened(db, r.id);
+  await noteLinkOpened(db, r.id);
+  assert.equal(await count("SELECT count(*) AS n FROM onboarding_events WHERE request=$1 AND action='link_opened'", [r.id]), 1);
+  assert.equal(await browserRequestState(db, cookie), "confirmed");
+  // Unsinn oder unbekannte IDs werden still ignoriert.
+  await noteLinkOpened(db, "kein-gueltiger-wert");
+  await noteLinkOpened(db, randomUUID());
+  await noteLinkOpened(db, null);
+  // Neues Absenden: der alte Link zählt nicht mehr als Bestätigung.
+  const again = await startRequest(db, { kind: "new", email: alice.email, fullName: "Alice Beispiel", phone: "0170 1234567", phoneCountry: "DE" }, mine.proof);
+  assert.equal(again.id, r.id);
+  assert.equal(await browserRequestState(db, cookie), "waiting");
+  // Bestätigt und an das Konto gebunden: „confirmed“, auch ohne Link-Hinweis.
+  await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(await browserRequestState(db, cookie), "confirmed");
+  // Nach der Bindung legt ein Link-Hinweis nichts mehr an.
+  await noteLinkOpened(db, r.id);
+  assert.equal(await count("SELECT count(*) AS n FROM onboarding_events WHERE request=$1 AND action='link_opened'", [r.id]), 1);
+});

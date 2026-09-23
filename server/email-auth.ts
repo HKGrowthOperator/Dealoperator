@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { AppError } from "./operator";
 import { safeNext } from "../lib/navigation";
 
@@ -33,11 +34,66 @@ export const RESEND_SECONDS = 60;
  * Vorlage mit {{ .RedirectTo }}&token_hash=… einen gültigen Link ergibt.
  * via=starten führt Link-Fehler zurück in den Start statt zur Anmeldung.
  */
-export function emailRedirect(next: string | null | undefined, via?: "starten") {
+export function emailRedirect(
+  next: string | null | undefined,
+  via?: "starten",
+  /** Anfrage aus dem Start: der Rücksprung meldet dem wartenden Gerät „bestätigt“. */
+  request?: string,
+) {
   const url = new URL("/auth/callback", process.env.APP_URL!);
   url.searchParams.set("next", safeNext(next || null));
   if (via) url.searchParams.set("via", via);
+  if (request) url.searchParams.set("anfrage", request);
   return url.toString();
+}
+
+/**
+ * Passwort für die Anmeldung ohne Mail. Mindestens 8 Zeichen; mehr als 72
+ * Byte schneidet das Hashverfahren ab, deshalb die Obergrenze.
+ */
+export const passwordSchema = z
+  .string({ required_error: "Bitte lege ein Passwort fest." })
+  .min(8, "Bitte nimm mindestens 8 Zeichen.")
+  .max(72, "Bitte nimm höchstens 72 Zeichen.")
+  .refine((v) => new TextEncoder().encode(v).length <= 72, "Bitte nimm höchstens 72 Zeichen.");
+
+/** Anmeldung mit Passwort: nie verraten, ob E-Mail oder Passwort falsch war. */
+export function signInFailure(error: AuthFailure) {
+  const code = error?.code || "";
+  const status = error?.status || 0;
+  if (code === "email_not_confirmed")
+    return new AppError(
+      "Bitte bestätige zuerst deine E-Mail-Adresse über den Link aus der Mail.",
+      409,
+      undefined,
+      "email",
+    );
+  if (code === "invalid_credentials" || code === "invalid_grant" || status === 400)
+    return new AppError("E-Mail oder Passwort stimmt nicht.", 400, undefined, "password");
+  if (status === 429 || code.startsWith("over_"))
+    return new AppError("Zu viele Versuche. Bitte warte einen Moment und versuche es dann erneut.", 429);
+  return new AppError("Die Anmeldung klappt gerade nicht. Bitte versuche es gleich noch einmal.", 503);
+}
+
+/** Passwort setzen oder ändern. */
+export function passwordFailure(error: AuthFailure) {
+  const code = error?.code || "";
+  const status = error?.status || 0;
+  if (code === "weak_password")
+    return new AppError(
+      "Dieses Passwort ist zu leicht zu erraten. Nimm ein längeres, gern mit Zahlen oder Sonderzeichen.",
+      400,
+      undefined,
+      "password",
+    );
+  if (code === "same_password")
+    return new AppError("Das ist bereits dein Passwort.", 400, undefined, "password");
+  if (code === "reauthentication_needed" || code === "session_not_found" || status === 401)
+    return new AppError(
+      "Bitte melde dich aus Sicherheitsgründen kurz per Link neu an und leg das Passwort danach fest.",
+      401,
+    );
+  return new AppError("Das Passwort konnte gerade nicht gespeichert werden. Bitte versuche es gleich noch einmal.", 503);
 }
 
 type AuthFailure = { status?: number; code?: string; message?: string } | null | undefined;
