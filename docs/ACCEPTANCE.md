@@ -54,8 +54,10 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | Tag mit übernommenem Stand (z. B. 22.09.) | Kein eigener Abschluss möglich; Korrektur über das Team |
 | Wochenende | Keine Erinnerung, kein Fehltag; freiwilliger Abschluss als Bonus |
 | Push auf einem echten Gerät einrichten, Testnachricht | Nachricht kommt bei geschlossener Seite an; iPhone nur als Home-Bildschirm-App |
-| 20:30 ohne Abschluss (Pflicht-Tag, Push aktiv) | Genau eine Erinnerung; nach eingereichtem Abschluss keine |
-| Neue Registrierung über `/starten`, E-Mail bestätigt | Genau ein Inbox-Eintrag und ein Push je Verwaltungskonto plus kurze E-Mail (sofern `RESEND_API_KEY`/`NOTIFY_FROM` gesetzt); späteres Anmelden löst nichts aus |
+| 20:30 ohne Abschluss (Calling-Tag, Push aktiv) | Genau eine Erinnerung; nach eingereichtem Abschluss keine |
+| Neue Registrierung über `/starten`, E-Mail bestätigt | Genau ein Inbox-Eintrag und ein Push je Admin und Moderator plus kurze E-Mail (sofern `RESEND_API_KEY`/`NOTIFY_FROM` gesetzt); späteres Anmelden löst nichts aus |
+| „Anmelden“ mit einer neuen Adresse | Link kommt an; nach Bestätigung Profileinrichtung unter `/start`, Team bekommt einen Hinweis |
+| Team-Inbox nach einem Hinweis | Je Kanal „übergeben“ nur nach Annahme durch Push-Dienst bzw. Resend; sonst „wartet“ mit Grund, „fehlgeschlagen“ oder „abgelaufen“ |
 | Wins-Text zweimal übernehmen | Zweites Mal „unverändert“, keine Doppelzählung |
 
 ## Import und sichere Übernahme
@@ -64,10 +66,13 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 2. `/verwaltung` mit dem Betreiberkonto öffnen. Ein gewöhnliches Mitglied erhält keinen Adminzugang.
 3. Vorbereitete Tageszahlen mit stabiler `participantKey` und nachvollziehbarer Zustimmung importieren. Leere Kennzahlen bleiben unbekannt; `0` bedeutet ausdrücklich null. Nicht aus anderen Kennzahlen schätzen.
 4. Vorschau und Änderungen kontrollieren, dann speichern. Wiederholtes Senden darf die Werte nicht verdoppeln.
-5. Mitglied mit passender bestätigter E-Mail übernimmt sein vorbereitetes Profil. Ohne E-Mail-Match einen persönlichen, einmaligen Übernahmecode verwenden. Den Code nur der richtigen Person zukommen lassen; nicht öffentlich teilen.
-6. Bisherige Tageszahlen bleiben erhalten. Andere Konten können weder das bereits zugeordnete Profil noch einen verbrauchten Code übernehmen.
-7. Beim bewussten Neustart trotz passender Importdaten bleibt der Import erhalten und wird nicht stillschweigend gelöscht.
-8. Admin-Kontaktansicht prüfen: E-Mail aus bestätigter Sitzung; Telefonnummer freiwillig und nicht SMS-verifiziert. Veröffentlichung im Ranking ist keine Werbeeinwilligung.
+5. Übernahme abgemeldet: Profil im Ranking („Das sind meine Zahlen“) oder unter `/starten` wählen, Kontaktdaten eingeben, E-Mail bestätigen. `/status` zeigt „In Prüfung“. Nichts ist freigegeben, bis das Team unter Verwaltung → Übernahmen freigibt.
+6. Übernahme angemeldet ohne Profil: `/profil-uebernehmen` (auch aus Tagesabschluss-Checkliste, Kontoeinstellungen, Profileinrichtung) oder persönlicher Einladungslink `/profil-uebernehmen?profil=…&einladung=…`. Name und Telefon ergänzen, „Übernahme anfragen“, keine zweite Mail. Mehrfaches Absenden: eine Anfrage, ein Team-Hinweis.
+7. Abgemeldet mit bestehendem Konto aus der Profilauswahl „Anmelden“ wählen: nach dem Link zurück zur Übernahme mit derselben Auswahl und Einladung. Link im falschen Browser geöffnet: zurück zu `/anmelden` mit demselben Ziel.
+8. Rückfrage des Teams (Text ist Pflicht): Person sieht die Frage unter `/status`, antwortet dort, das Team sieht die Antwort unter Übernahmen. Ablehnung: `/status` bietet eigenes Profil oder eine andere Anfrage.
+9. Bisherige Tageszahlen bleiben nach der Freigabe erhalten. Ein zugeordnetes Profil lässt sich nicht erneut anfragen; niemand im Team (außer der festen Grundverwaltung) entscheidet über die eigene Anfrage.
+10. Beim bewussten Neustart trotz passender Importdaten bleibt der Import erhalten und wird nicht stillschweigend gelöscht.
+11. Admin-Kontaktansicht prüfen: E-Mail aus bestätigter Sitzung; Telefonnummer freiwillig und nicht SMS-verifiziert. Veröffentlichung im Ranking ist keine Werbeeinwilligung.
 
 ## Darstellung und Bedienung
 
