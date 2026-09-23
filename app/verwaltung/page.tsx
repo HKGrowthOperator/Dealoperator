@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import ImportConsole from "../features/import-console";
 import AdminPanels from "../features/admin-panels";
@@ -9,8 +9,8 @@ export default async function Page() {
   return (
     <div className="operator-site">
       <OperatorHeader />
-      {actor?.admin ? (
-        <AdminPanels />
+      {isTeam(actor) ? (
+        <AdminPanels role={actor.admin ? "admin" : "moderator"} />
       ) : (
         // Ohne Verwaltungskonto bleibt nur die lokale CSV-Vorschau samt
         // Anmeldehinweis. Es wird nichts gespeichert.

@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   UserSearch,
+  UsersRound,
 } from "lucide-react";
 import { berlinDate } from "@/lib/kpis";
 import { AKQUISE_DAY, eventLabel, formatDay } from "@/lib/ranking-history";
@@ -35,18 +36,22 @@ import {
 import { ReviewCases, WinsImport } from "./admin-wins";
 import { RulesPanel } from "./admin-rules";
 import { DiscordPanel, NotificationsPanel } from "./admin-status";
+import { TeamPanel } from "./admin-team";
 
+// adminOnly: Einstellungen, Diagnose, Kontaktliste und Rollen. Moderatoren
+// sehen diese Reiter nicht; der Server lehnt die Aktionen zusätzlich ab.
 const TABS = [
-  { id: "inbox", label: "Team-Inbox", icon: Inbox },
-  { id: "wins", label: "Wins-Import", icon: ClipboardPaste },
-  { id: "faelle", label: "Prüffälle", icon: UserSearch },
-  { id: "pausen", label: "Pausen", icon: CirclePause },
-  { id: "events", label: "Akquise Days", icon: Sparkles },
-  { id: "regeln", label: "Dranbleiben-Regeln", icon: SlidersHorizontal },
-  { id: "benachrichtigungen", label: "Benachrichtigungen", icon: Bell },
-  { id: "discord", label: "Discord", icon: Headphones },
-  { id: "uebernahmen", label: "Übernahmen", icon: ShieldCheck },
-  { id: "csv", label: "CSV-Import", icon: FileInput },
+  { id: "inbox", label: "Team-Inbox", icon: Inbox, adminOnly: false },
+  { id: "wins", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
+  { id: "faelle", label: "Prüffälle", icon: UserSearch, adminOnly: false },
+  { id: "pausen", label: "Pausen", icon: CirclePause, adminOnly: false },
+  { id: "uebernahmen", label: "Übernahmen", icon: ShieldCheck, adminOnly: false },
+  { id: "events", label: "Akquise Days", icon: Sparkles, adminOnly: true },
+  { id: "regeln", label: "Dranbleiben-Regeln", icon: SlidersHorizontal, adminOnly: true },
+  { id: "benachrichtigungen", label: "Benachrichtigungen", icon: Bell, adminOnly: true },
+  { id: "discord", label: "Discord", icon: Headphones, adminOnly: true },
+  { id: "csv", label: "CSV-Import", icon: FileInput, adminOnly: true },
+  { id: "team", label: "Team & Rollen", icon: UsersRound, adminOnly: true },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 const isTab = (value: string | null): value is TabId =>
@@ -90,10 +95,12 @@ async function fetchOverview(signal?: AbortSignal): Promise<Loaded> {
  * Verwaltung in Reitern. Übernahmeprüfung (ReviewQueue) und CSV-Import
  * (ImportConsole) bleiben unverändert und stehen in eigenen Reitern.
  */
-export default function AdminPanels() {
+export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
   const params = useSearchParams();
   const requested = params.get("bereich");
-  const tab: TabId = isTab(requested) ? requested : "inbox";
+  const tabs = TABS.filter((t) => role === "admin" || !t.adminOnly);
+  const tab: TabId =
+    isTab(requested) && tabs.some((t) => t.id === requested) ? requested : "inbox";
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -145,7 +152,7 @@ export default function AdminPanels() {
         pausen: overview.pauses.filter((p) => p.status === "requested").length,
       }
     : {};
-  const active = TABS.find((t) => t.id === tab)!;
+  const active = tabs.find((t) => t.id === tab)!;
 
   return (
     <div className="adm">
@@ -168,7 +175,7 @@ export default function AdminPanels() {
           Kontaktdaten erscheinen nur hier im Team-Bereich.
         </p>
         <nav className="adm-tabs" aria-label="Bereiche der Verwaltung">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const Icon = t.icon;
             const count = counts[t.id];
             return (
@@ -193,7 +200,7 @@ export default function AdminPanels() {
         <label className="adm-tab-select">
           <span>Bereich</span>
           <select value={tab} onChange={(e) => go(e.target.value as TabId)}>
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}
                 {counts[t.id] ? ` (${counts[t.id]} offen)` : ""}
@@ -253,13 +260,18 @@ export default function AdminPanels() {
               {tab === "events" && (
                 <EventsPanel events={overview.events} onChanged={reload} />
               )}
-              {tab === "regeln" && (
+              {tab === "regeln" && overview.rules && (
                 <RulesPanel rules={overview.rules} onSaved={reload} />
               )}
-              {tab === "benachrichtigungen" && (
+              {tab === "benachrichtigungen" && overview.notifications && (
                 <NotificationsPanel status={overview.notifications} />
               )}
-              {tab === "discord" && <DiscordPanel status={overview.discord} />}
+              {tab === "discord" && overview.discord && (
+                <DiscordPanel status={overview.discord} />
+              )}
+              {tab === "team" && overview.team && (
+                <TeamPanel team={overview.team} onChanged={reload} />
+              )}
             </>
           )}
         </main>
@@ -608,9 +620,9 @@ function PausesPanel({
         <div>
           <h2 id="adm-pauses-title">Pausen</h2>
           <p>
-            Freigegebene Pausen nehmen Tage aus der Pflicht: keine Erinnerung,
-            kein Serienverlust, keine Teamprüfung. Die Frist verschiebt sich
-            auf den nächsten Pflicht-Tag danach.
+            Freigegebene Pausen zählen nicht als Calling-Tage: keine
+            Erinnerung, kein Serienverlust, keine Teamprüfung. Die Frist
+            verschiebt sich auf den nächsten Calling-Tag danach.
           </p>
         </div>
       </div>

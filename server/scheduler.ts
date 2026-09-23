@@ -15,6 +15,7 @@ import { approvedPauses, loadCommitmentSettings, trackingStart } from "./setting
 import { dispatch, enqueue, teamEvent, type Recheck } from "./notify";
 import { markEligibleMembers, toClosings, ownClosings } from "./closing";
 import { syncDiscord } from "./discord-sync";
+import { isTeamMember } from "./roles";
 
 /**
  * Serverseitiger Takt für Erinnerungen, Team-Hinweise und Discord.
@@ -44,11 +45,11 @@ function quiet(m: { quiet_start: number | null; quiet_end: number | null }) {
 const TEXT = {
   evening: {
     title: "Dein Tagesabschluss fehlt noch",
-    body: "Zahlen und kurze Reflexion eintragen, dann zählt dein Tag für dich und die Gruppensumme.",
+    body: "Zahlen und kurze Reflexion eintragen, dann zählt dein Tag für deine Serie.",
   },
-  streak: (day: string) => ({
-    title: "Deine Serie hängt am Tagesabschluss",
-    body: `Der Abschluss für ${day.slice(8, 10)}.${day.slice(5, 7)}. fehlt noch. Bis 10:00 Uhr zählt er fristgerecht.`,
+  streak: (day: string, deadlineHour: number) => ({
+    title: `Dein Abschluss für ${day.slice(8, 10)}.${day.slice(5, 7)}. ist noch offen`,
+    body: `Bis ${String(deadlineHour).padStart(2, "0")}:00 Uhr zählt er noch für deine Serie.`,
   }),
 };
 
@@ -84,7 +85,7 @@ export async function planReminders(
       settings,
     });
     for (const r of due) {
-      const text = r.kind === "evening" ? TEXT.evening : TEXT.streak(r.day);
+      const text = r.kind === "evening" ? TEXT.evening : TEXT.streak(r.day, settings.deadlineHour);
       const created = await enqueue(tx, {
         dedupeKey: r.dedupeKey,
         recipient: m.owner,
@@ -183,8 +184,7 @@ export const recheck: Recheck = async (db, n) => {
     return null;
   }
   if (n.kind.startsWith("team:")) {
-    const admins = (process.env.OPERATOR_ADMIN_IDS || "").split(",").map((v) => v.trim());
-    if (!admins.includes(n.recipient)) return "Kein Verwaltungskonto mehr.";
+    if (!(await isTeamMember(db, n.recipient))) return "Keine Team-Rolle mehr.";
     const [prefs] = await db.query(
       "SELECT team_alerts FROM notification_prefs WHERE owner=$1",
       [n.recipient],

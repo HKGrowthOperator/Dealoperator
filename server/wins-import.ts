@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
-import type { Actor } from "./auth";
+import { isTeam, type Actor } from "./auth";
 import { AppError, importBlocked, once, outbox } from "./operator";
 import {
   berlinDate,
@@ -66,8 +66,9 @@ export type WinsPreviewRow = {
 };
 
 function requireAdmin(actor: Actor) {
-  if (!actor.admin)
-    throw new AppError("Dieser Bereich ist nur für die Verwaltung freigeschaltet.", 403);
+  // Admins und Moderatoren dürfen Tagesmeldungen übernehmen und Prüffälle lösen.
+  if (!isTeam(actor))
+    throw new AppError("Dieser Bereich ist nur für das Team freigeschaltet.", 403);
 }
 
 /** Kontaktdaten aus Auszügen entfernen, bevor etwas gespeichert oder gezeigt wird. */

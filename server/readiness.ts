@@ -39,6 +39,8 @@ export const requiredTables = [
   "discord_posts",
   "participant_aliases",
   "import_review_cases",
+  // Migration 0004: Team-Rollen.
+  "team_roles",
 ];
 
 export async function inspectDatabase(db: Database) {

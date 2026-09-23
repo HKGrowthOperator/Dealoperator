@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
-import type { Actor } from "./auth";
+import { isTeam, type Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
 import { teamEvent } from "./notify";
 import { normalisePhone } from "../lib/phone";
@@ -299,7 +299,7 @@ export async function requestForActor(db: Database, actor: Actor) {
 
 /** Warteschlange für die Verwaltung, mit Abgleichhilfen und Konkurrenzanfragen. */
 export async function reviewQueue(db: Database, actor: Actor) {
-  if (!actor.admin) throw new AppError("Nur für die Verwaltung.", 403);
+  if (!isTeam(actor)) throw new AppError("Nur für das Team.", 403);
   const rows = await db.query(
     `SELECT r.id,r.kind,r.status,r.participant,r.full_name,r.email,r.phone,r.phone_input,
             r.hint,r.internal_note,r.applicant_message,r.owner,r.created_at,r.updated_at,
@@ -335,8 +335,8 @@ export const decisionSchema = z
  * jeden Zugriff.
  */
 export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
-  if (!actor.admin)
-    throw new AppError("Nur die Verwaltung kann Anfragen entscheiden.", 403);
+  if (!isTeam(actor))
+    throw new AppError("Nur das Team kann Anfragen entscheiden.", 403);
   const v = decisionSchema.parse(raw);
   return db.transaction(async (tx) => {
     const [request] = await tx.query(

@@ -62,15 +62,30 @@ export type Unconfirmed = {
   count: number;
   recent: { id: string; kind: "new" | "claim"; name: string; since: string }[];
 };
+export type TeamMember = {
+  owner: string;
+  role: "owner" | "admin" | "moderator";
+  email: string | null;
+  name: string | null;
+  fixed: boolean;
+  grantedAt: string | null;
+};
+export type TeamOverview = {
+  members: TeamMember[];
+  accounts: { owner: string; email: string; name: string | null }[];
+};
+/** Moderatoren bekommen Einstellungen, Diagnose und Rollen nicht (null). */
 export type AdminOverview = {
+  role: "admin" | "moderator";
   inbox: InboxItem[];
   unconfirmed?: Unconfirmed;
   pauses: AdminPause[];
   events: RankingEvent[];
-  rules: CommitmentSettings;
-  notifications: NotificationStatus;
+  rules: CommitmentSettings | null;
+  notifications: NotificationStatus | null;
   cases: ReviewCase[];
-  discord: DiscordStatus;
+  discord: DiscordStatus | null;
+  team: TeamOverview | null;
 };
 export type Participant = {
   id: string;

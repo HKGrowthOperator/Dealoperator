@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
-import type { Actor } from "./auth";
+import { isTeam, type Actor } from "./auth";
 import { teamEvent } from "./notify";
 import { normalisePhone } from "../lib/phone";
 import {
@@ -178,6 +178,7 @@ export async function ownState(db: Database, actor: Actor) {
     contact: contact || { phone: "", contact_opt_in: false },
     email: actor.email,
     admin: actor.admin,
+    team: isTeam(actor),
     syncStatus: "Discord-Anbindung wird vorbereitet",
   };
 }
@@ -432,8 +433,8 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
  * Eigentum und überspringt die Teamfreigabe nicht.
  */
 export async function issueClaim(db: Database, actor: Actor, id: string) {
-  if (!actor.admin)
-    throw new AppError("Nur die Verwaltung kann Einladungen erstellen.", 403);
+  if (!isTeam(actor))
+    throw new AppError("Nur das Team kann Einladungen erstellen.", 403);
   return db.transaction(async (tx) => {
     const [p] = await tx.query(
       "SELECT id,kind FROM participants WHERE id=$1 AND owner IS NULL FOR UPDATE",

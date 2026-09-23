@@ -2,7 +2,8 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { z } from "zod";
 import type { Database } from "./database";
-import type { Actor } from "./auth";
+import { isTeam, type Actor } from "./auth";
+import { teamRecipients } from "./roles";
 import { AppError } from "./operator";
 import { mailConfigIssues, sendMail } from "./mailer";
 
@@ -181,8 +182,8 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
   const v = prefsSchema.parse(raw);
   if ((v.quietStart === null) !== (v.quietEnd === null))
     throw new AppError("Bitte Beginn und Ende der Ruhezeit angeben oder beide leer lassen.");
-  if ((v.teamAlerts !== undefined || v.teamEmail !== undefined) && !actor.admin)
-    throw new AppError("Team-Benachrichtigungen gibt es nur für die Verwaltung.", 403);
+  if ((v.teamAlerts !== undefined || v.teamEmail !== undefined) && !isTeam(actor))
+    throw new AppError("Team-Benachrichtigungen gibt es nur für das Team.", 403);
   await db.query(
     `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email,quiet_start,quiet_end)
      VALUES($1,$2,COALESCE($3,true),COALESCE($4,$8),$5,$6,$7)
@@ -199,10 +200,10 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
       // Die Absicherungs-E-Mail geht an die bestätigte Adresse der Sitzung,
       // nie an eine frei eingetippte. Für die Verwaltung ist sie
       // standardmäßig an.
-      (v.teamEmail ?? actor.admin) ? actor.email : null,
+      (v.teamEmail ?? isTeam(actor)) ? actor.email : null,
       v.quietStart,
       v.quietEnd,
-      actor.admin,
+      isTeam(actor),
     ],
   );
   return notificationPrefs(db, actor.userId);
@@ -244,12 +245,7 @@ export async function enqueue(db: Database, n: NotificationInput): Promise<boole
   return rows.length > 0;
 }
 
-export function adminIds(env = process.env) {
-  return (env.OPERATOR_ADMIN_IDS || "")
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-}
+export { ownerIds as adminIds } from "./auth";
 
 /**
  * Feste Texte für Team-Meldungen auf Gerät und per E-Mail. Sie enthalten
@@ -298,7 +294,8 @@ export async function teamEvent(
   );
   if (!e.alert) return;
   const text = TEAM_ALERTS[e.alert.kind];
-  for (const admin of adminIds()) {
+  // Grundverwaltung, Admins und Moderatoren — jede Person genau einmal.
+  for (const admin of await teamRecipients(tx)) {
     for (const channel of ["push", "email"] as const)
       await enqueue(tx, {
         dedupeKey: `${e.alert.key}:${channel}:${admin}`,
@@ -316,12 +313,12 @@ export async function teamEvent(
 }
 
 /**
- * Verwaltungskonten bekommen die kurze E-Mail-Absicherung standardmäßig an
+ * Team-Konten (Admins, Moderatoren) bekommen die kurze E-Mail-Absicherung standardmäßig an
  * die bestätigte Adresse ihrer Sitzung. Legt die Einstellung beim ersten
  * Besuch der Verwaltung an und ändert eine bestehende Wahl nicht.
  */
 export async function ensureAdminPrefs(db: Database, actor: Actor) {
-  if (!actor.admin) return;
+  if (!isTeam(actor)) return;
   await db.query(
     `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email)
      VALUES($1,true,true,true,$2)

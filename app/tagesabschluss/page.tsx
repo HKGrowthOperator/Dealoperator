@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircle, LayoutDashboard } from "lucide-react";
-import { getCurrentUser } from "@/server/auth";
+import { MessageCircle, LayoutDashboard, Settings } from "lucide-react";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { closingState } from "@/server/closing";
 import { discordLink } from "@/server/discord-admin";
@@ -81,6 +81,11 @@ export default async function Page({
             <Link href="/heute?modus=eigen">
               <LayoutDashboard size={16} aria-hidden="true" /> Meine Übersicht
             </Link>
+            {isTeam(actor) && (
+              <Link href="/verwaltung">
+                <Settings size={16} aria-hidden="true" /> Verwaltung
+              </Link>
+            )}
           </nav>
         </div>
         <ClosingForm

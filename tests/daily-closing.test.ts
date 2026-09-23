@@ -315,7 +315,7 @@ test("wins import: preview, commit, repeat without changes; members' days stay t
   assert.equal(second.written, 0);
   assert.equal(second.cases, 0);
   assert.equal((await db.query("SELECT * FROM checkins WHERE participant=$1", [claimed])).length, 0);
-  await assert.rejects(previewWins(db, alice, { text, day }), /Verwaltung/);
+  await assert.rejects(previewWins(db, alice, { text, day }), /Team/);
 });
 
 test("a review case resolved as alias makes the next import of the same text count", async () => {
@@ -338,7 +338,7 @@ test("members request pauses from today on; the team decides once", async () => 
   await member(alice, "Alice");
   await assert.rejects(requestPause(db, alice, { from: dayOffset(-1), to: dayOffset(2) }), /ab heute/);
   const { id } = await requestPause(db, alice, { from: today(), to: dayOffset(3), reason: "Urlaub" });
-  await assert.rejects(decidePause(db, alice, { id, decision: "approved" }), /Verwaltung/);
+  await assert.rejects(decidePause(db, alice, { id, decision: "approved" }), /Team/);
   await decidePause(db, admin, { id, decision: "approved" });
   await assert.rejects(decidePause(db, admin, { id, decision: "rejected" }), /schon entschieden/);
 });

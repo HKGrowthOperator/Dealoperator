@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
 import { AppError, rateLimit } from "@/server/operator";
@@ -27,7 +27,9 @@ export async function GET() {
     const vapid = await vapidKeys(db);
     return json({
       publicKey: vapid.publicKey,
-      admin: actor.admin,
+      // Team-Schalter (Push und E-Mail bei neuen Registrierungen) für Admins
+      // und Moderatoren.
+      admin: isTeam(actor),
       prefs: await notificationPrefs(db, actor.userId),
     });
   } catch (e) {

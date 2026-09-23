@@ -208,6 +208,12 @@ CREATE TABLE IF NOT EXISTS notification_deliveries(
 -- Jeder Schreibweg nennt die Herkunft ausdrücklich; kein stiller Standard.
 ALTER TABLE checkins ALTER COLUMN origin DROP DEFAULT;
 
+CREATE TABLE team_roles(
+  owner text PRIMARY KEY,
+  role text NOT NULL CHECK (role IN ('admin','moderator')),
+  granted_by text NOT NULL,
+  granted_at timestamptz NOT NULL DEFAULT now()
+);
 INSERT INTO events(day,title,partner,url,thanks,created_by)
 VALUES('2026-09-22','Akquise Day','akquise.de','https://akquise.de',
   'Danke an akquise.de für diesen Tag und an alle, die mitgezogen haben.','migration-0003')

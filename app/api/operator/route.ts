@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database } from "@/server/database";
 import {
   AppError,
@@ -28,9 +28,11 @@ export async function GET() {
     const state = await ownState(db, actor);
     return json({
       ...state,
-      ...(actor.admin
+      ...(isTeam(actor)
         ? {
-            contacts: await adminContacts(db, actor),
+            // Die vollständige Kontaktliste sehen nur Admins; Moderatoren
+            // bekommen Kontaktdaten nur an der einzelnen Anfrage.
+            contacts: actor.admin ? await adminContacts(db, actor) : [],
             requests: await reviewQueue(db, actor),
             participants: await db.query(
               "SELECT id,import_key,name,company,kind,owner IS NOT NULL AS claimed,public_consent,searchable FROM participants ORDER BY created_at DESC",
@@ -62,9 +64,9 @@ export async function POST(request: Request) {
       );
     if (value.action === "account")
       return json(await updateAccount(db, actor, value.value));
-    if (!actor.admin)
+    if (!isTeam(actor))
       throw new AppError(
-        "Dieser Bereich ist nur für die Verwaltung freigeschaltet.",
+        "Dieser Bereich ist nur für das Team freigeschaltet.",
         403,
       );
     if (value.action === "previewImport") {

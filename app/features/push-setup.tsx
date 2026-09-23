@@ -389,11 +389,12 @@ export default function PushSetup({
       <ul className="cm-rules">
         <li>
           <Bell size={16} aria-hidden="true" /> Um {clockText(settings.eveningReminder)}, wenn dein
-          Tagesabschluss an einem Pflicht-Tag noch fehlt.
+          Tagesabschluss an einem Calling-Tag noch fehlt.
         </li>
         <li>
           <Bell size={16} aria-hidden="true" /> Um {clockText(settings.streakWarning)} am nächsten
-          Pflicht-Tag, wenn eine laufende Serie an der {settings.deadlineHour}-Uhr-Frist hängt.
+          Calling-Tag, wenn dein Abschluss noch offen ist und bis {settings.deadlineHour}:00 Uhr
+          noch für deine laufende Serie zählt.
         </li>
         <li>
           <BellOff size={16} aria-hidden="true" /> Nie am Wochenende, nie in deiner Ruhezeit oder
@@ -581,7 +582,7 @@ export default function PushSetup({
 
           {info.admin && (
             <div className="cm-pref cm-admin-prefs">
-              <p className="cm-label">Nur für die Verwaltung</p>
+              <p className="cm-label">Für Admins und Moderatoren</p>
               <label className="cm-switch">
                 <input
                   type="checkbox"
@@ -598,7 +599,7 @@ export default function PushSetup({
                 <span className="cm-switch-track" aria-hidden="true" />
                 <span>
                   <strong>Team-Pushs</strong>
-                  <small>Zum Beispiel bei einer neuen Registrierung, einmal je Ereignis.</small>
+                  <small>Bei neuen Anmeldungen und Profilübernahmen, einmal je Person.</small>
                 </span>
               </label>
               <label className="cm-switch">

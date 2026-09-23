@@ -275,7 +275,7 @@ test("non-admin cannot import or create claim invitations", async () => {
     /Verwaltung/,
   );
   const id = await imported();
-  await assert.rejects(issueClaim(db, alice, id), /Verwaltung/);
+  await assert.rejects(issueClaim(db, alice, id), /Team/);
 });
 test("a confirmed email alone never hands over a prepared profile", async () => {
   const id = await imported();
@@ -309,9 +309,9 @@ test("only the team can decide, and members cannot decide for themselves", async
   const requestId = await request(id, alice);
   await assert.rejects(
     decideRequest(db, alice, { id: requestId, decision: "approve" }),
-    /Verwaltung/,
+    /Team/,
   );
-  await assert.rejects(reviewQueue(db, alice), /Verwaltung/);
+  await assert.rejects(reviewQueue(db, alice), /Team/);
   assert.equal(
     (await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0]
       .owner,

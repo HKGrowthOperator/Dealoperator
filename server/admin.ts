@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
-import type { Actor } from "./auth";
+import { isTeam, type Actor } from "./auth";
 import { AppError } from "./operator";
 import { calendarDaySchema } from "../lib/kpis";
 import { saveCommitmentSettings, loadCommitmentSettings } from "./settings";
@@ -14,14 +14,19 @@ import { saveCommitmentSettings, loadCommitmentSettings } from "./settings";
 
 function requireAdmin(actor: Actor) {
   if (!actor.admin)
-    throw new AppError("Dieser Bereich ist nur für die Verwaltung freigeschaltet.", 403);
+    throw new AppError("Das kann nur ein Admin ändern.", 403);
+}
+/** Admins und Moderatoren. */
+function requireTeam(actor: Actor) {
+  if (!isTeam(actor))
+    throw new AppError("Dieser Bereich ist nur für das Team freigeschaltet.", 403);
 }
 
 // ---------------------------------------------------------------------------
 // Team-Inbox
 
 export async function teamInbox(db: Database, actor: Actor) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const rows = await db.query(
     `SELECT id,kind,ref,state,title,body,created_at,updated_at,resolved_at FROM team_inbox
       ORDER BY (resolved_at IS NULL) DESC, updated_at DESC LIMIT 100`,
@@ -45,7 +50,7 @@ export async function teamInbox(db: Database, actor: Actor) {
  * sein). Namen nur im geschützten Verwaltungsbereich.
  */
 export async function unconfirmedRegistrations(db: Database, actor: Actor) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const rows = await db.query(
     `SELECT id,kind,full_name,created_at,updated_at FROM onboarding_requests
       WHERE status='awaiting_email' AND updated_at > now() - interval '14 days'
@@ -66,7 +71,7 @@ export async function unconfirmedRegistrations(db: Database, actor: Actor) {
 }
 
 export async function resolveInbox(db: Database, actor: Actor, raw: unknown) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const v = z.object({ id: z.number().int().positive(), reopen: z.boolean().default(false) }).strict().parse(raw);
   await db.query(
     v.reopen
@@ -81,7 +86,7 @@ export async function resolveInbox(db: Database, actor: Actor, raw: unknown) {
 // Pausen
 
 export async function pauseList(db: Database, actor: Actor) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const rows = await db.query(
     `SELECT pa.id,pa.from_day,pa.to_day,pa.reason,pa.status,pa.created_at,p.name
        FROM pauses pa JOIN participants p ON p.id=pa.participant
@@ -102,7 +107,7 @@ const decideSchema = z
   .strict();
 
 export async function decidePause(db: Database, actor: Actor, raw: unknown) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const v = decideSchema.parse(raw);
   const rows = await db.query(
     `UPDATE pauses SET status=$2,decided_by=$3,decided_at=now() WHERE id=$1 AND status='requested' RETURNING id`,
@@ -118,7 +123,7 @@ export async function decidePause(db: Database, actor: Actor, raw: unknown) {
 
 /** Das Team kann eine Pause auch direkt eintragen (z. B. Urlaub, Krankheit). */
 export async function addPause(db: Database, actor: Actor, raw: unknown) {
-  requireAdmin(actor);
+  requireTeam(actor);
   const v = z
     .object({
       participantId: z.string().min(1).max(100),
@@ -204,7 +209,7 @@ export async function deleteEvent(db: Database, actor: Actor, raw: unknown) {
 // Dranbleiben-Regeln
 
 export async function commitmentRules(db: Database, actor: Actor) {
-  requireAdmin(actor);
+  requireTeam(actor);
   return loadCommitmentSettings(db);
 }
 
