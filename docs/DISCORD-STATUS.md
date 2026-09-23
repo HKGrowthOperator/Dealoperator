@@ -2,43 +2,44 @@
 
 Stand: 23. September 2026.
 
-## Was im Code vorbereitet ist
+## Grundsatz (seit 23.09.2026)
 
-Website und Discord haben **eine** Datenquelle: die Tagesabschlüsse in der
-Datenbank. Discord bekommt keine eigene Zählung und kann keine Zahlen ohne
-vollständige Reflexion einreichen.
+Discord ist für **Calls** da: Sessions und Roleplay in eigenen Räumen,
+Call-Partner finden, sich gegenseitig pushen und sehen, wer durchzieht. Die
+Ränge der Website (vor allem „Aktiver Caller“) erscheinen dort als Rollen.
+Tagesabschlüsse, Reflexionen, Zahlen und Kontaktdaten werden **nicht** in
+Discord geteilt; die frühere Beitragsfunktion (`server/discord-sync.ts`) ist
+stillgelegt und wird nicht mehr aufgerufen.
+
+## Was im Code vorbereitet ist
 
 | Teil | Datei | Braucht |
 | --- | --- | --- |
-| Kontoverknüpfung (OAuth2 „identify“), je Discord-Konto genau ein Website-Konto | `server/discord-admin.ts`, `app/api/discord/connect`, `app/api/discord/callback` | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, Redirect `APP_URL/api/discord/callback` in der Discord-Anwendung |
-| Beiträge freigegebener Tagesabschlüsse im Reflexions-Channel, Korrektur bearbeitet den vorhandenen Beitrag, zurückgenommene Freigabe löscht ihn | `server/discord-sync.ts` (läuft im Minutentakt) | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, `DISCORD_REFLECTION_CHANNEL_ID` |
-| „Antworten auf Discord“ auf `/reflexionen` führt zum gespeicherten Beitrag | `server/reflections.ts` | gespeicherte Zuordnung in `discord_posts` |
-| Befehle `/tagesabschluss` (Link zur Website) und `/serie` (eigene Serien, nur für die fragende Person sichtbar) | `app/api/discord/interactions` | `DISCORD_PUBLIC_KEY`, Befehlsregistrierung in der Discord-Anwendung, Interactions-URL `APP_URL/api/discord/interactions` |
-| Rollen und Channels lesen (nur lesend, zur Zuordnung) | Verwaltung → Discord → Inventar | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` |
+| Session-Räume: je Session auf der Website ein Sprachkanal (mit Chat) und ein Discord-Event; Link erscheint in der Session; Titel, Zeit und Plätze werden nachgezogen; nach Absage oder 6 Stunden nach Ende abgeräumt | `server/discord-sessions.ts` (Knopf in Verwaltung → Discord und alle 15 Minuten im Server-Takt) | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, optional `DISCORD_SESSION_CATEGORY_ID`; Bot-Rechte „Kanäle verwalten“, „Events verwalten“ |
+| Rang „Aktiver Caller“ als Rolle: 5 Calling-Tage am Stück mit mindestens 50 Anwahlen, weg nach 3 Calling-Tagen in Folge ohne Anwahlen (`lib/active-caller.ts`); Session-Räume sind dann nur mit dieser Rolle oder als Moderator betretbar, sehen können sie alle | `server/discord-sessions.ts`, `server/active-caller.ts` | zusätzlich `DISCORD_ACTIVE_ROLE_ID`; Bot-Recht „Rollen verwalten“, Bot-Rolle über der Rolle |
+| Moderatorrolle für Admins und Moderatoren der Website | `server/discord-sessions.ts` | zusätzlich `DISCORD_MODERATOR_ROLE_ID`; Bot-Rolle über der Rolle |
+| Kontoverknüpfung (OAuth2 „identify“), je Discord-Konto genau ein Website-Konto; Voraussetzung für die Rollen | `server/discord-admin.ts`, `app/api/discord/connect`, `app/api/discord/callback` | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, Redirect `APP_URL/api/discord/callback` |
+| Befehle `/tagesabschluss` (Link zur Website) und `/serie` (eigene Serie, nur für die fragende Person sichtbar) | `app/api/discord/interactions` | `DISCORD_PUBLIC_KEY`, Befehlsregistrierung, Interactions-URL `APP_URL/api/discord/interactions` |
+| Rollen und Channels lesen (nur lesend, um IDs zu finden) | Verwaltung → Discord → Inventar | `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID` |
 
-Übertragen wird nur, was ein Mitglied beim Einreichen ausdrücklich zum Teilen
-auf Discord angekreuzt hat, nur aus den letzten sieben Tagen und nie Entwürfe,
-Importe, Kontaktdaten, Unterstützungswünsche oder alte private Reflexionen.
-Zahlen stehen im Beitrag nur mit Zustimmung zur öffentlichen Anzeige.
+Rollen entzieht der Abgleich nur denen, denen er sie selbst gegeben hat; von
+Hand vergebene Rollen im Discord bleiben unberührt.
 
 ## Was davon läuft
 
-**Nichts davon ist aktiv.** Keine der oben genannten Umgebungsvariablen ist
-gesetzt. Ohne sie bleibt die Outbox unverändert (nichts wird als übertragen
-markiert), die Verwaltung zeigt die fehlenden Werte, `/reflexionen` bietet
-statt eines Beitrags ehrlich den Einladungslink an, und
-`/api/discord/interactions` antwortet mit 404. Es wurden keine Nachrichten in
-den Server gesendet.
+Sobald die Werte in Coolify gesetzt sind, zeigt Verwaltung → Discord den Stand
+und einen Knopf „Jetzt mit Discord abgleichen“. Ohne die Werte passiert
+nichts; die Website sagt dann ehrlich, dass der Raum-Link noch folgt.
 
 ## Was von außen noch nötig ist
 
 - Discord-Anwendung mit Bot: Client-ID, Client-Secret, Bot-Token, Public Key.
-- Server-(Guild-)ID und die ID des Reflexions-Channels. Empfehlung: ein
-  Channel, der nur für verknüpfte, berechtigte Mitglieder sichtbar ist.
-- Das bestehende Rollen- und Channelkonzept (welche Rollen gibt es, wer darf
-  was sehen). Vorhandene Rollen werden nicht überschrieben; das Inventar in der
-  Verwaltung liest sie nur.
-- Registrierung der beiden Befehle in der Discord-Anwendung.
+- Server-(Guild-)ID, eine Kategorie für die Session-Räume (optional), die
+  Rollen „Aktiver Caller“ und „Moderator“ (IDs über Verwaltung → Discord →
+  Rollen und Channels lesen).
+- Bot einladen mit „Kanäle verwalten“, „Events verwalten“, „Rollen
+  verwalten“; seine Rolle in der Rollenliste über „Aktiver Caller“ und
+  „Moderator“ schieben.
 
 ## Slack und Zoom
 
