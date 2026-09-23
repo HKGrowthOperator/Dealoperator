@@ -96,6 +96,8 @@ type CommitmentRow = {
   id: string;
   name: string;
   company: string;
+  /** Rang „Aktiver Caller“. */
+  active?: boolean;
   streak: { current: number; best: number };
   activeDays: number;
   closedDays: number;
@@ -940,6 +942,12 @@ export default function RankingBoard({
                                 <span className="rr-rank-name">
                                   <strong>{row.name}</strong>
                                   <small>{row.company || "Caller"}</small>
+                                  {row.active && (
+                                    <span className="rr-active-caller">
+                                      <Flame size={13} aria-hidden="true" />
+                                      Aktiver Caller
+                                    </span>
+                                  )}
                                 </span>
                                 <dl className="rr-commit-stats">
                                   <div data-lead="true">

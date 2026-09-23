@@ -3,6 +3,7 @@ import { berlinDate } from "../lib/kpis";
 import { summarize } from "../lib/commitment";
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
 import { ownClosings, toClosings } from "./closing";
+import { activeCallerForParticipant } from "./active-caller";
 
 /**
  * Öffentliche Dranbleiben-Rangliste: nur Serien und aktive Tage von Personen,
@@ -51,10 +52,13 @@ export async function commitmentRanking(
       now,
       settings,
     });
+    // Rang „Aktiver Caller“ (lib/active-caller.ts), auch hier sichtbar.
+    const caller = await activeCallerForParticipant(db, p.id as string, today, { settings, pauses });
     rows.push({
       id: p.id as string,
       name: p.name as string,
       company: (p.company as string) || "",
+      active: caller.active,
       streak: overall.streak,
       activeDays: range.activeDays,
       closedDays: range.closedDays,

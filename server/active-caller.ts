@@ -1,6 +1,6 @@
 import type { Database } from "./database";
 import { berlinDate } from "../lib/kpis";
-import { addDays } from "../lib/commitment";
+import { addDays, type CommitmentSettings, type Pause } from "../lib/commitment";
 import { activeCaller, type ActiveCaller } from "../lib/active-caller";
 import { approvedPauses, loadCommitmentSettings } from "./settings";
 
@@ -19,15 +19,21 @@ export async function activeCallerFor(db: Database, owner: string, today = berli
   return activeCallerForParticipant(db, p.id as string, today);
 }
 
-export async function activeCallerForParticipant(db: Database, participant: string, today = berlinDate()) {
+export async function activeCallerForParticipant(
+  db: Database,
+  participant: string,
+  today = berlinDate(),
+  /** Bereits geladene Regeln und Pausen (z. B. in der Rangliste). */
+  known: { settings?: CommitmentSettings; pauses?: Pause[] } = {},
+) {
   const [rows, settings, pauses] = await Promise.all([
     db.query(
       `SELECT day,counts->>'attempts' AS attempts
          FROM checkins WHERE participant=$1 AND day >= $2 AND day <= $3`,
       [participant, addDays(today, -WINDOW_DAYS), today],
     ),
-    loadCommitmentSettings(db),
-    approvedPauses(db, participant),
+    known.settings ?? loadCommitmentSettings(db),
+    known.pauses ?? approvedPauses(db, participant),
   ]);
   const attempts: Record<string, number> = {};
   for (const r of rows) attempts[r.day as string] = Number(r.attempts) || 0;
