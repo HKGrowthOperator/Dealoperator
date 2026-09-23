@@ -350,6 +350,17 @@ export default function OnboardingStart({
           >
             Weiter zu meinen Kontaktdaten
           </button>
+          <p className="onboarding-signin">
+            Du hast schon ein Konto?{" "}
+            <Link
+              href={`/anmelden?next=${encodeURIComponent(
+                `/profil-uebernehmen?profil=${selected.id}${invite ? `&einladung=${invite}` : ""}`,
+              )}`}
+            >
+              Anmelden
+            </Link>
+            , deine Auswahl bleibt erhalten.
+          </p>
           <button
             type="button"
             className="text-link"

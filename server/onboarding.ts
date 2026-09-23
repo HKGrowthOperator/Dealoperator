@@ -227,6 +227,21 @@ export async function bindConfirmedRequest(
       await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits ein Profil.");
       return null;
     }
+    // Läuft für dieses Konto schon eine Übernahme (z. B. angemeldet gestellt),
+    // bleibt es bei dieser einen Anfrage.
+    const [running] = await tx.query(
+      `SELECT id FROM onboarding_requests
+        WHERE owner=$1 AND kind='claim' AND status IN ('pending','info_needed') LIMIT 1`,
+      [actor.userId],
+    );
+    if (running) {
+      await tx.query(
+        `UPDATE onboarding_requests SET owner=$2,status='superseded',updated_at=now() WHERE id=$1`,
+        [request.id, actor.userId],
+      );
+      await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits eine offene Übernahme.");
+      return null;
+    }
     // Die Bindung an das Konto ist die Stelle, an der aus einer anonymen
     // Eingabe eine belegte Anfrage wird.
     await tx.query(
@@ -298,7 +313,10 @@ export async function noteConfirmedAccount(db: Database, actor: Actor) {
 export async function requestForActor(db: Database, actor: Actor) {
   const [r] = await db.query(
     `SELECT r.id,r.kind,r.status,r.full_name,r.email,r.phone,r.hint,r.applicant_message,
-            r.created_at,r.updated_at,r.decided_at,p.name AS participant_name
+            r.created_at,r.updated_at,r.decided_at,p.name AS participant_name,
+            (SELECT e.note FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='applicant_answered'
+              ORDER BY e.created_at DESC LIMIT 1) AS last_answer
      FROM onboarding_requests r
      LEFT JOIN participants p ON p.id=r.participant
      WHERE r.owner=$1 ORDER BY r.created_at DESC LIMIT 1`,
@@ -315,6 +333,7 @@ export async function requestForActor(db: Database, actor: Actor) {
     hint: r.hint,
     // Interne Prüfnotizen bleiben im Team; nur applicant_message ist sichtbar.
     message: r.applicant_message,
+    lastAnswer: (r.last_answer as string | null) || "",
     participantName: r.participant_name,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -332,6 +351,9 @@ export async function reviewQueue(db: Database, actor: Actor) {
             p.name AS participant_name,p.company AS participant_company,p.role AS participant_role,
             p.email AS participant_known_email,p.import_key,
             a.phone AS known_phone,
+            (SELECT e.note FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='applicant_answered'
+              ORDER BY e.created_at DESC LIMIT 1) AS applicant_answer,
             (SELECT count(*) FROM onboarding_requests o
               WHERE o.participant=r.participant AND o.id<>r.id
                 AND o.status IN (${OPEN_LIST})) AS competing
@@ -501,4 +523,164 @@ export async function openClaimRequest(db: Database, userId: string) {
     [userId],
   );
   return r ? (r.id as string) : null;
+}
+
+export const claimSchema = z
+  .object({
+    participantId: z.string().trim().min(1).max(100),
+    invite: z.string().trim().max(200).optional(),
+    fullName: contactSchema.shape.fullName,
+    phone: contactSchema.shape.phone,
+    hint: contactSchema.shape.hint,
+  })
+  .strict();
+
+/**
+ * Übernahme mit einem bereits angemeldeten Konto. Die E-Mail ist bestätigt,
+ * deshalb gibt es keinen zweiten Bestätigungslink; die Anfrage geht direkt in
+ * die Teamprüfung. Wie beim Weg über die Registrierung gilt: Weder die
+ * bestätigte E-Mail noch ein Einladungscode geben das Profil frei.
+ *
+ * Wiederholtes Absenden für dasselbe Profil ändert nur die Angaben derselben
+ * Anfrage; es entsteht weder eine zweite Anfrage noch ein zweiter
+ * Team-Hinweis.
+ */
+export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unknown) {
+  const v = claimSchema.parse(raw);
+  const phone = normalisePhone(v.phone);
+  if (!phone.ok) throw new AppError(phone.reason);
+  await rateLimit(db, `claim-account:${actor.userId}`, 10, 3600);
+  await rateLimit(db, `onboarding-profile:${v.participantId}`, 12, 3600);
+
+  return db.transaction(async (tx) => {
+    // Dieselbe Sperre wie bei Profilanlage und Bindung: pro Konto läuft immer
+    // nur einer dieser Schritte.
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `owner:${actor.userId}`,
+    ]);
+    const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
+      actor.userId,
+    ]);
+    if (owned)
+      throw new AppError(
+        "Dein Konto hat bereits ein eigenes Profil. Eine zweite Übernahme ist nicht möglich.",
+        409,
+      );
+
+    const [open] = await tx.query(
+      `SELECT id,participant,status FROM onboarding_requests
+        WHERE owner=$1 AND kind='claim' AND status IN ('pending','info_needed')
+        ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [actor.userId],
+    );
+    if (open && open.participant !== v.participantId)
+      throw new AppError(
+        "Für dein Konto läuft bereits eine Übernahmeanfrage. Bitte warte die Prüfung durch das Team ab.",
+        409,
+      );
+    if (open) {
+      await tx.query(
+        `UPDATE onboarding_requests SET full_name=$2,phone=$3,phone_input=$4,hint=$5,updated_at=now()
+          WHERE id=$1`,
+        [open.id, v.fullName, phone.value, v.phone, v.hint],
+      );
+      await log(tx, open.id, actor.userId, "resubmitted", "");
+      return { id: open.id as string, status: open.status as string, repeated: true };
+    }
+
+    // Prüft: noch frei, persönliches Profil, auffindbar oder gültige Einladung.
+    const p = await profileForSelection(tx, v.participantId, v.invite);
+
+    // Eine noch unbestätigte Anfrage derselben Adresse für dasselbe Profil (etwa
+    // aus einem anderen Browser) wird zu dieser Anfrage, statt eine zweite
+    // anzulegen.
+    const [waiting] = await tx.query(
+      `SELECT id FROM onboarding_requests
+        WHERE lower(email)=$1 AND participant=$2 AND status='awaiting_email' FOR UPDATE`,
+      [actor.email, p.id],
+    );
+    const id = (waiting?.id as string | undefined) ?? randomUUID();
+    if (waiting)
+      await tx.query(
+        `UPDATE onboarding_requests
+            SET owner=$2,status='pending',kind='claim',full_name=$3,phone=$4,phone_input=$5,
+                hint=$6,updated_at=now()
+          WHERE id=$1`,
+        [id, actor.userId, v.fullName, phone.value, v.phone, v.hint],
+      );
+    else
+      await tx.query(
+        `INSERT INTO onboarding_requests(id,kind,participant,email,full_name,phone,phone_input,hint,status,owner)
+         VALUES($1,'claim',$2,$3,$4,$5,$6,$7,'pending',$8)`,
+        [id, p.id, actor.email, v.fullName, phone.value, v.phone, v.hint, actor.userId],
+      );
+    // Andere noch unbestätigte Anfragen dieser Adresse dürfen sich später nicht
+    // mehr an das Konto hängen.
+    await tx.query(
+      `UPDATE onboarding_requests SET status='superseded',updated_at=now()
+        WHERE lower(email)=$1 AND status='awaiting_email' AND id<>$2`,
+      [actor.email, id],
+    );
+    await log(tx, id, actor.userId, "submitted_signed_in", "");
+    await tx.query(
+      `INSERT INTO account_private(owner,email,phone) VALUES($1,$2,$3)
+       ON CONFLICT(owner) DO UPDATE SET email=excluded.email,
+         phone=CASE WHEN account_private.phone='' THEN excluded.phone ELSE account_private.phone END,
+         updated_at=now()`,
+      [actor.userId, actor.email, phone.value],
+    );
+    await teamEvent(tx, {
+      dedupeKey: `registration:${id}`,
+      kind: "registration",
+      ref: id,
+      state: "review_ready",
+      title: `Profilübernahme prüfbereit: ${v.fullName}`,
+      body: "Angefragt mit einem angemeldeten Konto, E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung.",
+      // Genau einmal je Anfrage, auch bei wiederholtem Absenden.
+      alert: { key: `claim:${id}`, kind: "claim" },
+    });
+    return { id, status: "pending", repeated: false };
+  });
+}
+
+const answerSchema = z
+  .object({ message: z.string().trim().min(3, "Bitte schreib kurz deine Antwort.").max(1000) })
+  .strict();
+
+/**
+ * Antwort auf eine Rückfrage des Teams. Die Anfrage geht damit zurück in die
+ * Prüfung; das Team sieht die Antwort unter Übernahmen und bekommt einen
+ * Hinweis.
+ */
+export async function answerInfoRequest(db: Database, actor: Actor, raw: unknown) {
+  const v = answerSchema.parse(raw);
+  await rateLimit(db, `claim-answer:${actor.userId}`, 5, 3600);
+  return db.transaction(async (tx) => {
+    const [request] = await tx.query(
+      `SELECT id,full_name FROM onboarding_requests
+        WHERE owner=$1 AND status='info_needed' ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
+      [actor.userId],
+    );
+    if (!request)
+      throw new AppError("Zu deiner Anfrage gibt es gerade keine offene Rückfrage.", 409);
+    const [event] = await tx.query(
+      `INSERT INTO onboarding_events(request,actor,action,note)
+       VALUES($1,$2,'applicant_answered',$3) RETURNING id`,
+      [request.id, actor.userId, v.message],
+    );
+    await tx.query(
+      "UPDATE onboarding_requests SET status='pending',updated_at=now() WHERE id=$1",
+      [request.id],
+    );
+    await teamEvent(tx, {
+      dedupeKey: `answer:${event.id}`,
+      kind: "registration",
+      ref: request.id,
+      state: "review_ready",
+      title: `Antwort auf Rückfrage: ${request.full_name}`,
+      body: "Die Person hat auf eure Rückfrage geantwortet. Die Antwort steht unter Übernahmen.",
+      alert: { key: `answer:${event.id}`, kind: "answer" },
+    });
+    return { ok: true, status: "pending" };
+  });
 }

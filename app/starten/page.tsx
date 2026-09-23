@@ -16,7 +16,16 @@ export default async function Page({
   searchParams: Promise<Record<string, string>>;
 }) {
   const search = await searchParams;
-  if (await getCurrentUser()) redirect(safeNext(search.next || null));
+  if (await getCurrentUser()) {
+    // Angemeldet mit ausgewähltem Profil oder Einladung: direkt zur
+    // Übernahme mit dem bestehenden Konto, ohne die Auswahl zu verlieren.
+    if (search.profil) {
+      const params = new URLSearchParams({ profil: search.profil.slice(0, 100) });
+      if (search.einladung) params.set("einladung", search.einladung.slice(0, 200));
+      redirect(`/profil-uebernehmen?${params}`);
+    }
+    redirect(safeNext(search.next || null));
+  }
 
   // Direktlink aus einer persönlichen Einladung: Profil vorauswählen, sofern
   // es noch frei ist. Ein bereits übernommenes Profil fällt hier heraus.

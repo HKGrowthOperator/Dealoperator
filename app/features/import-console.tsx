@@ -367,7 +367,7 @@ export default function ImportConsole({
                           id: p.id,
                         });
                         setInvitation(
-                          `Deine Zahlen aus dem gemeinsamen Callen stehen im Ranking von Deal Operator. Wenn du deine Zahlen künftig selbst eintragen möchtest (freiwillig): ${window.location.origin}/profil-uebernehmen?profil=${p.id}\nDein persönlicher Code: ${d.token}, 7 Tage gültig. Der Code gilt nur für dich, bitte nicht weitergeben.`,
+                          `Deine Zahlen aus dem gemeinsamen Callen stehen im Ranking von Deal Operator. Wenn du deine Zahlen künftig selbst eintragen möchtest (freiwillig), frag hier die Übernahme an: ${window.location.origin}/profil-uebernehmen?profil=${encodeURIComponent(p.id)}&einladung=${encodeURIComponent(d.token)}\nDer Link ist 7 Tage gültig und nur für dich, bitte nicht weitergeben. Das Team prüft die Anfrage kurz und gibt das Profil dann frei.`,
                         );
                       } catch (e) {
                         setMessage((e as Error).message);

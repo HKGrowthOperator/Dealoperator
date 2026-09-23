@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Check, Clock, MessageCircleQuestion, ShieldCheck, XCircle } from "lucide-react";
+import ClaimAnswer from "./claim-answer";
 
 const VIEW: Record<
   string,
@@ -8,26 +9,26 @@ const VIEW: Record<
   pending: {
     icon: <Clock />,
     tone: "",
-    title: "Deine E-Mail ist bestätigt.",
-    lead: "Das Deal-Operator-Team prüft jetzt deine Profilübernahme.",
+    title: "Deine Anfrage ist in Prüfung.",
+    lead: "Das Deal-Operator-Team gleicht deine Angaben ab und gibt das Profil frei, sobald die Zuordnung eindeutig ist.",
   },
   info_needed: {
     icon: <MessageCircleQuestion />,
     tone: "",
-    title: "Das Team hat eine Rückfrage.",
-    lead: "Damit wir dein Profil sicher zuordnen können, fehlt uns noch eine Information.",
+    title: "Rückfrage vom Team.",
+    lead: "Damit das Team das Profil sicher zuordnen kann, braucht es noch eine Angabe von dir. Antworte einfach hier.",
   },
   rejected: {
     icon: <XCircle />,
     tone: "",
     title: "Diese Übernahme wurde nicht freigegeben.",
-    lead: "Melde dich kurz beim Team, dann richten wir dir ein eigenes Profil ein.",
+    lead: "Du kannst ein eigenes Profil anlegen oder ein anderes Profil anfragen.",
   },
   superseded: {
     icon: <XCircle />,
     tone: "",
-    title: "Dieses Profil wurde bereits zugeordnet.",
-    lead: "Ein anderes Konto wurde für dieses Profil freigegeben. Melde dich kurz beim Team, dann richten wir dir ein eigenes Profil ein.",
+    title: "Dieses Profil ist bereits zugeordnet.",
+    lead: "Ein anderes Konto wurde dafür freigegeben. Du kannst ein eigenes Profil anlegen oder ein anderes Profil anfragen.",
   },
   approved: {
     icon: <Check />,
@@ -36,6 +37,28 @@ const VIEW: Record<
     lead: "Deine bisherigen Zahlen stehen dir jetzt zur Verfügung.",
   },
 };
+
+/** Schritte der Anfrage, damit der Stand auf einen Blick lesbar ist. */
+function steps(status: string) {
+  const reviewLabel = status === "info_needed" ? "Rückfrage nötig" : "In Prüfung";
+  const done = (s: string[]) => s.includes(status);
+  return [
+    { label: "Anfrage eingegangen", state: "done" },
+    {
+      label: reviewLabel,
+      state: done(["approved", "rejected", "superseded"]) ? "done" : "current",
+    },
+    {
+      label:
+        status === "rejected"
+          ? "Nicht freigegeben"
+          : status === "superseded"
+            ? "Anderweitig zugeordnet"
+            : "Freigegeben",
+      state: done(["approved", "rejected", "superseded"]) ? "done" : "open",
+    },
+  ] as const;
+}
 
 export default function RequestStatus({
   request,
@@ -47,6 +70,7 @@ export default function RequestStatus({
     phone: string;
     hint: string;
     message: string;
+    lastAnswer: string;
     participantName: string;
     createdAt: string;
   };
@@ -57,11 +81,21 @@ export default function RequestStatus({
     month: "2-digit",
     year: "numeric",
   });
+  const closed = ["rejected", "superseded"].includes(request.status);
   return (
     <section className="auth-card card">
       <span className={`icon-tile ${view.tone}`}>{view.icon}</span>
       <h1>{view.title}</h1>
       <p>{view.lead}</p>
+
+      <ol className="request-steps" aria-label="Stand deiner Anfrage">
+        {steps(request.status).map((s) => (
+          <li key={s.label} data-state={s.state} aria-current={s.state === "current" ? "step" : undefined}>
+            <span aria-hidden="true">{s.state === "done" ? <Check size={14} /> : null}</span>
+            {s.label}
+          </li>
+        ))}
+      </ol>
 
       {request.participantName && (
         <div className="onboarding-selected compact">
@@ -77,16 +111,35 @@ export default function RequestStatus({
         </div>
       )}
 
+      {request.status === "info_needed" && <ClaimAnswer />}
+
+      {request.status === "pending" && request.lastAnswer && (
+        <div className="notice">
+          <strong>Deine Antwort ist beim Team.</strong>
+          <p>{request.lastAnswer}</p>
+        </div>
+      )}
+
       {request.status === "pending" && (
         <div className="notice">
           <strong>Was jetzt passiert.</strong>
           <p>
-            Wir gleichen deine Angaben mit der Person ab, die wir bereits
-            kennen — zum Beispiel über den bestehenden Kontakt. Nach der
-            Freigabe trägst du neue Tage selbst ein; Korrekturen an übernommenen
-            Tagen laufen über das Team. Das öffentliche Ranking kannst du schon
-            jetzt ansehen.
+            Das Team gleicht deine Angaben mit der Person ab, die es bereits
+            kennt. Nach der Freigabe trägst du neue Tage selbst ein; Korrekturen
+            an übernommenen Tagen laufen über das Team. Das öffentliche Ranking
+            kannst du schon jetzt ansehen.
           </p>
+        </div>
+      )}
+
+      {closed && (
+        <div className="request-actions">
+          <Link className="btn primary full" href="/start?weiter=eigen">
+            Eigenes Profil anlegen
+          </Link>
+          <Link className="btn secondary full" href="/profil-uebernehmen">
+            Anderes Profil anfragen
+          </Link>
         </div>
       )}
 
@@ -115,17 +168,11 @@ export default function RequestStatus({
         )}
       </dl>
 
-      <Link className="btn secondary full" href="/ranking">
-        Zum öffentlichen Ranking
-      </Link>
-      <a
-        className="text-link"
-        href="https://discord.gg/NjkFJtBkZm"
-        target="_blank"
-        rel="noreferrer"
-      >
-        Austausch auf Discord
-      </a>
+      {!closed && (
+        <Link className="btn secondary full" href="/ranking">
+          Zum öffentlichen Ranking
+        </Link>
+      )}
 
       <div className="auth-note">
         <ShieldCheck size={20} />

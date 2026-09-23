@@ -22,6 +22,7 @@ type Request = {
   hint: string;
   internal_note: string;
   applicant_message: string;
+  applicant_answer: string | null;
   owner: string | null;
   created_at: string;
   decided_at: string | null;
@@ -254,6 +255,11 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
               </div>
             </dl>
 
+            {r.applicant_answer && (
+              <p className="review-note">
+                <strong>Antwort auf eure Rückfrage:</strong> {r.applicant_answer}
+              </p>
+            )}
             {r.internal_note && (
               <p className="review-note">
                 <strong>Interne Notiz:</strong> {r.internal_note}

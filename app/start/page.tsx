@@ -22,7 +22,8 @@ export default async function Page({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const next = safeNext((await searchParams).next || null);
+  const search = await searchParams;
+  const next = safeNext(search.next || null);
   const actor = await getCurrentUser();
   if (!actor) redirect(`/anmelden?next=${encodeURIComponent(next)}`);
 
@@ -36,15 +37,21 @@ export default async function Page({
   if (state.participant) redirect(next);
 
   // Laufende Übernahmeanfrage: Prüfstatus statt Profilformular. Es entsteht
-  // ausdrücklich kein zweites Profil mit leeren Zahlen.
+  // ausdrücklich kein zweites Profil mit leeren Zahlen. Nach einer Ablehnung
+  // zeigt /status das Ergebnis; von dort geht es mit ?weiter=eigen zum
+  // eigenen Profil.
   const request = state.request as { kind?: string; status?: string } | null;
+  const status = String(request?.status ?? "pending");
   if (
     (bound?.kind === "claim" || request?.kind === "claim") &&
-    ["pending", "info_needed", "rejected", "superseded"].includes(
-      String(request?.status ?? "pending"),
-    )
+    (["pending", "info_needed"].includes(status) ||
+      (["rejected", "superseded"].includes(status) && search.weiter !== "eigen"))
   )
     redirect("/status");
+
+  // Anmeldung aus der Profilübernahme heraus: dorthin zurück, mit Auswahl.
+  if (new URL(next, "https://operator.invalid").pathname === "/profil-uebernehmen")
+    redirect(next);
 
   return (
     <div className="operator-site">

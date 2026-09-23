@@ -373,6 +373,54 @@ body,
   word-break: break-word;
 }
 
+.request-steps {
+  list-style: none;
+  margin: 18px 0 4px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+.request-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #58708e;
+  font-size: 0.95rem;
+}
+.request-steps li > span {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid #c5d4ea;
+  background: #fff;
+}
+.request-steps li[data-state="done"] {
+  color: #123765;
+}
+.request-steps li[data-state="done"] > span {
+  border-color: #0755f5;
+  background: #0755f5;
+  color: #fff;
+}
+.request-steps li[data-state="current"] {
+  color: #123765;
+  font-weight: 600;
+}
+.request-steps li[data-state="current"] > span {
+  border-color: #0755f5;
+  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 11px #0755f5;
+}
+.request-actions {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
 /* Verwaltung: Warteschlange der Übernahmeanfragen. */
 .admin-layout {
   width: min(960px, 100% - 32px);

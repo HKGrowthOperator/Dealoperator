@@ -350,8 +350,11 @@ export function EligibilityChecklist({
           key: "profile",
           done: !needs.has("profile") && !needs.has("login"),
           title: "Eigenes persönliches Profil",
-          text: "Lege dein eigenes Profil an. Stehen deine Zahlen schon im Ranking, sag vorher kurz dem Team Bescheid, damit es sie deinem Konto zuordnet.",
-          links: [{ href: `/start?next=${encodeURIComponent(next)}`, label: "Profil anlegen" }],
+          text: "Lege ein neues Profil an oder frag die Übernahme an, wenn deine Zahlen schon im Ranking stehen.",
+          links: [
+            { href: `/start?next=${encodeURIComponent(next)}`, label: "Profil anlegen" },
+            { href: "/profil-uebernehmen", label: "Meine Zahlen sind schon auf der Seite" },
+          ],
         },
     {
       key: "phone",

@@ -32,6 +32,7 @@ export default async function Page() {
             phone: String(request.phone),
             hint: String(request.hint || ""),
             message: String(request.message || ""),
+            lastAnswer: String(request.lastAnswer || ""),
             participantName: request.participantName
               ? String(request.participantName)
               : "",

@@ -5,7 +5,9 @@ import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
 import { AppError } from "@/server/operator";
 import {
+  answerInfoRequest,
   profileForSelection,
+  requestClaimSignedIn,
   requestForActor,
   ONBOARDING_COOKIE,
   searchProfiles,
@@ -67,6 +69,18 @@ export async function POST(request: Request) {
         },
         503,
       );
+    // Angemeldet: Übernahme mit dem bestehenden Konto anfragen oder auf eine
+    // Rückfrage antworten. Keine zweite Bestätigungsmail.
+    if (raw?.action === "claim" || raw?.action === "answer") {
+      const actor = await getCurrentUser();
+      if (!actor) throw new AppError("Bitte melde dich zuerst an.", 401);
+      const db = database();
+      return json(
+        raw.action === "claim"
+          ? await requestClaimSignedIn(db, actor, raw.value)
+          : await answerInfoRequest(db, actor, raw.value),
+      );
+    }
     if (raw?.action !== "start") throw new AppError("Unbekannte Aktion.");
 
     const db = database();

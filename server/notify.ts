@@ -266,6 +266,10 @@ export const TEAM_ALERTS = {
     title: "Profilübernahme prüfbereit",
     body: "Eine bestätigte Profilübernahme wartet auf eure Prüfung. Details in der Verwaltung.",
   },
+  answer: {
+    title: "Antwort auf eine Rückfrage",
+    body: "Jemand hat auf eure Rückfrage zur Profilübernahme geantwortet. Details in der Verwaltung.",
+  },
 } as const;
 export type TeamAlert = keyof typeof TEAM_ALERTS;
 

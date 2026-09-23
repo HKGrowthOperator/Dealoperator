@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { UserRound, LoaderCircle } from "lucide-react";
 
@@ -51,6 +52,10 @@ export default function MemberOnboarding({
       <p>
         Deine E-Mail ist bestätigt. Richte jetzt dein Profil ein und starte mit
         deinen eigenen Zahlen.
+      </p>
+      <p className="onboarding-signin">
+        Deine Zahlen stehen schon im Ranking?{" "}
+        <Link href="/profil-uebernehmen">Übernahme anfragen</Link>
       </p>
       <form className="form-stack" onSubmit={submit}>
         <label>

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 export default function AccountSettings({ demo }: { demo: boolean }) {
   const [value, setValue] = useState({
@@ -54,9 +55,12 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
       )}
       {!exists ? (
         <p>
-          Stehen deine Zahlen schon im Ranking? Sag kurz dem Team Bescheid,
-          damit es sie deinem Konto zuordnet. Sonst speicherst du nach dem
-          Ausfüllen deines Profils deinen ersten Tagesabschluss.
+          Stehen deine Zahlen schon im Ranking?{" "}
+          <Link className="text-link" href="/profil-uebernehmen">
+            Übernahme anfragen
+          </Link>
+          . Sonst speicherst du nach dem Ausfüllen deines Profils deinen ersten
+          Tagesabschluss.
         </p>
       ) : (
         <form
