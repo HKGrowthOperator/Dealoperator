@@ -10,7 +10,7 @@ Die Website besitzt ihre eigenen persistenten Community-Funktionen. Ein Website-
 
 Die nächste Ausbaustufe verwendet dieselbe PostgreSQL-Datenbank als maßgeblichen Zahlenstand. Website und Bot greifen durch geprüfte Serverfunktionen darauf zu. Ein MCP-Zugang ist für den späteren Dauerbetrieb nicht nötig. Ein Bot/Worker kann als eigener Dienst auf Coolify laufen; seine Zugangsdaten bleiben ausschließlich serverseitig.
 
-Die Geschäftslogik liegt in `server/operator.ts`, die Kennzahlen und Ränge in `lib/kpis.ts`. Für die Bot-Anbindung diese Logik bewusst erweitern, nicht eine zweite Rangberechnung in Discord erfinden. Nach einer Zahlenänderung legt die Anwendung in derselben Transaktion einen Eintrag in `operator.sync_outbox` an bzw. aktualisiert ihn.
+Die Geschäftslogik liegt in `server/operator.ts`, die Kennzahlen und KPI-Level in `lib/kpis.ts`. Für die Bot-Anbindung diese Logik bewusst erweitern, nicht eine zweite Rangberechnung in Discord erfinden. Nach einer Zahlenänderung legt die Anwendung in derselben Transaktion einen Eintrag in `operator.sync_outbox` an bzw. aktualisiert ihn.
 
 ## Zahlenformat
 
@@ -31,16 +31,16 @@ Werte sind nichtnegative ganze Zahlen oder `null` für nicht gemeldet. Ein fehle
 
 `saveCheckin` nimmt einen vollständigen Stand, `expectedRevision` und eine eindeutige `requestId` entgegen. Wiederholungen derselben Anfrage sind idempotent; veraltete Revisionen erzeugen einen Konflikt. Diese Semantik auch bei Discord-Modals erhalten. Eine Discord-Meldung darf keine neueren Website-Zahlen überschreiben. Vor dem Speichern den erwarteten Tagesstand laden und bei Konflikt erneut bestätigen lassen.
 
-## Ränge der Website
+## Level der Website
 
-Die Stufen heißen Bronze, Silber, Gold, Platin, Diamant. Grundlage ist die jeweilige aufsummierte Kennzahl, kein vermischter Punktescore.
+Jeder Track hat eigene Level, Level 1 bis Level 5; vor der ersten Schwelle steht „Noch kein Level“. Grundlage ist die jeweilige aufsummierte Kennzahl, kein vermischter Punktescore. Die Website zeigt sie als XP: 1 XP = 1 Anwahl, 1 gelegtes Setting, 1 gelegtes Closing bzw. 1 gewonnener Deal. Schwellen und Texte: `tracks` in `lib/kpis.ts`, `lib/levels.ts`.
 
-| Track      | Kennzahl            | Bronze | Silber |  Gold | Platin | Diamant |
-| ---------- | ------------------- | -----: | -----: | ----: | -----: | ------: |
-| Dialer     | Anwahlversuche      |    100 |    500 | 1.500 |  5.000 |  15.000 |
-| Setter     | Settings vereinbart |      5 |     20 |    50 |    150 |     400 |
-| Closer     | Closings vereinbart |      3 |     10 |    30 |    100 |     250 |
-| Deal Maker | Deals gewonnen      |      1 |      5 |    15 |     50 |     150 |
+| Track      | Kennzahl            | Level 1 | Level 2 | Level 3 | Level 4 | Level 5 |
+| ---------- | ------------------- | ------: | ------: | ------: | ------: | ------: |
+| Dialer     | Anwahlversuche      |     100 |     500 |   1.500 |   5.000 |  15.000 |
+| Setter     | Settings vereinbart |       5 |      20 |      50 |     150 |     400 |
+| Closer     | Closings vereinbart |       3 |      10 |      30 |     100 |     250 |
+| Deal Maker | Deals gewonnen      |       1 |       5 |      15 |      50 |     150 |
 
 Das Ranking selbst kann nach Kennzahl und Zeitraum gefiltert werden; gleiche Werte erhalten denselben Rang. Discord-Rollen nicht allein aus dem Rang eines zeitlich gefilterten öffentlichen Rankings ableiten. Vor dem Rollenabgleich mit dem vorhandenen Discord-Konzept abgleichen: Welche Rollen-IDs, Schwellen, Zeiträume und Aktivitätsregeln verwendet es bereits? Ohne diese Informationen keine vorhandenen Rollen überschreiben.
 

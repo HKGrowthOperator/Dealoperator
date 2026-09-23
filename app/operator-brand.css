@@ -641,27 +641,6 @@ body {
 .week-banner p {
   color: #526a8a;
 }
-.kpi-track progress {
-  appearance: none;
-  border: 0;
-  border-radius: 6px;
-  overflow: hidden;
-  height: 6px;
-  background: #dde8f8;
-  color: #0755f5;
-}
-.kpi-track progress::-webkit-progress-bar {
-  background: #dde8f8;
-  border-radius: 6px;
-}
-.kpi-track progress::-webkit-progress-value {
-  background: #0755f5;
-  border-radius: 6px;
-}
-.kpi-track progress::-moz-progress-bar {
-  background: #0755f5;
-  border-radius: 6px;
-}
 
 @media (max-width: 1100px) {
   .operator-header {

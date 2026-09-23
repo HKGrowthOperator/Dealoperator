@@ -102,31 +102,37 @@ export const tracks = [
     thresholds: [1, 5, 15, 50, 150],
   },
 ] as const;
-export const tiers = ["Bronze", "Silber", "Gold", "Platin", "Diamant"];
+export type TrackId = (typeof tracks)[number]["id"];
+/**
+ * Level je KPI-Track. Level 0 heißt „noch kein Level", Level 1 beginnt bei
+ * der ersten Schwelle, das höchste Level ist thresholds.length.
+ *
+ * XP sind die aufsummierte Kennzahl des Tracks: 1 XP = 1 Anwahl, 1 gelegtes
+ * Setting, 1 gelegtes Closing bzw. 1 gewonnener Deal. Nicht gemeldet (null)
+ * zählt als 0 XP; `value` behält den Unterschied für Aufrufer, die ihn brauchen.
+ *
+ * `percent` ist das Verhältnis xp / next — genau das, was „xp / next XP"
+ * ausschreibt. Die Leiste und die Zahl darunter sagen dasselbe.
+ */
 export function progress(values: Counts) {
   return tracks.map((t) => {
     const value = values[t.metric];
-    const level =
-      value === null ? 0 : t.thresholds.filter((n) => value >= n).length;
+    const xp = value ?? 0;
+    const level = t.thresholds.filter((n) => xp >= n).length;
     const next = t.thresholds[level] ?? null;
-    const previous = t.thresholds[level - 1] ?? 0;
     return {
       ...t,
       value,
-      tier: value === null ? null : (tiers[level - 1] ?? null),
+      xp,
+      level,
+      maxLevel: t.thresholds.length,
       next,
       percent:
-        value === null
-          ? 0
-          : next === null
-            ? 100
-            : Math.max(
-                0,
-                Math.min(100, ((value - previous) / (next - previous)) * 100),
-              ),
+        next === null ? 100 : Math.max(0, Math.min(100, (xp / next) * 100)),
     };
   });
 }
+export type TrackProgress = ReturnType<typeof progress>[number];
 /**
  * Art eines Datensatzes. Der frei bearbeitbare Rollentext („Team · …") war
  * als Merkmal nicht haltbar, deshalb steht die Art in einer eigenen Spalte.
