@@ -206,16 +206,16 @@ test("ranking uses competition ties, keeps a reported zero and drops unreported 
 test("four independent pilot rank thresholds and corrections", () => {
   const p = progress(counts());
   assert.deepEqual(
-    p.map((x) => x.tier),
-    ["Bronze", "Bronze", "Bronze", "Bronze"],
+    p.map((x) => x.level),
+    [1, 1, 1, 1],
   );
-  assert.equal(progress({ ...counts(), settingsBooked: 4 })[1].tier, null);
+  assert.equal(progress({ ...counts(), settingsBooked: 4 })[1].level, 0);
   for (const t of p) {
     for (const threshold of t.thresholds) {
       assert.ok(
         progress({ ...emptyCounts(), [t.metric]: threshold }).find(
           (x) => x.id === t.id,
-        )?.tier,
+        )?.level,
       );
     }
   }
@@ -295,7 +295,7 @@ test("a confirmed email alone never hands over a prepared profile", async () => 
   const state = await ownState(db, alice);
   assert.equal(state.participant.id, id);
   assert.equal(state.records[0].counts.attempts, 100);
-  assert.equal(state.progress[0].tier, "Bronze");
+  assert.equal(state.progress[0].level, 1);
   assert.equal((await ownState(db, bob)).records.length, 0);
   assert.equal(
     (await loadOwnRecords(db, alice.userId)).results.map((r) =>
