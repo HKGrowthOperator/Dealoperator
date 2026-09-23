@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { configurationIssues, connectionOptions } from "../server/config";
 import { safeNext } from "../lib/navigation";
-import { normalisePhone } from "../lib/phone";
+import { normalisePhone, splitPhone } from "../lib/phone";
 import { readiness } from "../server/readiness";
 
 test("production database connection cannot weaken TLS via URL options", () => {
@@ -176,4 +176,32 @@ test("phone numbers are normalised to E.164 and require a country code", () => {
   assert.equal(normalisePhone("+4917012345678901234").ok, false);
   assert.equal(normalisePhone("+49 170 abc").ok, false);
   assert.equal(normalisePhone("+0170123456").ok, false);
+});
+
+test("with a selected country the national spelling works, including the leading 0", () => {
+  for (const [input, country, expected] of [
+    ["0170 1234567", "DE", "+491701234567"],
+    ["170 1234567", "DE", "+491701234567"],
+    ["0170/123 45 67", "DE", "+491701234567"],
+    ["+49 (0)170 1234567", "DE", "+491701234567"],
+    ["0049 170 1234567", "AT", "+491701234567"],
+    ["0664 1234567", "AT", "+436641234567"],
+    ["079 123 45 67", "CH", "+41791234567"],
+    ["06 1234 5678", "NL", "+31612345678"],
+    ["02 1234 5678", "IT", "+390212345678"],
+    ["612 345 678", "ES", "+34612345678"],
+    ["(212) 555-0123", "US", "+12125550123"],
+  ] as const) {
+    const result = normalisePhone(input, country);
+    assert.equal(result.ok, true, `${input} ${country}`);
+    assert.equal((result as { value: string }).value, expected, `${input} ${country}`);
+  }
+  assert.equal(normalisePhone("0170", "DE").ok, false);
+  assert.equal(normalisePhone("0170 12x4567", "DE").ok, false);
+  assert.equal(normalisePhone("0170 1234567", "XX").ok, false);
+  // Zurück ins Formular: Land und nationale Schreibweise.
+  assert.deepEqual(splitPhone("+491701234567"), { country: "DE", national: "01701234567" });
+  assert.deepEqual(splitPhone("+4231234567"), { country: "LI", national: "1234567" });
+  assert.deepEqual(splitPhone("+390212345678"), { country: "IT", national: "0212345678" });
+  assert.deepEqual(splitPhone(""), { country: "DE", national: "" });
 });

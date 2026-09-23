@@ -930,8 +930,15 @@ test("repeated submissions never create a second request or a second profile", a
     1,
   );
   // Die Missbrauchsgrenze bleibt bestehen: nach fünf Anforderungen ist Schluss.
+  // Mit Wartezeit, damit die Seite „Erneut senden“ passend sperren kann.
   await send();
-  await assert.rejects(send(), /Zu viele Versuche/);
+  await assert.rejects(send(), (e: unknown) => {
+    const err = e as { status?: number; retryAfter?: number; message: string };
+    assert.match(err.message, /mehrere Bestätigungsmails/);
+    assert.equal(err.status, 429);
+    assert.ok((err.retryAfter ?? 0) > 0 && (err.retryAfter ?? 0) <= 900);
+    return true;
+  });
 });
 
 test("a new member's released numbers reach the public ranking and replace the day", async () => {

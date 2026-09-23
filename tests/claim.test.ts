@@ -186,7 +186,7 @@ test("a later confirmed link never hides the running takeover on the status page
   const r = await requestClaimSignedIn(db, alice, details(p));
   await decideRequest(db, admin, { id: r.id, decision: "info", applicantMessage: "Welche Firma?" });
   const other = await startRequest(db, {
-    kind: "claim", participantId: q, email: alice.email, fullName: "Fremd", phone: "+49 171 9999999",
+    kind: "claim", participantId: q, email: alice.email, fullName: "Fremde Person", phone: "+49 171 9999999",
   });
   assert.equal(await bindConfirmedRequest(db, alice, other.id), null);
   const mine = await requestForActor(db, alice);
@@ -261,4 +261,107 @@ test("signing in from a takeover binds only a request for the same profile and t
   await noteConfirmedAccount(db, bob, true);
   assert.equal(await count("SELECT count(*) AS n FROM team_inbox WHERE dedupe_key='account:bob'"), 1);
   assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE ref='account:bob'"), 0);
+});
+
+test("not found: the team assigns the profile; without a choice nothing is released", async () => {
+  const p = await profile("Alice B.");
+  const r = await startRequest(db, {
+    kind: "claim", email: alice.email, fullName: "Alice Beispiel", phone: "0170 1234567", phoneCountry: "DE",
+    hint: "Gesucht nach „Alice“",
+  });
+  assert.equal(r.participant, null);
+  const bound = await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(bound?.kind, "claim");
+  const [row] = await db.query("SELECT status,participant,phone FROM onboarding_requests WHERE id=$1", [r.id]);
+  assert.deepEqual({ ...row }, { status: "pending", participant: null, phone: "+491701234567" });
+  const [event] = await db.query("SELECT title FROM team_inbox WHERE ref=$1", [r.id]);
+  assert.match(String(event.title), /Zuordnung gesucht/);
+  // Ohne Profil kann das Team nicht freigeben; ein eigenes Profil entsteht auch nicht.
+  await assert.rejects(decideRequest(db, admin, { id: r.id, decision: "approve" }), /passende Profil/);
+  await assert.rejects(createMember(db, alice, { name: "Alice", company: "", role: "", publicConsent: false }), /gerade geprüft/);
+  // Gemeinsame und vergebene Profile lassen sich auch so nicht zuordnen.
+  const joint = await profile("Team X", { kind: "joint" });
+  await assert.rejects(decideRequest(db, admin, { id: r.id, decision: "approve", participantId: joint }));
+  const other = await profile("Bob B.", { owner: "bob" });
+  await assert.rejects(decideRequest(db, admin, { id: r.id, decision: "approve", participantId: other }), /anderen Konto/);
+  const ok = await decideRequest(db, admin, { id: r.id, decision: "approve", participantId: p });
+  assert.equal(ok.status, "approved");
+  assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, "alice");
+  assert.equal((await requestForActor(db, alice))?.status, "approved");
+});
+
+test("a signed-in account can ask the team for assignment once; a second path is refused", async () => {
+  const p = await profile("Alice B.");
+  const r = await requestClaimSignedIn(db, alice, { fullName: "Alice Beispiel", phone: "+49 170 1234567", hint: "Gruppe Nord" });
+  const again = await requestClaimSignedIn(db, alice, { fullName: "Alice Beispiel", phone: "+49 170 1234567", hint: "Gruppe Nord, Tel." });
+  assert.equal(again.id, r.id);
+  assert.equal(again.repeated, true);
+  await assert.rejects(requestClaimSignedIn(db, alice, details(p)), /bereits eine Übernahmeanfrage/);
+  assert.equal(await count("SELECT count(*) AS n FROM onboarding_requests"), 1);
+  assert.equal(await count("SELECT count(*) AS n FROM team_inbox WHERE ref=$1", [r.id]), 1);
+});
+
+test("switching between new and team assignment keeps one unconfirmed request", async () => {
+  const base = { email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" };
+  const a = await startRequest(db, { kind: "new", ...base });
+  const b = await startRequest(db, { kind: "claim", ...base, hint: "Doch schon Zahlen" });
+  assert.equal(a.id, b.id);
+  const [row] = await db.query("SELECT kind,hint FROM onboarding_requests WHERE id=$1", [a.id]);
+  assert.deepEqual({ ...row }, { kind: "claim", hint: "Doch schon Zahlen" });
+});
+
+test("the form checks the full name and marks the field; German numbers work with a leading 0", async () => {
+  const { errorResponse } = await import("../server/http");
+  const p = await profile("Alice B.");
+  const read = async (e: unknown) => (await errorResponse(e).json()) as { error: string; field?: string };
+  const nick = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice", phone: "0170 1234567", phoneCountry: "DE" })
+    .then(() => null, (e) => e);
+  assert.deepEqual(await read(nick), { error: "Bitte gib Vor- und Nachnamen an.", field: "fullName" });
+  const badPhone = await startRequest(db, { kind: "new", email: alice.email, fullName: "Alice Beispiel", phone: "12", phoneCountry: "DE" })
+    .then(() => null, (e) => e);
+  assert.equal((await read(badPhone)).field, "phone");
+  const badMail = await startRequest(db, { kind: "new", email: "alice@", fullName: "Alice Beispiel", phone: "0170 1234567" })
+    .then(() => null, (e) => e);
+  assert.equal((await read(badMail)).field, "email");
+  const ok = await startRequest(db, { kind: "new", email: alice.email, fullName: "Alice Beispiel", phone: "0170 1234567", phoneCountry: "DE" });
+  assert.equal((await db.query("SELECT phone FROM onboarding_requests WHERE id=$1", [ok.id]))[0].phone, "+491701234567");
+});
+
+test("the browser's unconfirmed entries can be shown again until the email is confirmed", async () => {
+  const { pendingForBrowser } = await import("../server/onboarding");
+  const p = await profile("Alice B.");
+  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" });
+  const shown = await pendingForBrowser(db, r.id);
+  assert.equal(shown?.email, alice.email);
+  assert.equal(shown?.profile?.id, p);
+  assert.equal(shown?.profileTaken, false);
+  assert.ok((shown?.secondsAgo ?? 99) < 30);
+  assert.equal(await pendingForBrowser(db, "kein-gueltiger-wert"), null);
+  assert.equal(await pendingForBrowser(db, undefined), null);
+  // Vergibt das Team das Profil inzwischen an jemand anderen, wird es nicht wieder angeboten.
+  await db.query("UPDATE participants SET owner='bob' WHERE id=$1", [p]);
+  const later = await pendingForBrowser(db, r.id);
+  assert.equal(later?.profile, null);
+  assert.equal(later?.profileTaken, true);
+  await db.query("UPDATE participants SET owner=NULL WHERE id=$1", [p]);
+  await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(await pendingForBrowser(db, r.id), null);
+});
+
+test("sign-in errors become clear messages with a real waiting time", async () => {
+  const { codeFailure, linkFailureReason, sendFailure } = await import("../server/email-auth");
+  const wait = sendFailure({ status: 429, code: "over_email_send_rate_limit", message: "For security purposes, you can only request this after 42 seconds." });
+  assert.equal(wait.status, 429);
+  assert.equal(wait.retryAfter, 42);
+  assert.match(wait.message, /42 Sekunden/);
+  assert.equal(sendFailure({ status: 429, code: "over_email_send_rate_limit", message: "email rate limit exceeded" }).retryAfter, 60);
+  assert.equal(sendFailure({ status: 400, code: "email_address_invalid" }).status, 400);
+  assert.equal(sendFailure({ status: 500 }).status, 503);
+  assert.match(codeFailure({ status: 403, code: "otp_expired" }).message, /passt nicht oder gilt nicht mehr/);
+  assert.equal(codeFailure({ status: 429, code: "over_request_rate_limit" }).status, 429);
+  assert.equal(codeFailure({ status: 502 }).status, 503);
+  assert.equal(linkFailureReason({ status: 403, code: "otp_expired" }), "abgelaufen");
+  assert.equal(linkFailureReason({ status: 404, code: "flow_state_not_found" }), "verwendet");
+  assert.equal(linkFailureReason({ status: 503 }), "technik");
+  assert.equal(linkFailureReason({ status: 400, code: "validation_failed" }), "link");
 });
