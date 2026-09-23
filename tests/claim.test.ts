@@ -327,25 +327,89 @@ test("the form checks the full name and marks the field; German numbers work wit
   assert.equal((await db.query("SELECT phone FROM onboarding_requests WHERE id=$1", [ok.id]))[0].phone, "+491701234567");
 });
 
-test("the browser's unconfirmed entries can be shown again until the email is confirmed", async () => {
-  const { pendingForBrowser } = await import("../server/onboarding");
+test("only the browser that sent last sees its entries again, and only a real send counts as sent", async () => {
+  const { browserSecret, markMailSent, pendingForBrowser } = await import("../server/onboarding");
   const p = await profile("Alice B.");
-  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" });
-  const shown = await pendingForBrowser(db, r.id);
+  const mine = browserSecret();
+  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" }, mine.proof);
+  const cookie = `${r.id}.${mine.secret}`;
+  const shown = await pendingForBrowser(db, cookie);
   assert.equal(shown?.email, alice.email);
   assert.equal(shown?.profile?.id, p);
-  assert.equal(shown?.profileTaken, false);
-  assert.ok((shown?.secondsAgo ?? 99) < 30);
+  // Noch keine Übergabe an Supabase: kein „Mail geschickt“.
+  assert.equal(shown?.mailSent, false);
+  await markMailSent(db, r.id, alice.email);
+  assert.equal((await pendingForBrowser(db, cookie))?.mailSent, true);
+  // Nur die ID ohne Geheimnis, falsches Geheimnis, Unsinn: nichts.
+  assert.equal(await pendingForBrowser(db, r.id), null);
+  assert.equal(await pendingForBrowser(db, `${r.id}.falsch`), null);
   assert.equal(await pendingForBrowser(db, "kein-gueltiger-wert"), null);
   assert.equal(await pendingForBrowser(db, undefined), null);
-  // Vergibt das Team das Profil inzwischen an jemand anderen, wird es nicht wieder angeboten.
-  await db.query("UPDATE participants SET owner='bob' WHERE id=$1", [p]);
-  const later = await pendingForBrowser(db, r.id);
-  assert.equal(later?.profile, null);
-  assert.equal(later?.profileTaken, true);
-  await db.query("UPDATE participants SET owner=NULL WHERE id=$1", [p]);
+  // Jemand anderes sendet danach für dieselbe Adresse: der erste Browser sieht
+  // die neuen Angaben nicht, und nach einem neuen Absenden gilt „nicht versendet“.
+  const other = browserSecret();
+  await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Mallory Fremd", phone: "+49 171 9999999" }, other.proof);
+  assert.equal(await pendingForBrowser(db, cookie), null);
+  const theirs = await pendingForBrowser(db, `${r.id}.${other.secret}`);
+  assert.equal(theirs?.fullName, "Mallory Fremd");
+  assert.equal(theirs?.mailSent, false);
   await bindConfirmedRequest(db, alice, r.id);
-  assert.equal(await pendingForBrowser(db, r.id), null);
+  assert.equal(await pendingForBrowser(db, `${r.id}.${other.secret}`), null);
+});
+
+test("a person without an account cannot read what the real owner of an address enters later", async () => {
+  const { browserSecret, pendingForBrowser } = await import("../server/onboarding");
+  const attacker = browserSecret();
+  const a = await startRequest(db, { kind: "new", email: alice.email, fullName: "Irgend Wer", phone: "+49 171 9999999" }, attacker.proof);
+  const victim = browserSecret();
+  const v = await startRequest(db, { kind: "new", email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567", }, victim.proof);
+  assert.equal(a.id, v.id);
+  assert.equal(await pendingForBrowser(db, `${a.id}.${attacker.secret}`), null);
+  assert.equal((await pendingForBrowser(db, `${v.id}.${victim.secret}`))?.fullName, "Alice Beispiel");
+});
+
+test("a taken profile shows up as taken for the browser that asked for it", async () => {
+  const { browserSecret, pendingForBrowser } = await import("../server/onboarding");
+  const p = await profile("Alice B.");
+  const bobRequest = await requestClaimSignedIn(db, bob, details(p, { fullName: "Bob Beispiel" }));
+  const mine = browserSecret();
+  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" }, mine.proof);
+  await decideRequest(db, admin, { id: bobRequest.id, decision: "approve" });
+  const shown = await pendingForBrowser(db, `${r.id}.${mine.secret}`);
+  assert.equal(shown?.profileTaken, true);
+  assert.equal(shown?.takenName, "Alice B.");
+  assert.equal(shown?.profile, null);
+});
+
+test("switching from a chosen profile to team assignment never blocks the team's approval", async () => {
+  const p = await profile("Alice B.");
+  const base = { email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" };
+  const first = await startRequest(db, { kind: "claim", participantId: p, ...base });
+  const assign = await startRequest(db, { kind: "claim", ...base, hint: "Doch lieber das Team" });
+  assert.notEqual(first.id, assign.id);
+  await bindConfirmedRequest(db, alice, assign.id);
+  // Die andere, unbestätigte Anfrage ist erledigt.
+  assert.equal((await db.query("SELECT status FROM onboarding_requests WHERE id=$1", [first.id]))[0].status, "superseded");
+  const ok = await decideRequest(db, admin, { id: assign.id, decision: "approve", participantId: p });
+  assert.equal(ok.status, "approved");
+  // Auch wenn eine ältere offene Anfrage derselben Adresse übrig wäre: kein Konflikt.
+  const q = await profile("Bob B.");
+  await startRequest(db, { kind: "claim", participantId: q, email: bob.email, fullName: "Bob Beispiel", phone: "+49 171 7654321" });
+  const bobAssign = await requestClaimSignedIn(db, bob, { fullName: "Bob Beispiel", phone: "+49 171 7654321" });
+  const done = await decideRequest(db, admin, { id: bobAssign.id, decision: "approve", participantId: q });
+  assert.equal(done.status, "approved");
+});
+
+test("sending again for an invitation-only profile does not need the code a second time", async () => {
+  const p = await profile("Verborgen B.", { searchable: false });
+  const { token } = await issueClaim(db, admin, p);
+  const base = { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" };
+  await assert.rejects(startRequest(db, base), /persönliche Einladung/);
+  const first = await startRequest(db, { ...base, invite: token });
+  const again = await startRequest(db, base);
+  assert.equal(again.id, first.id);
+  // Ohne vorherige Anfrage bleibt die Einladung nötig.
+  await assert.rejects(startRequest(db, { ...base, email: bob.email }), /persönliche Einladung/);
 });
 
 test("sign-in errors become clear messages with a real waiting time", async () => {
@@ -354,7 +418,11 @@ test("sign-in errors become clear messages with a real waiting time", async () =
   assert.equal(wait.status, 429);
   assert.equal(wait.retryAfter, 42);
   assert.match(wait.message, /42 Sekunden/);
-  assert.equal(sendFailure({ status: 429, code: "over_email_send_rate_limit", message: "email rate limit exceeded" }).retryAfter, 60);
+  // Stündliches Kontingent ohne genannte Restzeit: keine erfundene Zahl.
+  const quota = sendFailure({ status: 429, code: "over_email_send_rate_limit", message: "email rate limit exceeded" });
+  assert.equal(quota.retryAfter, undefined);
+  assert.doesNotMatch(quota.message, /\d/);
+  assert.equal(codeFailure({ status: 429, code: "over_request_rate_limit" }).retryAfter, undefined);
   assert.equal(sendFailure({ status: 400, code: "email_address_invalid" }).status, 400);
   assert.equal(sendFailure({ status: 500 }).status, 503);
   assert.match(codeFailure({ status: 403, code: "otp_expired" }).message, /passt nicht oder gilt nicht mehr/);
