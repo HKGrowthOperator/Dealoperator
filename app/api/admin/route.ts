@@ -23,7 +23,7 @@ import {
   reviewCases,
 } from "@/server/wins-import";
 import { discordStatus, discordInventory } from "@/server/discord-admin";
-import { setTeamRole, teamList } from "@/server/roles";
+import { designateRole, setTeamRole, teamList } from "@/server/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -106,6 +106,8 @@ export async function POST(request: Request) {
         return json(await discordInventory());
       case "setRole":
         return json(await setTeamRole(db, actor, v));
+      case "designateRole":
+        return json(await designateRole(db, actor, v));
       default:
         throw new AppError("Unbekannte Aktion.");
     }

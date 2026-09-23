@@ -14,6 +14,7 @@ import {
   updateAccount,
 } from "@/server/operator";
 import { decideRequest, reviewQueue } from "@/server/onboarding";
+import { DESIGNATIONS_KEY } from "@/server/roles";
 import { parseImport } from "@/lib/kpis";
 import { body, errorResponse, json } from "@/server/http";
 export async function GET() {
@@ -34,8 +35,15 @@ export async function GET() {
             // bekommen Kontaktdaten nur an der einzelnen Anfrage.
             contacts: actor.admin ? await adminContacts(db, actor) : [],
             requests: await reviewQueue(db, actor),
+            // designated_role: für das Profil vorgemerkte Team-Rolle (siehe
+            // designateRole), damit die Übernahmeprüfung darauf hinweist.
             participants: await db.query(
-              "SELECT id,import_key,name,company,kind,owner IS NOT NULL AS claimed,public_consent,searchable FROM participants ORDER BY created_at DESC",
+              `SELECT p.id,p.import_key,p.name,p.company,p.kind,p.owner IS NOT NULL AS claimed,
+                      p.public_consent,p.searchable,
+                      (SELECT s.value->p.id->>'role' FROM app_settings s
+                        WHERE s.key=$1 AND jsonb_typeof(s.value)='object') AS designated_role
+                 FROM participants p ORDER BY p.created_at DESC`,
+              [DESIGNATIONS_KEY],
             ),
           }
         : {}),
