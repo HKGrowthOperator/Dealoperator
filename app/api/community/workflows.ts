@@ -292,7 +292,7 @@ export async function handleWorkflow(
       return result(
         {
           error:
-            "Das private Partnerregister benötigt eine gesonderte Freischaltung. Die Community bleibt kostenfrei.",
+            "Diese Funktion ist hier nicht verfügbar.",
         },
         403,
       );

@@ -133,8 +133,8 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
           <h2>Übernahmeanfragen</h2>
           <p>
             Eine bestätigte E-Mail ist noch keine Identität. Gleiche die Angaben
-            mit der Person ab, die ihr bereits kennt — zum Beispiel über den
-            bestehenden WhatsApp-Kontakt — und gib erst dann frei.
+            mit der Person ab, die ihr bereits kennt, zum Beispiel über den
+            bekannten Kontakt, und gib erst dann frei.
           </p>
         </div>
       </header>
