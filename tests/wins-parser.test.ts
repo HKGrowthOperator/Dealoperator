@@ -484,3 +484,12 @@ test("a phone number sender matches its alias key, never its plain number", () =
   assert.equal(e.status, "ok");
   assert.equal(e.participantId, "p-alex");
 });
+
+test("numbers posted in a live Zoom session in the morning count for that day", () => {
+  const [e] = parseWins({
+    text: ["Dienstag, 22. September", "10:30:05 Von Anna Beispiel an Alle: 30 Anwahlen"].join("\n"),
+    defaultDay: "2026-09-22",
+    directory,
+  });
+  assert.deepEqual([e.day, e.status], ["2026-09-22", "ok"]);
+});

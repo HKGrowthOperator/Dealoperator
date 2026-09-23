@@ -56,6 +56,8 @@ export type WinsMessage = {
   line: number;
   /** WhatsApp: Nachricht wurde nachträglich bearbeitet. */
   edited?: boolean;
+  /** Zoom-Chat einer laufenden Session: Zahlen gelten für diesen Tag. */
+  live?: boolean;
 };
 
 /** Ein gemeldeter Wert für eine Kennzahl samt Zeitpunkt der Nachricht. */
@@ -308,6 +310,7 @@ export function splitMessages(
         time: `${pad(m[1])}:${m[2]}`,
         text: m[4].trim(),
         line: index + 1,
+        live: true,
       });
       return;
     }
@@ -793,7 +796,9 @@ export function parseWins({
     const { metrics, conflicts, increment, uncertain } = readMetrics(m.text);
     const marks = dayMarks(m.text, m.messageDay);
     const late = m.time !== null && m.time < lateNightCutoff;
-    const morning = m.time !== null && !late && m.time < morningUntil;
+    // Im Zoom-Chat einer laufenden Session meint eine Zahl am Vormittag
+    // diesen Tag; die Vormittagsregel gilt für Gruppenmeldungen.
+    const morning = m.time !== null && !late && !m.live && m.time < morningUntil;
     const dated = marks.explicit.find((e) => e.kind !== "relative");
     let day = m.messageDay;
     let days: string[] = [];
