@@ -35,6 +35,15 @@ type Request = {
   competing: number | string;
 };
 
+type Candidate = {
+  id: string;
+  name: string;
+  company: string | null;
+  kind: string;
+  claimed: boolean;
+  searchable: boolean;
+};
+
 const LABEL: Record<string, string> = {
   awaiting_email: "E-Mail noch nicht bestätigt",
   pending: "Wartet auf Prüfung",
@@ -52,6 +61,12 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
   const [note, setNote] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState("");
+  // Zuordnungsanfragen ohne vorgewähltes Profil: das Team wählt es hier aus.
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [pick, setPick] = useState("");
+  const [assignTo, setAssignTo] = useState("");
+  const freeProfiles = (list: Candidate[] | undefined) =>
+    (list || []).filter((p) => !p.claimed && p.kind === "person");
 
   const load = useCallback(async () => {
     if (!admin) return;
@@ -60,6 +75,7 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
       setRows(d.requests || []);
+      setCandidates(freeProfiles(d.participants));
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -77,6 +93,7 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
         const data = await response.json();
         if (!response.ok) throw Error(data.error);
         setRows(data.requests || []);
+        setCandidates(freeProfiles(data.participants));
         setError("");
       })
       .catch((e) => {
@@ -100,6 +117,7 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
           value: {
             id,
             decision,
+            ...(decision === "approve" && assignTo ? { participantId: assignTo } : {}),
             internalNote: note,
             applicantMessage: reply,
           },
@@ -110,6 +128,8 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
       setOpen("");
       setNote("");
       setReply("");
+      setAssignTo("");
+      setPick("");
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -165,11 +185,14 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
               <div>
                 <strong>{r.full_name}</strong>
                 <small>
-                  möchte{" "}
                   {r.participant_name ? (
-                    <b>{r.participant_name}</b>
+                    <>
+                      möchte <b>{r.participant_name}</b>
+                    </>
+                  ) : r.kind === "claim" ? (
+                    "hat sein Profil nicht gefunden · Zuordnung durch euch"
                   ) : (
-                    "ein neues Profil"
+                    "möchte ein neues Profil"
                   )}
                   {r.participant_company ? ` · ${r.participant_company}` : ""}
                   {/^team\b/i.test(r.participant_role || "") && (
@@ -294,10 +317,49 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                       an die Person gibt es nicht.
                     </small>
                   </label>
+                  {r.kind === "claim" && !r.participant && (
+                    <div className="review-picker">
+                      <label>
+                        Profil zuordnen
+                        <input
+                          value={pick}
+                          onChange={(e) => setPick(e.target.value)}
+                          placeholder="Name oder Unternehmen suchen"
+                        />
+                      </label>
+                      <ul>
+                        {candidates
+                          .filter((p) =>
+                            `${p.name} ${p.company || ""}`
+                              .toLowerCase()
+                              .includes(pick.trim().toLowerCase()),
+                          )
+                          .slice(0, 8)
+                          .map((p) => (
+                            <li key={p.id}>
+                              <button
+                                type="button"
+                                className={`btn secondary${assignTo === p.id ? " chosen" : ""}`}
+                                aria-pressed={assignTo === p.id}
+                                onClick={() => setAssignTo(p.id)}
+                              >
+                                {p.name}
+                                {p.company ? ` · ${p.company}` : ""}
+                                {p.searchable ? "" : " · nur per Einladung"}
+                              </button>
+                            </li>
+                          ))}
+                      </ul>
+                      <small>
+                        Nur freie, persönliche Profile. Freigeben ordnet das gewählte
+                        Profil diesem Konto zu.
+                      </small>
+                    </div>
+                  )}
                   <div className="review-actions">
                     <button
                       className="btn primary"
-                      disabled={!!busy}
+                      disabled={!!busy || (r.kind === "claim" && !r.participant && !assignTo)}
                       onClick={() => decide(r.id, "approve")}
                     >
                       {busy === r.id + "approve" ? (
@@ -305,7 +367,7 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                       ) : (
                         <Check size={16} />
                       )}
-                      Freigeben
+                      {r.kind === "claim" && !r.participant ? "Zuordnen und freigeben" : "Freigeben"}
                     </button>
                     <button
                       className="btn secondary"
@@ -342,6 +404,8 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                     setOpen(r.id);
                     setNote(r.internal_note || "");
                     setReply("");
+                    setAssignTo("");
+                    setPick("");
                   }}
                 >
                   Prüfen und entscheiden

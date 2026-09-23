@@ -28,17 +28,27 @@ const contactSchema = z.object({
     .string()
     .trim()
     .min(3, "Bitte gib deinen vollständigen Vor- und Nachnamen an.")
-    .max(120),
-  email: z.string().trim().toLowerCase().email().max(254),
-  phone: z.string().trim().min(1).max(40),
+    .max(120)
+    // Ein Spitzname aus dem Ranking reicht dem Team für den Abgleich nicht.
+    .refine((v) => /\S\s+\S/.test(v), "Bitte gib Vor- und Nachnamen an."),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Bitte prüfe deine E-Mail-Adresse.")
+    .max(254),
+  phone: z.string().trim().min(1, "Bitte gib deine Telefonnummer an.").max(40),
   hint: z.string().trim().max(300).default(""),
 });
 
 export const startSchema = z
   .object({
     kind: z.enum(["claim", "new"]),
+    // Bei einer Übernahme ohne gefundenes Profil fehlt die ID: dann sucht das
+    // Team das passende Profil heraus („Zuordnung durch das Team“).
     participantId: z.string().trim().max(100).optional(),
     invite: z.string().trim().max(200).optional(),
+    phoneCountry: z.string().trim().max(4).optional(),
   })
   .merge(contactSchema)
   .strict();
@@ -113,10 +123,8 @@ export const ONBOARDING_COOKIE = "do_onboarding";
  */
 export async function startRequest(db: Database, raw: unknown) {
   const v = startSchema.parse(raw);
-  const phone = normalisePhone(v.phone);
-  if (!phone.ok) throw new AppError(phone.reason);
-  if (v.kind === "claim" && !v.participantId)
-    throw new AppError("Bitte wähle zuerst dein vorbereitetes Profil.");
+  const phone = normalisePhone(v.phone, v.phoneCountry);
+  if (!phone.ok) throw new AppError(phone.reason, 400, undefined, "phone");
 
   // Kein einzelner globaler Zähler: ein Missbrauchsversuch darf nicht den
   // Einstieg für alle anderen sperren.
@@ -124,7 +132,13 @@ export async function startRequest(db: Database, raw: unknown) {
   // Fünf Anforderungen je Viertelstunde und Adresse: eng genug, um Mailversand
   // zu begrenzen, aber weit genug für den realen Fall, dass jemand den Link
   // zuerst im falschen Browser geöffnet hat und ihn neu anfordern muss.
-  await rateLimit(db, `onboarding:${v.email}`, 5, 900);
+  await rateLimit(
+    db,
+    `onboarding:${v.email}`,
+    5,
+    900,
+    "Du hast in kurzer Zeit mehrere Bestätigungsmails angefordert. Bitte nutze die letzte Mail oder warte, bis die Zeit abgelaufen ist.",
+  );
   if (v.participantId)
     await rateLimit(db, `onboarding-profile:${v.participantId}`, 12, 3600);
 
@@ -134,8 +148,8 @@ export async function startRequest(db: Database, raw: unknown) {
     // Eindeutigkeitsindex.
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${v.email}`]);
     let participant: string | null = null;
-    if (v.kind === "claim") {
-      const p = await profileForSelection(tx, v.participantId!, v.invite);
+    if (v.kind === "claim" && v.participantId) {
+      const p = await profileForSelection(tx, v.participantId, v.invite);
       participant = p.id;
     }
     const [existing] = await tx.query(
@@ -148,18 +162,20 @@ export async function startRequest(db: Database, raw: unknown) {
     // sonst könnte jeder, der die Adresse kennt, die Angaben überschreiben,
     // die das Team gerade prüft.
     if (existing && existing.status !== "awaiting_email")
-      return { id: existing.id as string, participant, resubmitted: true };
+      return { id: existing.id as string, kind: v.kind, participant, resubmitted: true };
     if (existing) {
       // Erneutes Absenden aktualisiert die Angaben, statt eine zweite offene
       // Anfrage für dieselbe Person und dasselbe Profil anzulegen.
+      // Auch die Art kann wechseln: „Ich starte neu“ und „Zuordnung durch
+      // das Team“ haben beide kein vorgewähltes Profil.
       await tx.query(
         `UPDATE onboarding_requests
-         SET full_name=$2,phone=$3,phone_input=$4,hint=$5,updated_at=now()
+         SET kind=$6,full_name=$2,phone=$3,phone_input=$4,hint=$5,updated_at=now()
          WHERE id=$1`,
-        [existing.id, v.fullName, phone.value, v.phone, v.hint],
+        [existing.id, v.fullName, phone.value, v.phone, v.hint, v.kind],
       );
       await log(tx, existing.id, v.email, "resubmitted", "");
-      return { id: existing.id as string, participant, resubmitted: true };
+      return { id: existing.id as string, kind: v.kind, participant, resubmitted: true };
     }
     const id = randomUUID();
     await tx.query(
@@ -172,8 +188,43 @@ export async function startRequest(db: Database, raw: unknown) {
     // oder fremd sein. Die Verwaltung sieht unbestätigte Registrierungen
     // gesammelt (siehe unconfirmedRegistrations); Eintrag, Push und E-Mail
     // entstehen erst bei der Bestätigung in bindConfirmedRequest.
-    return { id, participant, resubmitted: false };
+    return { id, kind: v.kind, participant, resubmitted: false };
   });
+}
+
+/**
+ * Angaben der noch unbestätigten Anfrage aus DIESEM Browser (httpOnly-Cookie),
+ * damit /starten nach Zurück, Neuladen oder einem fehlgeschlagenen Link den
+ * Stand wieder zeigt, statt alles neu abzufragen. Nur solange die E-Mail
+ * unbestätigt ist und die Anfrage frisch ist; danach gilt die Anmeldung.
+ */
+export async function pendingForBrowser(db: Database, id: string | undefined) {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const [r] = await db.query(
+    `SELECT r.kind,r.participant,r.email,r.full_name,r.phone,r.hint,
+            EXTRACT(EPOCH FROM now()-r.updated_at)::float AS age,
+            p.name,p.company,p.role,p.owner
+       FROM onboarding_requests r LEFT JOIN participants p ON p.id=r.participant
+      WHERE r.id=$1 AND r.status='awaiting_email'
+        AND r.updated_at > now() - interval '2 days'`,
+    [id],
+  );
+  if (!r) return null;
+  return {
+    kind: r.kind as RequestKind,
+    // Ein inzwischen vergebenes Profil wird nicht wieder angeboten.
+    profile:
+      r.participant && !r.owner
+        ? { id: r.participant as string, name: r.name as string, company: r.company as string, role: r.role as string }
+        : null,
+    profileTaken: Boolean(r.participant && r.owner),
+    email: r.email as string,
+    fullName: r.full_name as string,
+    phone: r.phone as string,
+    hint: r.hint as string,
+    /** Sekunden seit dem letzten Absenden, für die Wartezeit bis „Erneut senden“. */
+    secondsAgo: Number(r.age) || 0,
+  };
 }
 
 async function log(
@@ -279,13 +330,17 @@ export async function bindConfirmedRequest(
       ref: request.id,
       state: request.kind === "claim" ? "review_ready" : "confirmed",
       title:
-        request.kind === "claim"
-          ? `Profilübernahme prüfbereit: ${request.full_name}`
-          : `Neue Registrierung bestätigt: ${request.full_name}`,
+        request.kind !== "claim"
+          ? `Neue Registrierung bestätigt: ${request.full_name}`
+          : request.participant
+            ? `Profilübernahme prüfbereit: ${request.full_name}`
+            : `Zuordnung gesucht: ${request.full_name}`,
       body:
-        request.kind === "claim"
-          ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
-          : "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden.",
+        request.kind !== "claim"
+          ? "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden."
+          : request.participant
+            ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
+            : "E-Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte das passende Profil auswählen und freigeben.",
       // Einmal je Konto, egal wie viele Anfragen es später noch stellt.
       alert:
         request.kind === "claim"
@@ -395,6 +450,8 @@ export const decisionSchema = z
   .object({
     id: z.string().trim().min(1).max(100),
     decision: z.enum(["approve", "reject", "info"]),
+    // Nur bei einer Zuordnungsanfrage ohne vorgewähltes Profil.
+    participantId: z.string().trim().min(1).max(100).optional(),
     internalNote: z.string().trim().max(2000).default(""),
     applicantMessage: z.string().trim().max(2000).default(""),
   })
@@ -419,8 +476,9 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       "SELECT participant FROM onboarding_requests WHERE id=$1",
       [v.id],
     );
-    if (peek?.participant)
-      await tx.query("SELECT id FROM participants WHERE id=$1 FOR UPDATE", [peek.participant]);
+    const target = peek?.participant ?? (v.decision === "approve" ? v.participantId : undefined);
+    if (target)
+      await tx.query("SELECT id FROM participants WHERE id=$1 FOR UPDATE", [target]);
     const [request] = await tx.query(
       "SELECT * FROM onboarding_requests WHERE id=$1 FOR UPDATE",
       [v.id],
@@ -460,11 +518,21 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     }
 
     // approve
-    if (request.kind !== "claim" || !request.participant)
+    if (request.kind !== "claim")
       throw new AppError(
         "Diese Anfrage betrifft kein vorbereitetes Profil.",
         400,
       );
+    if (!request.participant) {
+      // Zuordnungsanfrage: das Team wählt das Profil hier aus.
+      if (!v.participantId)
+        throw new AppError("Bitte wähle zuerst das passende Profil aus.", 400);
+      request.participant = v.participantId;
+      await tx.query("UPDATE onboarding_requests SET participant=$2 WHERE id=$1", [
+        request.id,
+        v.participantId,
+      ]);
+    }
     if (!request.owner)
       throw new AppError(
         "Diese Anfrage hat noch keine bestätigte E-Mail. Eine Freigabe ist erst danach möglich.",
@@ -566,7 +634,9 @@ export async function openClaimRequest(db: Database, userId: string) {
 
 export const claimSchema = z
   .object({
-    participantId: z.string().trim().min(1).max(100),
+    // Fehlt, wenn die Person ihr Profil nicht findet: Zuordnung durch das Team.
+    participantId: z.string().trim().min(1).max(100).optional(),
+    phoneCountry: z.string().trim().max(4).optional(),
     invite: z.string().trim().max(200).optional(),
     fullName: contactSchema.shape.fullName,
     phone: contactSchema.shape.phone,
@@ -586,8 +656,9 @@ export const claimSchema = z
  */
 export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unknown) {
   const v = claimSchema.parse(raw);
-  const phone = normalisePhone(v.phone);
-  if (!phone.ok) throw new AppError(phone.reason);
+  const phone = normalisePhone(v.phone, v.phoneCountry);
+  if (!phone.ok) throw new AppError(phone.reason, 400, undefined, "phone");
+  const wanted = v.participantId ?? null;
   // Nur das Konto zählt. Der öffentliche Profilzähler des anonymen Starts
   // darf die Anfrage des angemeldeten Inhabers nicht blockieren.
   await rateLimit(
@@ -620,7 +691,7 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
         ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
       [actor.userId],
     );
-    if (open && open.participant !== v.participantId)
+    if (open && open.participant !== wanted)
       throw new AppError(
         "Für dein Konto läuft bereits eine Übernahmeanfrage. Bitte warte die Prüfung durch das Team ab.",
         409,
@@ -635,23 +706,27 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       return { id: open.id as string, status: open.status as string, repeated: true };
     }
 
-    // Prüft: noch frei, persönliches Profil, auffindbar oder gültige Einladung.
-    const p = await profileForSelection(tx, v.participantId, v.invite);
-    // Wartet auf eine gerade laufende Freigabe und sieht danach deren Ergebnis.
-    const [still] = await tx.query("SELECT owner FROM participants WHERE id=$1 FOR SHARE", [p.id]);
-    if (still?.owner)
-      throw new AppError(
-        "Dieses Profil steht nicht mehr zur Übernahme bereit. Es wurde bereits einem Konto zugeordnet.",
-        409,
-      );
+    let p: { id: string } | null = null;
+    if (wanted) {
+      // Prüft: noch frei, persönliches Profil, auffindbar oder gültige Einladung.
+      p = await profileForSelection(tx, wanted, v.invite);
+      // Wartet auf eine gerade laufende Freigabe und sieht danach deren Ergebnis.
+      const [still] = await tx.query("SELECT owner FROM participants WHERE id=$1 FOR SHARE", [p.id]);
+      if (still?.owner)
+        throw new AppError(
+          "Dieses Profil steht nicht mehr zur Übernahme bereit. Es wurde bereits einem Konto zugeordnet.",
+          409,
+        );
+    }
 
     // Eine noch unbestätigte Anfrage derselben Adresse für dasselbe Profil (etwa
     // aus einem anderen Browser) wird zu dieser Anfrage, statt eine zweite
     // anzulegen.
     const [waiting] = await tx.query(
       `SELECT id FROM onboarding_requests
-        WHERE lower(email)=$1 AND participant=$2 AND status='awaiting_email' FOR UPDATE`,
-      [actor.email, p.id],
+        WHERE lower(email)=$1 AND COALESCE(participant,'')=COALESCE($2,'')
+          AND status='awaiting_email' FOR UPDATE`,
+      [actor.email, p?.id ?? null],
     );
     const id = (waiting?.id as string | undefined) ?? randomUUID();
     if (waiting)
@@ -666,7 +741,7 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       await tx.query(
         `INSERT INTO onboarding_requests(id,kind,participant,email,full_name,phone,phone_input,hint,status,owner)
          VALUES($1,'claim',$2,$3,$4,$5,$6,$7,'pending',$8)`,
-        [id, p.id, actor.email, v.fullName, phone.value, v.phone, v.hint, actor.userId],
+        [id, p?.id ?? null, actor.email, v.fullName, phone.value, v.phone, v.hint, actor.userId],
       );
     // Andere noch unbestätigte Anfragen dieser Adresse dürfen sich später nicht
     // mehr an das Konto hängen.
@@ -688,8 +763,10 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       kind: "registration",
       ref: id,
       state: "review_ready",
-      title: `Profilübernahme prüfbereit: ${v.fullName}`,
-      body: "Angefragt mit einem angemeldeten Konto, E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung.",
+      title: p ? `Profilübernahme prüfbereit: ${v.fullName}` : `Zuordnung gesucht: ${v.fullName}`,
+      body: p
+        ? "Angefragt mit einem angemeldeten Konto, E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
+        : "Angemeldetes Konto, E-Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte das passende Profil auswählen und freigeben.",
       // Genau einmal je Anfrage, auch bei wiederholtem Absenden.
       alert: { key: `claim:${id}`, kind: "claim" },
     });
