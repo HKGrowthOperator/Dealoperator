@@ -23,11 +23,16 @@ export async function GET(request: Request) {
     const actor = await getCurrentUser();
     if (!actor) return json({ error: LOGIN }, 401);
     if (!databaseReady()) return json({ error: "Die Datenbank ist noch nicht verbunden." }, 503);
+    const current = berlinDate().slice(0, 7);
     const month = z
       .string()
       .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
-      .parse(new URL(request.url).searchParams.get("monat") || berlinDate().slice(0, 7));
-    return json(await closingState(database(), actor, month));
+      // Nur von 2026 bis zum aktuellen Monat: mehr gibt es nicht zu sehen.
+      .refine((m) => m >= "2026-01" && m <= current, "Diesen Monat gibt es hier nicht.")
+      .parse(new URL(request.url).searchParams.get("monat") || current);
+    const db = database();
+    await rateLimit(db, `closing-get:${actor.userId}`, 60);
+    return json(await closingState(db, actor, month));
   } catch (e) {
     return errorResponse(e);
   }

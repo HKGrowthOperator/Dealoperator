@@ -304,10 +304,16 @@ export function summarize({
   // Serien werden über die GESAMTE Zeit ab Erfassungsbeginn gebildet, damit
   // eine Monatsansicht nicht mitten in einer Serie bei null beginnt.
   const start = trackingStart && trackingStart < from ? trackingStart : from;
+  // Schutz gegen unsinnig lange Zeiträume (höchstens zehn Jahre).
+  if (Date.parse(to) - Date.parse(start) > 3660 * 86_400_000)
+    throw Error("Zeitraum zu lang.");
   for (let day = start; day <= to; day = addDays(day, 1)) {
     const closing = byDay.get(day);
     const due = isDueDay(day, settings, pauses);
-    const deadline = due ? deadlineFor(day, settings, pauses) : null;
+    // Fristen nur dort berechnen, wo sie etwas entscheiden: ab Erfassungs-
+    // beginn und höchstens bis heute. Das hält auch lange Zeiträume schnell.
+    const relevant = !!trackingStart && day >= trackingStart && day <= today;
+    const deadline = due && relevant ? deadlineFor(day, settings, pauses) : null;
     let status: DayStatus;
 
     if (!trackingStart || day < trackingStart) status = "before-start";
