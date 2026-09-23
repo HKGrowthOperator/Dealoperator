@@ -48,10 +48,14 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | Konto ohne Telefonnummer öffnet `/tagesabschluss` | Checkliste nennt die fehlende Nummer; Entwurf speicherbar, Einreichen gesperrt |
 | Entwurf mit Zahlen speichern | Nirgends sichtbar: nicht im Ranking, nicht in der Gruppensumme, nicht in `/reflexionen`, keine Serie |
 | Einreichen ohne Energie oder ohne Antworten | Klare Meldung, nichts gezählt |
-| Vollständig einreichen (Bestätigung gelesen) | Tag zählt im Ranking (öffentlich nur mit Freigabe), Serie steigt, Karte in `/reflexionen` für berechtigte Mitglieder |
+| Vollständig einreichen (beim ersten Mal „Wer sieht deinen Tagesabschluss?“ bestätigen, danach nie wieder) | Tag zählt im Ranking (öffentlich nur mit Freigabe), Serie steigt, Karte in `/reflexionen` für berechtigte Mitglieder; nichts geht in den Discord |
 | Korrektur beginnen, nicht einreichen | Weiter gilt die zuletzt eingereichte Fassung |
 | Abschluss mit 0 Anwahlen (rechtzeitig, mit Reflexion) | Die Serie läuft weiter, auch über viele Tage ohne Anwahlen. Es gibt nur diese eine Serie (Übersicht, Dranbleiben-Rangliste, „laufende Serien“, Discord `/serie`) |
-| Tag mit übernommenem Stand (z. B. 22.09.) | Kein eigener Abschluss möglich; Korrektur über das Team |
+| Tag mit übernommenem Stand aus den Gruppenmeldungen (Wins-Import) | Eigener Abschluss ersetzt ihn; kuratierte Stände (CSV, Akquise Day, Duo-Aufteilung) bleiben gesperrt |
+| 5 Calling-Tage am Stück mit mindestens 50 Anwahlen | Rang „Aktiver Caller“ in Dein Bereich, Tagesabschluss und Dranbleiben-Rangliste; Sessions & Roleplay freigeschaltet; mit verknüpftem Discord-Konto die Rolle im Discord |
+| Danach 3 Calling-Tage in Folge ohne Anwahlen | Rang weg; Zusagen und Anlegen von Sessions gesperrt (Absagen geht), Discord-Rolle wird entzogen |
+| Session anlegen für heute oder mit weniger als 12 Stunden Vorlauf | Klare Meldung, nichts angelegt |
+| Session anlegen für morgen, 8 Plätze | Sichtbar für alle; nach dem Discord-Abgleich „Discord-Raum bereit“ und nach der Zusage der Weg „Server beitreten → Zum Session-Raum“ |
 | Wochenende | Keine Erinnerung, kein Fehltag; freiwilliger Abschluss als Bonus |
 | Push auf einem echten Gerät einrichten, Testnachricht | Nachricht kommt bei geschlossener Seite an; iPhone nur als Home-Bildschirm-App |
 | 20:30 ohne Abschluss (Calling-Tag, Push aktiv) | Genau eine Erinnerung; nach eingereichtem Abschluss keine |

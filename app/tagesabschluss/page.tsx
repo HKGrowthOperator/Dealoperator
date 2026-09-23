@@ -11,6 +11,8 @@ import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import ClosingForm, { type ClosingState } from "../features/closing-form";
 import CommitmentDashboard from "../features/commitment-dashboard";
 import PushSetup, { PushPrompt } from "../features/push-setup";
+import ActiveCallerCard from "../features/active-caller-card";
+import { activeCallerFor } from "@/server/active-caller";
 import DiscordLink from "../features/discord-link";
 import "../commitment.css";
 
@@ -42,9 +44,15 @@ export default async function Page({
   // Vorladen erspart dem Browser einen leeren Zwischenstand. Klappt es nicht,
   // laden die Bausteine selbst und zeigen einen ehrlichen Fehler.
   let initial: ClosingState | null = null;
+  let caller: Awaited<ReturnType<typeof activeCallerFor>> | undefined;
   let link: { available: boolean; link: { name: string; since: string } | null } | null = null;
   if (databaseReady()) {
     const db = database();
+    try {
+      caller = await activeCallerFor(db, actor.userId);
+    } catch {
+      caller = undefined;
+    }
     try {
       initial = JSON.parse(
         JSON.stringify(await closingState(db, actor, today.slice(0, 7))),
@@ -104,6 +112,7 @@ export default async function Page({
           initial={initial}
           syncUrl
         />
+        <ActiveCallerCard state={caller} team={isTeam(actor)} />
         <CommitmentDashboard initial={initial} />
         <div className="cm-two">
           <PushSetup settings={initial?.settings} />
