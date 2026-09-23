@@ -71,7 +71,8 @@ export default async function Page({
           <h1>Tagesabschluss</h1>
           <p>
             Zahlen und Reflexion gehören zusammen. Sobald beides vollständig eingereicht ist,
-            zählt dein Tag im Ranking, in der Gruppensumme und in deiner Serie.
+            zählt dein Tag für deine Serie und, mit Zustimmung zur öffentlichen Anzeige, im
+            Ranking und in der Gruppensumme.
           </p>
           <nav className="cm-page-links" aria-label="Weiter">
             <Link href="/reflexionen">

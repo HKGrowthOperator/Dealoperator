@@ -43,9 +43,10 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
     <section className="card padded operator-account">
       <h2>Konto & öffentliche Sichtbarkeit</h2>
       <p className="hint">
-        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Die
-        Telefonnummer ist freiwillig und wird nicht als verifiziert
-        gekennzeichnet.
+        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Für deinen
+        eigenen Tagesabschluss und das Lesen der Reflexionen brauchst du eine
+        Telefonnummer mit Ländervorwahl. Sie wird nicht per SMS geprüft und ist
+        nur für das Team sichtbar.
       </p>
       {error && (
         <p className="form-error" role="alert">
@@ -119,7 +120,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
               />
             </label>
             <label>
-              Telefonnummer · privat und freiwillig
+              Telefonnummer · nur für das Team, mit Ländervorwahl
               <input
                 type="tel"
                 maxLength={40}

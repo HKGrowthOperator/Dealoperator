@@ -1175,8 +1175,8 @@ export default function ClosingForm({
             <ul>
               <li>
                 {confirmation.publicConsent
-                  ? "Deine Zahlen gehen in Ranking und Gruppensumme ein und sind öffentlich sichtbar, weil du der öffentlichen Anzeige zugestimmt hast."
-                  : "Deine Zahlen gehen in Ranking und Gruppensumme ein. Öffentlich erscheinen sie nicht, weil du der öffentlichen Anzeige nicht zugestimmt hast. Das kannst du in deinem Profil ändern."}
+                  ? "Deine Zahlen zählen im Ranking und in der Gruppensumme und sind öffentlich sichtbar, weil du der öffentlichen Anzeige zugestimmt hast."
+                  : "Deine Zahlen zählen für deine Serien und stehen in deinem Bereich. Im Ranking und in der Gruppensumme erscheinen sie erst, wenn du der öffentlichen Anzeige zustimmst. Das kannst du in deinem Profil ändern."}
               </li>
               {CONFIRM_STATUS[confirmation.status] && (
                 <li>{CONFIRM_STATUS[confirmation.status]}</li>
@@ -1342,9 +1342,9 @@ export default function ClosingForm({
           <fieldset className="cm-group cm-visibility">
             <legend>Wer sieht deinen Tagesabschluss?</legend>
             <p>
-              Mit dem Einreichen zählt dein Tag: deine Zahlen gehen in Ranking und
-              Gruppensumme ein (öffentlich nur, wenn du der öffentlichen Anzeige
-              zugestimmt hast), und deine Reflexion erscheint im Austausch unter
+              Mit dem Einreichen zählt dein Tag für deine Serien. Deine Zahlen gehen
+              in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
+              zugestimmt hast. Deine Reflexion erscheint im Austausch unter
               /reflexionen. Lesen können alle angemeldeten Mitglieder mit bestätigter
               E-Mail, hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer
               wird nicht per SMS geprüft; neue Mitglieder können sich selbst registrieren.
