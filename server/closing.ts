@@ -188,15 +188,31 @@ export const submitSchema = z
     // Calls und Sessions da; ältere Formulare schicken das Feld noch mit. Es
     // wird angenommen und nicht beachtet (discord_share bleibt false).
     discord: z.boolean().optional(),
-    // Das Formular zeigt vor dem Absenden, wer was sieht. Ohne diese
-    // Bestätigung nimmt der Server nichts an — auch nicht über die API.
-    acknowledged: z.literal(true, {
-      errorMap: () => ({
-        message: "Bitte bestätige, dass du gelesen hast, wer deinen Tagesabschluss sieht.",
-      }),
-    }),
+    // „Ich habe gelesen, wer meinen Tagesabschluss sieht.“ Pflicht nur, bis
+    // die Bestätigung einmal vorliegt (visibilityConfirmed); geprüft wird in
+    // submitClosing, weil es dafür das Profil braucht.
+    acknowledged: z.boolean().optional(),
   })
   .strict();
+
+const ACK_MISSING = "Bitte bestätige, dass du gelesen hast, wer deinen Tagesabschluss sieht.";
+
+/**
+ * Hat das Mitglied schon einmal bestätigt, wer seinen Tagesabschluss sieht?
+ *
+ * Kein eigenes Feld: Ein eigener Abschluss (origin='closing') entsteht nur
+ * über submitClosing, und der erste davon nur mit dieser Bestätigung. Gibt
+ * es also einen, liegt die Bestätigung vor, auf jedem Gerät und an jedem
+ * späteren Tag. Eigene Abschlüsse werden nicht gelöscht und nicht zu
+ * Importen zurückgestuft.
+ */
+export async function visibilityConfirmed(db: Database, participant: string) {
+  const [row] = await db.query(
+    "SELECT EXISTS(SELECT 1 FROM checkins WHERE participant=$1 AND origin='closing') AS confirmed",
+    [participant],
+  );
+  return !!row?.confirmed;
+}
 
 const draftSchema = z
   .object({
@@ -290,6 +306,9 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
     const e = await eligibility(tx, actor);
     assertEligible(e);
     const participant = e.participant!.id;
+    // Wer sieht was: einmal bestätigen reicht, auch über die API.
+    if (!v.acknowledged && !(await visibilityConfirmed(tx, participant)))
+      throw new AppError(ACK_MISSING, 400, undefined, "acknowledged");
     const settings = await loadCommitmentSettings(tx);
     const first = firstClosableDay(e.participant!.eligibleSince, settings);
     if (first && v.day < first)
@@ -452,6 +471,7 @@ export async function closingState(
       trackingStart: null,
       firstClosableDay: null,
       pauses: [],
+      visibilityConfirmed: false,
     };
   const [rows, drafts, pauses, pending] = await Promise.all([
     ownClosings(db, e.participant.id),
@@ -527,6 +547,12 @@ export async function closingState(
       reason: p.reason,
       status: p.status,
     })),
+    /**
+     * Einmal bestätigt, wer den Tagesabschluss sieht: Der Hinweis mit der
+     * Pflichtbestätigung entfällt. Dieselbe Regel wie visibilityConfirmed(),
+     * hier aus den ohnehin geladenen Zeilen.
+     */
+    visibilityConfirmed: rows.some((r) => r.origin === "closing"),
   };
 }
 

@@ -127,6 +127,42 @@ test("submitting needs numbers, a consciously chosen energy, both answers and th
   assert.equal(ok.revision, 1);
 });
 
+/** Eine Einreichung ohne die Bestätigung „wer sieht was“ (Feld fehlt ganz). */
+function unacknowledged(extra: Record<string, unknown> = {}) {
+  const value: Record<string, unknown> = closing(extra);
+  delete value.acknowledged;
+  return value;
+}
+
+test("who sees the closing is confirmed once; later closings need no confirmation, on any day", async () => {
+  const id = await member(alice, "Alice");
+  await db.query("UPDATE participants SET eligible_since=now()-interval '10 days' WHERE id=$1", [id]);
+  const month = today().slice(0, 7);
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  // Ein Tag aus den Gruppenmeldungen ist keine Bestätigung.
+  await db.query(
+    `INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,'{"attempts":5}','wins-import','import')`,
+    [id, dayOffset(-1)],
+  );
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  // Beim ersten Mal ohne Bestätigung: abgelehnt, weggelassen wie verneint.
+  await assert.rejects(submitClosing(db, alice, unacknowledged()), /wer deinen Tagesabschluss sieht/);
+  await assert.rejects(submitClosing(db, alice, closing({ acknowledged: false })), /wer deinen Tagesabschluss sieht/);
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, false);
+  await submitClosing(db, alice, closing());
+  assert.equal((await closingState(db, alice, month)).visibilityConfirmed, true);
+  // Danach: Korrektur und ein anderer Tag ohne erneute Bestätigung.
+  const correction = unacknowledged({ expectedRevision: 1, counts: { attempts: 12, settingsBooked: 0, closingsBooked: 0 } });
+  assert.equal((await submitClosing(db, alice, correction)).revision, 2);
+  assert.ok((await submitClosing(db, alice, unacknowledged({ day: dayOffset(-1), expectedRevision: 1 }))).ok);
+  // Auch ein älteres Formular, das die Bestätigung weiter mitschickt, geht.
+  assert.ok((await submitClosing(db, alice, closing({ expectedRevision: 2 }))).ok);
+  // Bob hat noch nie eingereicht: für ihn gilt die Bestätigung weiter.
+  await member(bob, "Bob");
+  assert.equal((await closingState(db, bob, month)).visibilityConfirmed, false);
+  await assert.rejects(submitClosing(db, bob, unacknowledged()), /wer deinen Tagesabschluss sieht/);
+});
+
 test("without a phone number there is no counted closing and no access to the exchange", async () => {
   await member(alice, "Alice", { phone: false });
   await assert.rejects(submitClosing(db, alice, closing()), /Telefonnummer/);
