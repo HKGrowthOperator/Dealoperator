@@ -133,7 +133,10 @@ try {
   assert.equal((await ready.json()).ready, false);
   // Ohne Datenbank trägt die freigegebene Momentaufnahme die öffentliche
   // Ansicht: echte gemeldete Zahlen, klar gekennzeichnet, ohne private Felder.
-  const ranking = await (await fetch(base + "/api/ranking")).json();
+  // Fester Tag der Momentaufnahme, damit der Test nicht vom Datum abhängt.
+  const ranking = await (
+    await fetch(base + "/api/ranking?from=2026-09-22&to=2026-09-22")
+  ).json();
   assert.equal(ranking.ready, true);
   assert.equal(ranking.snapshot, true);
   assert.match(ranking.label, /Gemeldeter Stand/);

@@ -185,7 +185,7 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
     throw new AppError("Team-Benachrichtigungen gibt es nur für die Verwaltung.", 403);
   await db.query(
     `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email,quiet_start,quiet_end)
-     VALUES($1,$2,COALESCE($3,true),COALESCE($4,false),$5,$6,$7)
+     VALUES($1,$2,COALESCE($3,true),COALESCE($4,$8),$5,$6,$7)
      ON CONFLICT(owner) DO UPDATE SET reminders=excluded.reminders,
        team_alerts=COALESCE($3,notification_prefs.team_alerts),
        team_email=COALESCE($4,notification_prefs.team_email),
@@ -197,10 +197,12 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
       v.teamAlerts ?? null,
       v.teamEmail ?? null,
       // Die Absicherungs-E-Mail geht an die bestätigte Adresse der Sitzung,
-      // nie an eine frei eingetippte.
-      v.teamEmail ? actor.email : null,
+      // nie an eine frei eingetippte. Für die Verwaltung ist sie
+      // standardmäßig an.
+      (v.teamEmail ?? actor.admin) ? actor.email : null,
       v.quietStart,
       v.quietEnd,
+      actor.admin,
     ],
   );
   return notificationPrefs(db, actor.userId);
@@ -574,7 +576,8 @@ export async function notificationStatus(db: Database) {
       ORDER BY created_at DESC LIMIT 20`,
   );
   const [secret] = await db.query("SELECT 1 FROM app_secrets WHERE key='vapid'");
-  const current = process.env.VAPID_PUBLIC_KEY?.trim() || (secret ? (await vapidKeys(db)).publicKey : "");
+  const fromEnv = !!(process.env.VAPID_PUBLIC_KEY?.trim() && process.env.VAPID_PRIVATE_KEY?.trim());
+  const current = fromEnv || secret ? (await vapidKeys(db)).publicKey : "";
   const [devices] = await db.query(
     `SELECT count(*) FILTER (WHERE vapid_key=$1 OR vapid_key='') AS n,
             count(*) FILTER (WHERE vapid_key<>$1 AND vapid_key<>'') AS stale
@@ -583,7 +586,7 @@ export async function notificationStatus(db: Database) {
   );
   return {
     push: {
-      keys: process.env.VAPID_PUBLIC_KEY ? "env" : secret ? "database" : "noch nicht erzeugt",
+      keys: fromEnv ? "env" : secret ? "database" : "noch nicht erzeugt",
       devices: Number(devices.n),
       // Geräte, die einem früheren Server-Schlüssel zugestimmt haben und neu
       // zustimmen müssen (nach einem Wechsel der VAPID-Schlüssel).

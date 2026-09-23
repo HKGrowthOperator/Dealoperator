@@ -286,6 +286,10 @@ export function readMetrics(text: string): {
   increment: boolean;
   uncertain: boolean;
 } {
+  // Tausenderpunkte („1.200 Anwahlen“) sind ganze Zahlen, keine Dezimalwerte.
+  text = text.replace(/(?<![\d.,])(\d{1,3})((?:\.\d{3})+)(?![\d.,]?\d)/g, (_, head: string, groups: string) =>
+    head + groups.replace(/\./g, ""),
+  );
   let rest = ` ${text.toLowerCase().replace(/\s+/g, " ")} `;
   const found = new Map<Metric, number[]>();
   for (const { metric, words } of PATTERNS) {

@@ -241,3 +241,10 @@ test("the latest value per metric wins across messages; a later lower value is a
   });
   assert.equal(lowered.at(-1)!.status, "review");
 });
+
+test("thousand separators are whole numbers, not decimals", () => {
+  const r = readMetrics("1.200 Anwahlen und 3 Settings");
+  assert.equal(r.uncertain, false);
+  assert.deepEqual(r.metrics, { attempts: 1200, settingsBooked: 3 });
+  assert.equal(readMetrics("1.5 Settings").uncertain, true);
+});

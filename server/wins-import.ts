@@ -11,6 +11,7 @@ import {
   type Counts,
   type Metric,
 } from "../lib/kpis";
+import { splitOrigin } from "../lib/joint-reports";
 import {
   normaliseName,
   parseWins,
@@ -125,12 +126,18 @@ async function build(db: Database, text: string, day: string) {
       });
       continue;
     }
-    const [p] = await db.query("SELECT id,owner,claimed_at FROM participants WHERE id=$1", [e.participantId]);
+    const [p] = await db.query("SELECT id,owner,claimed_at,import_key FROM participants WHERE id=$1", [e.participantId]);
     const [c] = await db.query(
       "SELECT counts,revision,origin FROM checkins WHERE participant=$1 AND day=$2",
       [e.participantId, e.day],
     );
-    const blocked = importBlocked(p, c, e.day);
+    const split = splitOrigin(p?.import_key);
+    // Aufgeteilte Duo-Meldungen (50/50) nie durch eine Einzelmeldung ersetzen:
+    // die Gruppensumme würde sonst doppelt zählen.
+    const blocked =
+      split && split.day === e.day
+        ? "Übersprungen: 50/50 aus gemeinsamer Meldung aufgeteilt. Korrektur bitte bewusst im Team."
+        : importBlocked(p, c, e.day);
     const before = c ? (c.counts as Counts) : null;
     // Eine Meldung ist ein Stand für die genannten Kennzahlen. Nicht genannte
     // Kennzahlen bleiben, wie sie sind.
