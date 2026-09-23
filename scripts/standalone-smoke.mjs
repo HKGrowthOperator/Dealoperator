@@ -95,12 +95,26 @@ try {
     const location = new URL(response.headers.get("location") || "", base);
     assert.equal(location.pathname + location.search + location.hash, to, from);
   }
-  // Die frühere Direktübernahme führt in den geprüften Ablauf.
-  const retired = await fetch(base + "/profil-uebernehmen?profil=abc", {
+  // Profilübernahme ohne Anmeldung führt in den Start, Profil und Einladung
+  // bleiben erhalten.
+  const retired = await fetch(base + "/profil-uebernehmen?profil=abc&einladung=xyz", {
     redirect: "manual",
   });
   assert.equal(retired.status, 307);
-  assert.ok(retired.headers.get("location")?.includes("/starten?profil=abc"));
+  assert.ok(
+    retired.headers.get("location")?.includes("/starten?profil=abc&einladung=xyz"),
+    retired.headers.get("location") || "",
+  );
+  // Statusseite und Übernahme-Anfrage verlangen eine Anmeldung.
+  const status = await fetch(base + "/status", { redirect: "manual" });
+  assert.equal(status.status, 307);
+  assert.ok(status.headers.get("location")?.includes("/anmelden"));
+  const claim = await fetch(base + "/api/onboarding", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "claim", value: {} }),
+  });
+  assert.ok([401, 403, 503].includes(claim.status), `claim without login -> ${claim.status}`);
   // Öffentliche Profilsuche ohne Konfiguration: ehrlich leer statt Fehler.
   const search = await (await fetch(base + "/api/onboarding?q=test")).json();
   assert.equal(search.ready, false);
