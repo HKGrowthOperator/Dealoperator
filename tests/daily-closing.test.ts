@@ -386,11 +386,34 @@ test("members request pauses from today on; the team decides once", async () => 
 
 test("without Discord credentials nothing is marked as synced", async () => {
   await member(alice, "Alice");
-  await submitClosing(db, alice, closing({ discord: true }));
+  await submitClosing(db, alice, closing());
   const result = await syncDiscord(db);
   assert.equal(result.configured, false);
   const [row] = await db.query("SELECT state FROM sync_outbox");
   assert.equal(row.state, "pending");
+});
+
+test("a closing is never shared on Discord, even when an older form still asks for it", async () => {
+  const id = await member(alice, "Alice");
+  // Ältere Formulare schicken das Feld noch mit: angenommen, nicht beachtet.
+  const first = await submitClosing(db, alice, closing({ discord: true }));
+  assert.equal(first.revision, 1);
+  const share = async () =>
+    (await db.query("SELECT discord_share FROM checkins WHERE participant=$1", [id]))[0].discord_share;
+  assert.equal(await share(), false);
+  // Korrektur mit neuen Zahlen: bleibt aus.
+  await submitClosing(db, alice, closing({ expectedRevision: 1, discord: true, counts: { attempts: 41, settingsBooked: 2, closingsBooked: 1 } }));
+  assert.equal(await share(), false);
+  // Eine alte Freigabe von früher fällt beim nächsten Einreichen weg, auch
+  // ohne inhaltliche Änderung (keine neue Fassung).
+  await db.query("UPDATE checkins SET discord_share=true WHERE participant=$1", [id]);
+  const again = await submitClosing(db, alice, closing({ expectedRevision: 2, counts: { attempts: 41, settingsBooked: 2, closingsBooked: 1 } }));
+  assert.equal(again.unchanged, true);
+  assert.equal(again.revision, 2);
+  assert.equal(await share(), false);
+  // Der Stand für das Formular enthält keine Discord-Angabe mehr.
+  const state = await closingState(db, alice, today().slice(0, 7));
+  assert.equal("discord" in state.closings[0], false);
 });
 
 test("an account signing in without a request gets one inbox entry and no push, never for existing profiles", async () => {

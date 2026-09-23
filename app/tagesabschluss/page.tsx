@@ -102,7 +102,6 @@ export default async function Page({
           key={day}
           day={day}
           initial={initial}
-          discordAvailable={databaseReady() ? discordMissing("posts").length === 0 : undefined}
           syncUrl
         />
         <CommitmentDashboard initial={initial} />

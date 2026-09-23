@@ -77,7 +77,6 @@ export type ClosingRecord = {
   firstSubmittedAt: string | null;
   submittedAt: string | null;
   shared: boolean;
-  discord: boolean;
   callsDocumentedAt?: string | null;
 };
 export type ClosingDraft = {
@@ -418,7 +417,6 @@ type FormState = {
   values: Values;
   /** Revision des vorhandenen Eintrags für den Tag (0 = keiner). */
   baseRevision: number;
-  discord: boolean;
   acknowledged: boolean;
   /** Vom Nutzer seit dem Laden verändert. */
   dirty: boolean;
@@ -435,7 +433,6 @@ type Confirmation = {
   unchanged: boolean;
   status: DayStatus;
   publicConsent: boolean;
-  discord: boolean;
 };
 type FieldKey = CountKey | "energy" | "win" | "next" | "acknowledged";
 
@@ -480,7 +477,6 @@ function formFor(state: ClosingState, day: string): FormState {
     day,
     values,
     baseRevision: record?.revision ?? 0,
-    discord: record?.origin === "closing" ? record.discord : false,
     acknowledged: false,
     dirty: false,
     draftAt: draft && !locked ? draft.updatedAt : null,
@@ -562,7 +558,6 @@ const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
 export default function ClosingForm({
   day: requestedDay,
   initial,
-  discordAvailable,
   syncUrl = false,
   onSubmitted,
 }: {
@@ -570,8 +565,6 @@ export default function ClosingForm({
   day?: string;
   /** Vom Server vorgeladener Stand; ohne ihn lädt das Formular selbst. */
   initial?: ClosingState | null;
-  /** Ob die Discord-Anbindung eingerichtet ist; ohne Angabe wird gefragt. */
-  discordAvailable?: boolean;
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
   onSubmitted?: (day: string) => void;
@@ -582,9 +575,6 @@ export default function ClosingForm({
     initial ? formFor(initial, clampDay(initial, requestedDay)) : null,
   );
   const [loadError, setLoadError] = useState("");
-  const [discordReady, setDiscordReady] = useState<boolean | null>(
-    discordAvailable ?? null,
-  );
   const [attempted, setAttempted] = useState(false);
   const [touched, setTouched] = useState<Set<FieldKey>>(() => new Set());
   const [busy, setBusy] = useState(false);
@@ -621,17 +611,6 @@ export default function ClosingForm({
       });
     return () => controller.abort();
   }, [initial, requestedDay]);
-
-  useEffect(() => {
-    if (discordAvailable !== undefined) return;
-    let alive = true;
-    getJson<{ postsAvailable: boolean }>("/api/discord/connect")
-      .then((d) => alive && setDiscordReady(!!d.postsAvailable))
-      .catch(() => alive && setDiscordReady(false));
-    return () => {
-      alive = false;
-    };
-  }, [discordAvailable]);
 
   // ---- Entwurf automatisch speichern -------------------------------------
 
@@ -891,7 +870,6 @@ export default function ClosingForm({
         next: v.next.trim(),
         help: v.help.trim(),
       },
-      discord: form.discord,
       acknowledged: true,
     };
     const hash = JSON.stringify(value);
@@ -923,7 +901,6 @@ export default function ClosingForm({
         unchanged: !!result.unchanged,
         status: fresh ? statusOf(fresh, form.day) : "free",
         publicConsent: !!base.eligibility.participant?.publicConsent,
-        discord: form.discord,
       });
       setAttempted(false);
       setTouched(new Set());
@@ -1201,13 +1178,6 @@ export default function ClosingForm({
                   ? " mit deinen Zahlen."
                   : ", ohne deine Zahlen."}
               </li>
-              {confirmation.discord && (
-                <li>
-                  {discordReady
-                    ? "Deine Zustimmung zum Teilen auf Discord ist gespeichert."
-                    : "Deine Zustimmung zum Teilen auf Discord ist gespeichert. Die Discord-Übertragung ist noch nicht eingerichtet und wird erst genutzt, wenn sie läuft."}
-                </li>
-              )}
               <li>Für diesen Tag bekommst du keine Erinnerung mehr.</li>
             </ul>
           )}
@@ -1402,27 +1372,6 @@ export default function ClosingForm({
                 {ackError}
               </p>
             )}
-            <label className="cm-check">
-              <input
-                type="checkbox"
-                checked={form.discord}
-                disabled={busy}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  // Keine Zahl und kein Text: kein Entwurf nötig.
-                  setForm((f) => (f ? { ...f, discord: checked } : f));
-                }}
-              />
-              <span>
-                Zusätzlich im Discord-Channel teilen: Dort liest jede Person mit, die auf
-                dem Server ist (Zugang über den öffentlichen Einladungslink).
-                <small>
-                  {discordReady === false
-                    ? "Die Discord-Übertragung ist noch nicht eingerichtet; deine Zustimmung wird gespeichert und erst genutzt, wenn sie läuft."
-                    : "Freiwillig. Standardmäßig bleibt dein Abschluss auf der Website."}
-                </small>
-              </span>
-            </label>
           </fieldset>
 
           {draftLine && (

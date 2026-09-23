@@ -184,10 +184,12 @@ export const submitSchema = z
     idempotencyKey: z.string().uuid(),
     counts: closingCountsSchema,
     reflection: reflectionSchema,
+    // Früher: „Zusätzlich im Discord-Channel teilen“. Discord ist nur noch für
+    // Calls und Sessions da; ältere Formulare schicken das Feld noch mit. Es
+    // wird angenommen und nicht beachtet (discord_share bleibt false).
+    discord: z.boolean().optional(),
     // Das Formular zeigt vor dem Absenden, wer was sieht. Ohne diese
     // Bestätigung nimmt der Server nichts an — auch nicht über die API.
-    // Zusätzlich im Discord-Channel teilen: eigene Entscheidung je Abschluss.
-    discord: z.boolean().default(false),
     acknowledged: z.literal(true, {
       errorMap: () => ({
         message: "Bitte bestätige, dass du gelesen hast, wer deinen Tagesabschluss sieht.",
@@ -327,32 +329,40 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
     if (
       old?.origin === "closing" &&
       canonicalJson(old.counts) === canonicalJson(counts) &&
-      canonicalJson(old.reflection) === canonicalJson(reflection) &&
-      !!old.discord_share === v.discord
+      canonicalJson(old.reflection) === canonicalJson(reflection)
     ) {
       await tx.query("DELETE FROM checkin_drafts WHERE participant=$1 AND day=$2", [
         participant,
         v.day,
       ]);
+      // Eine alte Discord-Freigabe dieses Tages fällt auch ohne neue Fassung weg.
+      if (old.discord_share) {
+        await tx.query(
+          "UPDATE checkins SET discord_share=false,updated_at=now() WHERE participant=$1 AND day=$2",
+          [participant, v.day],
+        );
+        await outbox(tx, participant);
+      }
       return { ok: true, revision: old.revision as number, unchanged: true };
     }
     const revision = (old?.revision || 0) + 1;
     // Fristgerecht ist, was ZUERST vollständig einging. Eine spätere
-    // Korrektur macht einen pünktlichen Tag nicht verspätet.
+    // Korrektur macht einen pünktlichen Tag nicht verspätet. Geteilt wird
+    // nichts mehr auf Discord: discord_share ist immer false.
     const [row] = await tx.query(
       `INSERT INTO checkins(participant,day,counts,reflection,revision,source,origin,first_submitted_at,submitted_at,shared,discord_share,calls_documented_at)
-       VALUES($1,$2,$3::jsonb,$4::jsonb,$5,'website','closing',now(),now(),true,$6,CASE WHEN $7 THEN now() END)
+       VALUES($1,$2,$3::jsonb,$4::jsonb,$5,'website','closing',now(),now(),true,false,CASE WHEN $6 THEN now() END)
        ON CONFLICT(participant,day) DO UPDATE SET
          counts=excluded.counts, reflection=excluded.reflection, revision=excluded.revision,
-         source='website', origin='closing', shared=true, discord_share=excluded.discord_share,
+         source='website', origin='closing', shared=true, discord_share=false,
          submitted_at=now(), updated_at=now(),
          -- Erste Dokumentation von Anrufen bleibt, auch über Korrekturen hinweg.
-         calls_documented_at=COALESCE(checkins.calls_documented_at, CASE WHEN $7 THEN now() END),
+         calls_documented_at=COALESCE(checkins.calls_documented_at, CASE WHEN $6 THEN now() END),
          -- Ein ersetzter Import-Tag hat noch keine erste Einreichung.
          first_submitted_at=COALESCE(checkins.first_submitted_at, excluded.first_submitted_at)
        WHERE checkins.origin='closing' OR (checkins.origin='import' AND checkins.source='wins-import')
        RETURNING revision, first_submitted_at, submitted_at`,
-      [participant, v.day, JSON.stringify(counts), JSON.stringify(reflection), revision, v.discord, (counts.attempts ?? 0) > 0],
+      [participant, v.day, JSON.stringify(counts), JSON.stringify(reflection), revision, (counts.attempts ?? 0) > 0],
     );
     await tx.query(
       "INSERT INTO checkin_revisions(participant,day,revision,counts,reflection,actor,source) VALUES($1,$2,$3,$4::jsonb,$5::jsonb,$6,'website')",
@@ -388,7 +398,7 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
 
 export async function ownClosings(db: Database, participant: string) {
   const rows = await db.query(
-    `SELECT day,counts,reflection,revision,origin,source,first_submitted_at,submitted_at,shared,discord_share,calls_documented_at
+    `SELECT day,counts,reflection,revision,origin,source,first_submitted_at,submitted_at,shared,calls_documented_at
      FROM checkins WHERE participant=$1 ORDER BY day DESC`,
     [participant],
   );
@@ -405,7 +415,6 @@ export async function ownClosings(db: Database, participant: string) {
       : null,
     submittedAt: r.submitted_at ? new Date(r.submitted_at).toISOString() : null,
     shared: !!r.shared,
-    discord: !!r.discord_share,
     callsDocumentedAt: r.calls_documented_at
       ? new Date(r.calls_documented_at).toISOString()
       : null,
