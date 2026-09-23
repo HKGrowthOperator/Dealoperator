@@ -185,12 +185,17 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
   if ((v.teamAlerts !== undefined || v.teamEmail !== undefined) && !isTeam(actor))
     throw new AppError("Team-Benachrichtigungen gibt es nur für das Team.", 403);
   await db.query(
+    // Parameter ausdrücklich typisiert: Ohne Typ macht Postgres aus
+    // COALESCE($4,…) einen Text, und das Speichern scheitert an der
+    // boolean-Spalte. team_email ist standardmäßig an; für Konten ohne
+    // Team-Rolle bleibt das folgenlos, weil der Versand die Rolle prüft, und
+    // wer später eine Rolle bekommt, hat die Absicherung gleich an.
     `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email,quiet_start,quiet_end)
-     VALUES($1,$2,COALESCE($3,true),COALESCE($4,$8),$5,$6,$7)
+     VALUES($1,$2::boolean,COALESCE($3::boolean,true),COALESCE($4::boolean,true),$5,$6::integer,$7::integer)
      ON CONFLICT(owner) DO UPDATE SET reminders=excluded.reminders,
-       team_alerts=COALESCE($3,notification_prefs.team_alerts),
-       team_email=COALESCE($4,notification_prefs.team_email),
-       email=CASE WHEN $4 IS NULL THEN notification_prefs.email ELSE excluded.email END,
+       team_alerts=COALESCE($3::boolean,notification_prefs.team_alerts),
+       team_email=COALESCE($4::boolean,notification_prefs.team_email),
+       email=CASE WHEN $4::boolean IS NULL THEN notification_prefs.email ELSE excluded.email END,
        quiet_start=excluded.quiet_start,quiet_end=excluded.quiet_end,updated_at=now()`,
     [
       actor.userId,
@@ -203,7 +208,6 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
       (v.teamEmail ?? isTeam(actor)) ? actor.email : null,
       v.quietStart,
       v.quietEnd,
-      isTeam(actor),
     ],
   );
   return notificationPrefs(db, actor.userId);
