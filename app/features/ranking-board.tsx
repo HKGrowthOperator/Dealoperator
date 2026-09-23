@@ -713,7 +713,8 @@ export default function RankingBoard({
                 </div>
                 <div className="rr-score-detail">
                   <button onClick={() => choose("dealsWon")}>
-                    <strong>{fmt(totals.dealsWon)}</strong> Deals gewonnen
+                    <strong>{fmt(totals.dealsWon)}</strong>{" "}
+                    {totals.dealsWon === 1 ? "Deal gewonnen" : "Deals gewonnen"}
                   </button>
                   {runningStreaks !== null && (
                     <button onClick={() => choose(COMMITMENT)}>
