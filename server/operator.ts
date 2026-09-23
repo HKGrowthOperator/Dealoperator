@@ -2,10 +2,11 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import type { Actor } from "./auth";
+import { teamEvent } from "./notify";
+import { normalisePhone } from "../lib/phone";
 import {
   aggregate,
   countsSchema,
-  daySchema,
   importRowSchema,
   isJoint,
   participantKind,
@@ -41,7 +42,9 @@ export class AppError extends Error {
 }
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
-function canonical(value: unknown): string {
+/** Kanonische JSON-Form für Vergleiche und Fingerabdrücke. */
+export const canonicalJson = (value: unknown) => canonical(value);
+export function canonical(value: unknown): string {
   if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
   if (value && typeof value === "object")
     return (
@@ -60,21 +63,6 @@ async function rememberVerifiedEmail(tx: Database, actor: Actor) {
     [actor.userId, actor.email],
   );
 }
-export const checkinSchema = z
-  .object({
-    date: daySchema,
-    expectedRevision: z.number().int().min(0),
-    idempotencyKey: z.string().uuid(),
-    counts: countsSchema,
-    reflection: z.object({
-      win: z.string().trim().max(1500),
-      next: z.string().trim().max(1500),
-      help: z.string().trim().max(1500),
-      energy: z.number().int().min(1).max(10),
-    }),
-  })
-  .strict();
-export type CheckinInput = z.infer<typeof checkinSchema>;
 /**
  * Solange eine Übernahmeanfrage läuft, darf kein zweites Profil mit leeren
  * Zahlen entstehen. Sonst hätte die Person nach der Freigabe zwei Historien.
@@ -91,13 +79,13 @@ async function refuseDuringOpenClaim(tx: Database, actor: Actor) {
       409,
     );
 }
-async function outbox(tx: Database, participant: string) {
+export async function outbox(tx: Database, participant: string) {
   await tx.query(
     "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
     [participant],
   );
 }
-async function once<T>(
+export async function once<T>(
   db: Database,
   actor: string,
   key: string,
@@ -131,14 +119,18 @@ async function once<T>(
 }
 export async function publicRanking(db: Database, from: string, to: string) {
   const rows = await db.query(
-    `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.source,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
+    `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.origin,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
     [from, to],
   );
   const grouped = new Map<string, RankingRow>();
   for (const r of rows) {
+    // Entscheidergespräche werden nicht mehr erfasst und nie öffentlich
+    // ausgegeben, auch nicht aus alten Datensätzen.
+    r.counts = { ...r.counts, decisionMakerConversations: null };
     const current = grouped.get(r.id);
     if (current) {
       current.counts = aggregate([current.counts, r.counts]);
+      if (r.origin === "closing") current.source = "Tagesabschluss";
     } else
       grouped.set(r.id, {
         id: r.id,
@@ -149,7 +141,7 @@ export async function publicRanking(db: Database, from: string, to: string) {
         kind: participantKind(r.kind),
         claimed: r.claimed,
         counts: countsSchema.parse(r.counts),
-        source: "Selbst gemeldet",
+        source: r.origin === "closing" ? "Tagesabschluss" : "Übernommene Meldung",
         updatedAt: new Date(r.updated_at).toISOString(),
       });
   }
@@ -189,75 +181,9 @@ export async function ownState(db: Database, actor: Actor) {
     syncStatus: "Discord-Anbindung wird vorbereitet",
   };
 }
-export async function saveCheckin(db: Database, actor: Actor, raw: unknown) {
-  const value = checkinSchema.parse(raw);
-  return once(db, actor.userId, value.idempotencyKey, value, async (tx) => {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
-      `owner:${actor.userId}`,
-    ]);
-    let [p] = await tx.query(
-      "SELECT id FROM participants WHERE owner=$1 FOR UPDATE",
-      [actor.userId],
-    );
-    if (!p) {
-      await refuseDuringOpenClaim(tx, actor);
-      const [profile] = await tx.query(
-        "SELECT data FROM profiles WHERE id=$1",
-        [actor.userId],
-      );
-      const name = profile ? JSON.parse(profile.data).name : "";
-      if (!name)
-        throw new AppError(
-          "Bitte ergänze zuerst deinen Anzeigenamen oder übernimm dein vorbereitetes Profil.",
-        );
-      [p] = await tx.query(
-        "INSERT INTO participants(id,name,owner,email,claimed_at) VALUES($1,$2,$3,$4,now()) RETURNING id",
-        [randomUUID(), name, actor.userId, actor.email],
-      );
-    }
-    await rememberVerifiedEmail(tx, actor);
-    const [old] = await tx.query(
-      "SELECT counts,reflection,revision FROM checkins WHERE participant=$1 AND day=$2",
-      [p.id, value.date],
-    );
-    if ((old?.revision || 0) !== value.expectedRevision)
-      throw new AppError(
-        "Die Zahlen wurden inzwischen geändert. Lade den aktuellen Stand und prüfe deine Eingabe erneut.",
-        409,
-      );
-    const revision = (old?.revision || 0) + 1;
-    if (
-      old &&
-      canonical(old.counts) === canonical(value.counts) &&
-      canonical(old.reflection) === canonical(value.reflection)
-    )
-      return { ok: true, revision: old.revision };
-    await tx.query(
-      "INSERT INTO checkins(participant,day,counts,reflection,revision,source) VALUES($1,$2,$3::jsonb,$4::jsonb,$5,$6) ON CONFLICT(participant,day) DO UPDATE SET counts=excluded.counts,reflection=excluded.reflection,revision=excluded.revision,source=excluded.source,updated_at=now()",
-      [
-        p.id,
-        value.date,
-        JSON.stringify(value.counts),
-        JSON.stringify(value.reflection),
-        revision,
-        "website",
-      ],
-    );
-    await tx.query(
-      "INSERT INTO checkin_revisions(participant,day,revision,counts,actor,source) VALUES($1,$2,$3,$4::jsonb,$5,$6)",
-      [
-        p.id,
-        value.date,
-        revision,
-        JSON.stringify(value.counts),
-        actor.userId,
-        "website",
-      ],
-    );
-    await outbox(tx, p.id);
-    return { ok: true, revision };
-  });
-}
+// Eigene Tageszahlen entstehen ausschließlich über den vollständigen
+// Tagesabschluss in server/closing.ts (Zahlen plus Reflexion). Den früheren
+// direkten Check-in ohne Reflexion gibt es nicht mehr.
 export async function createMember(db: Database, actor: Actor, raw: unknown) {
   const value = z
     .object({
@@ -311,31 +237,73 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       [actor.userId, JSON.stringify(profile)],
     );
     await rememberVerifiedEmail(tx, actor);
+    // Wer über „Anmelden“ ohne Registrierungsanfrage kam, taucht sonst nie im
+    // Team auf. Mit Anfrage ist die Meldung bereits bei der E-Mail-Bestätigung
+    // entstanden — dann hier nichts Doppeltes.
+    const [request] = await tx.query(
+      "SELECT id FROM onboarding_requests WHERE owner=$1 LIMIT 1",
+      [actor.userId],
+    );
+    if (!request)
+      await teamEvent(tx, {
+        dedupeKey: `member:${actor.userId}`,
+        kind: "registration",
+        ref: id,
+        state: "confirmed",
+        title: `Neues Profil angelegt: ${value.name}`,
+        body: "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer fehlt noch.",
+        alert: { key: `signup:${actor.userId}`, kind: "new" },
+      });
     return { ok: true, id };
   });
+}
+/**
+ * Ein Import überschreibt nie einen eigenen Tagesabschluss. Für ein
+ * übernommenes Profil zählen ab dem Übernahmetag nur noch die eigenen
+ * Abschlüsse mit Reflexion; ein Import dafür wird nicht geschrieben.
+ */
+export function importBlocked(
+  p: { owner?: string | null; claimed_at?: string | Date | null } | undefined,
+  c: { origin?: string } | undefined,
+  day: string,
+) {
+  if (c?.origin === "closing")
+    return "Übersprungen: eigener Tagesabschluss liegt vor";
+  if (p?.owner && p.claimed_at) {
+    const claimed = new Date(p.claimed_at).toLocaleDateString("sv-SE", {
+      timeZone: "Europe/Berlin",
+    });
+    if (day >= claimed)
+      return "Übersprungen: Profil übernommen, ab dann zählt nur der eigene Tagesabschluss";
+  }
+  return null;
 }
 export async function previewImport(db: Database, rows: ImportRow[]) {
   const result = [];
   for (const r of rows) {
     const [p] = await db.query(
-      "SELECT id,owner FROM participants WHERE import_key=$1",
+      "SELECT id,owner,claimed_at FROM participants WHERE import_key=$1",
       [r.participantKey],
     );
     const [c] = p
       ? await db.query(
-          "SELECT revision,counts FROM checkins WHERE participant=$1 AND day=$2",
+          "SELECT revision,counts,origin FROM checkins WHERE participant=$1 AND day=$2",
           [p.id, r.date],
         )
       : [];
+    const blocked = importBlocked(p, c, r.date);
     result.push({
       key: `${r.participantKey}:${r.date}`,
       revision: c?.revision || 0,
       participantId: p?.id || null,
-      change: !p
-        ? "Neues Profil"
-        : !c
-          ? "Neuer Tagesstand"
-          : "Tagesstand ersetzen",
+      change: blocked
+        ? blocked
+        : !p
+          ? "Neues Profil"
+          : !c
+            ? "Neuer Tagesstand"
+            : "Tagesstand ersetzen",
+      blocked: !!blocked,
       claimed: !!p?.owner,
       previous: c?.counts || null,
     });
@@ -381,7 +349,12 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
           409,
         );
     }
+    let skipped = 0;
     for (const r of v.rows) {
+      if (current.find((c) => c.key === `${r.participantKey}:${r.date}`)?.blocked) {
+        skipped++;
+        continue;
+      }
       let [p] = await tx.query(
         "SELECT id,owner FROM participants WHERE import_key=$1 FOR UPDATE",
         [r.participantKey],
@@ -427,10 +400,16 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
           "Zwischenzeitliche Änderung. Bitte Import neu prüfen.",
           409,
         );
+      // Zweite Sicherung auf Datenbankebene: ein eigener Abschluss wird nie
+      // durch einen Import ersetzt.
       const [c] = await tx.query(
-        "INSERT INTO checkins(participant,day,counts,source) VALUES($1,$2,$3::jsonb,$4) ON CONFLICT(participant,day) DO UPDATE SET counts=excluded.counts,revision=checkins.revision+1,source=excluded.source,updated_at=now() RETURNING revision",
+        "INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,$3::jsonb,$4,'import') ON CONFLICT(participant,day) DO UPDATE SET counts=excluded.counts,revision=checkins.revision+1,source=excluded.source,updated_at=now() WHERE checkins.origin='import' RETURNING revision",
         [p.id, r.date, JSON.stringify(r.counts), "owner-import"],
       );
+      if (!c) {
+        skipped++;
+        continue;
+      }
       await tx.query(
         "INSERT INTO checkin_revisions(participant,day,revision,counts,actor,source) VALUES($1,$2,$3,$4::jsonb,$5,$6)",
         [
@@ -444,7 +423,7 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
       );
       await outbox(tx, p.id);
     }
-    return { ok: true, count: v.rows.length };
+    return { ok: true, count: v.rows.length - skipped, skipped };
   });
 }
 /**
@@ -494,6 +473,14 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
       contactOptIn: z.boolean(),
     })
     .parse(raw);
+  // Leer lassen ist erlaubt; eine angegebene Nummer muss gültig sein. Sie wird
+  // nicht per SMS geprüft, sondern nur einheitlich gespeichert.
+  let phone = "";
+  if (v.phone) {
+    const checked = normalisePhone(v.phone);
+    if (!checked.ok) throw new AppError(checked.reason);
+    phone = checked.value;
+  }
   return db.transaction(async (tx) => {
     const [p] = await tx.query(
       "UPDATE participants SET name=$2,company=$3,role=$4,public_consent=$5 WHERE owner=$1 RETURNING id",
@@ -509,9 +496,12 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
     );
     await tx.query(
       "INSERT INTO account_private(owner,phone,contact_opt_in) VALUES($1,$2,$3) ON CONFLICT(owner) DO UPDATE SET phone=excluded.phone,contact_opt_in=excluded.contact_opt_in,updated_at=now()",
-      [actor.userId, v.phone, v.contactOptIn],
+      [actor.userId, phone, v.contactOptIn],
     );
     await rememberVerifiedEmail(tx, actor);
+    // Name oder Zustimmung zur öffentlichen Anzeige geändert: vorhandene
+    // Discord-Beiträge ziehen nach (Zahlen nur mit Zustimmung).
+    await outbox(tx, p.id);
     return { ok: true };
   });
 }

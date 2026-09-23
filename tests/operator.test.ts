@@ -10,10 +10,10 @@ import {
   ownState,
   previewImport,
   publicRanking,
-  saveCheckin,
   updateAccount,
 } from "../server/operator";
 import { loadOwnRecords } from "../server/records";
+import { submitClosing } from "../server/closing";
 import {
   bindConfirmedRequest,
   decideRequest,
@@ -90,7 +90,7 @@ async function request(
   actor: typeof alice,
   extra: Record<string, unknown> = {},
 ) {
-  await startRequest(db, {
+  const started = await startRequest(db, {
     kind: "claim",
     participantId,
     fullName: "Test Person",
@@ -99,7 +99,8 @@ async function request(
     hint: "",
     ...extra,
   });
-  const bound = await bindConfirmedRequest(db, actor);
+  // Wie im Browser: die Anfrage-ID kommt aus dem httpOnly-Cookie.
+  const bound = await bindConfirmedRequest(db, actor, started.id);
   return bound!.id;
 }
 async function takeOver(participantId: string, actor: typeof alice) {
@@ -118,10 +119,34 @@ async function takeOver(participantId: string, actor: typeof alice) {
     applicantMessage: "",
   });
 }
+/** Hinterlegt eine gültige Nummer, wie sie das Profilformular speichert. */
+async function givePhone(actor: typeof alice, phone = "+4917012345678") {
+  await db.query(
+    `INSERT INTO account_private(owner,email,phone) VALUES($1,$2,$3)
+     ON CONFLICT(owner) DO UPDATE SET phone=excluded.phone`,
+    [actor.userId, actor.email, phone],
+  );
+}
+/** Vortag in Berlin — für übernommene Stände, die einen freien Tag lassen. */
+function yesterday() {
+  const d = new Date(`${berlinDate()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+/** Ein vollständiger Tagesabschluss im Format von submitClosing. */
 function checkin(extra: any = {}) {
+  const { date, counts: c, ...rest } = extra;
+  const full = { ...counts(), ...(c || {}) };
   return {
-    date: berlinDate(),
-    counts: counts(),
+    day: date || berlinDate(),
+    counts: {
+      attempts: full.attempts,
+      settingsBooked: full.settingsBooked,
+      closingsBooked: full.closingsBooked,
+      settingsHeld: full.settingsHeld,
+      closingsHeld: full.closingsHeld,
+      dealsWon: full.dealsWon,
+    },
     reflection: {
       win: "Privates Learning",
       next: "Nächster Call",
@@ -130,7 +155,8 @@ function checkin(extra: any = {}) {
     },
     expectedRevision: 1,
     idempotencyKey: randomUUID(),
-    ...extra,
+    acknowledged: true,
+    ...rest,
   };
 }
 
@@ -361,7 +387,7 @@ test("an invitation only unlocks selection and still needs the team", async () =
     hint: "",
   });
   // Die Einladung allein überträgt nichts.
-  await bindConfirmedRequest(db, bob);
+  await bindConfirmedRequest(db, bob, undefined);
   assert.equal((await ownState(db, bob)).participant, null);
   const [open] = await db.query(
     "SELECT id FROM onboarding_requests WHERE owner=$1",
@@ -451,19 +477,20 @@ test("the public search never exposes contact data or claimed profiles", async (
   // Zu kurze Eingaben liefern nichts, damit die Liste nicht abgegrast wird.
   assert.deepEqual(await searchProfiles(db, "A"), []);
 });
-test("corrected checkin replaces totals, changes only relevant rank and queues sync", async () => {
-  const id = await imported();
+test("corrected closing replaces the day's numbers and queues sync", async () => {
+  const id = await imported([row({ date: yesterday() })]);
   await takeOver(id, alice);
-  const r = await saveCheckin(
+  const first = await submitClosing(db, alice, checkin({ expectedRevision: 0 }));
+  const r = await submitClosing(
     db,
     alice,
-    checkin({ counts: { ...counts(), settingsBooked: 4 } }),
+    checkin({ expectedRevision: first.revision, counts: { ...counts(), settingsBooked: 4 } }),
   );
   assert.equal(r.revision, 2);
   const s = await ownState(db, alice);
-  assert.equal(s.records.length, 1);
-  assert.equal(s.progress[0].tier, "Bronze");
-  assert.equal(s.progress[1].tier, null);
+  // Übernommener Vortag bleibt, heute zählt der eigene Abschluss.
+  assert.equal(s.records.length, 2);
+  assert.equal(s.records[0].day, berlinDate());
   assert.equal(s.records[0].counts.settingsBooked, 4);
   assert.equal((await db.query("SELECT * FROM sync_outbox")).length, 1);
   assert.ok(
@@ -472,52 +499,68 @@ test("corrected checkin replaces totals, changes only relevant rank and queues s
     ).includes("Privates Learning"),
   );
 });
-test("request retry is idempotent, conflicting reuse and stale revisions fail", async () => {
+test("a closing never replaces a curated import day and never reaches before the tracking start", async () => {
   const id = await imported();
   await takeOver(id, alice);
-  const v = checkin({ counts: { ...counts(), attempts: 500 } });
-  const first = await saveCheckin(db, alice, v);
-  assert.deepEqual(await saveCheckin(db, alice, v), first);
+  // Heute liegt bereits ein übernommener Stand (z. B. Akquise Day): gesperrt.
+  await assert.rejects(submitClosing(db, alice, checkin()), /übernommenen Stand/);
+  const d = new Date(`${berlinDate()}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 3);
   await assert.rejects(
-    saveCheckin(db, alice, { ...v, counts: { ...counts(), attempts: 999 } }),
+    submitClosing(db, alice, checkin({ date: d.toISOString().slice(0, 10), expectedRevision: 0 })),
+    /vor deinem Start/,
+  );
+  const [row] = await db.query("SELECT origin,counts FROM checkins WHERE participant=$1", [id]);
+  assert.equal(row.origin, "import");
+  assert.equal(row.counts.attempts, 100);
+});
+test("request retry is idempotent, conflicting reuse and stale revisions fail", async () => {
+  const id = await imported([row({ date: yesterday() })]);
+  await takeOver(id, alice);
+  const v = checkin({ expectedRevision: 0, counts: { ...counts(), attempts: 500 } });
+  const first = await submitClosing(db, alice, v);
+  assert.deepEqual(await submitClosing(db, alice, v), first);
+  await assert.rejects(
+    submitClosing(db, alice, { ...v, counts: { ...v.counts, attempts: 999 } }),
     /anderen Werten/,
   );
   await assert.rejects(
-    saveCheckin(db, alice, checkin()),
-    /inzwischen geändert/,
+    submitClosing(db, alice, checkin({ expectedRevision: 0 })),
+    /neueren Stand/,
   );
-  assert.equal((await ownState(db, alice)).progress[0].value, 500);
+  assert.equal((await ownState(db, alice)).records[0].counts.attempts, 500);
 });
 test("checkin supports previous-day sourced appointments and rejects future dates", async () => {
-  const id = await imported();
+  const id = await imported([row({ date: yesterday() })]);
   await takeOver(id, alice);
-  await saveCheckin(
+  await submitClosing(
     db,
     alice,
     checkin({
+      expectedRevision: 0,
       counts: {
         ...emptyCounts(),
         attempts: 0,
-        decisionMakerConversations: 0,
         settingsBooked: 8,
+        closingsBooked: 0,
       },
     }),
   );
   assert.equal((await ownState(db, alice)).records[0].counts.settingsBooked, 8);
-  await assert.rejects(saveCheckin(db, alice, checkin({ date: "2099-01-01" })));
+  await assert.rejects(submitClosing(db, alice, checkin({ date: "2099-01-01" })));
 });
 test("stale import preview rolls back whole import including newly introduced participants", async () => {
-  const id = await imported();
+  const id = await imported([row({ date: yesterday() })]);
   const rows = [
     row({ participantKey: "new-person", name: "New Person" }),
     row(),
   ];
   const expected = await previewImport(db, rows);
   await takeOver(id, alice);
-  await saveCheckin(
+  await submitClosing(
     db,
     alice,
-    checkin({ counts: { ...counts(), attempts: 200 } }),
+    checkin({ expectedRevision: 0, counts: { ...counts(), attempts: 200 } }),
   );
   await assert.rejects(
     commitImport(db, admin, { rows, expected, key: randomUUID() }),
@@ -533,12 +576,13 @@ test("withdrawal hides public data and a subsequent owner import cannot override
     company: "Firma",
     role: "Sales",
     publicConsent: false,
-    phone: "+49 000 123",
+    phone: "+49 170 000 123",
     contactOptIn: false,
   });
   await imported();
   assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 0);
-  assert.equal((await ownState(db, alice)).contact.phone, "+49 000 123");
+  // Einheitlich gespeichert (E.164), nicht SMS-geprüft.
+  assert.equal((await ownState(db, alice)).contact.phone, "+49170000123");
 });
 test("schema refuses access from an unprivileged browser database role", async () => {
   await pg.exec("CREATE ROLE browser_test");
@@ -589,15 +633,15 @@ test("private buddy messages and partner register remain restricted", async () =
 });
 
 test("same daily content with a new request key does not increase revisions or sync work", async () => {
-  const id = await imported();
+  const id = await imported([row({ date: yesterday() })]);
   await takeOver(id, alice);
-  const first = await saveCheckin(db, alice, checkin());
+  const first = await submitClosing(db, alice, checkin({ expectedRevision: 0 }));
   const queue = (
     await db.query("SELECT revision FROM sync_outbox WHERE participant=$1", [
       id,
     ])
   )[0].revision;
-  const second = await saveCheckin(
+  const second = await submitClosing(
     db,
     alice,
     checkin({ expectedRevision: first.revision }),
@@ -627,7 +671,26 @@ test("new member creates a private profile and existing legacy records remain re
       meetings: 2,
     }),
   ]);
-  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  // Ein Anzeigename allein legt kein Profil mehr an: der Tagesabschluss
+  // setzt ein nutzbares Profil voraus.
+  await assert.rejects(
+    submitClosing(db, bob, checkin({ expectedRevision: 0 })),
+    /persönliches Profil/,
+  );
+  const { createMember } = await import("../server/operator");
+  await createMember(db, bob, {
+    name: "Bob",
+    company: "",
+    role: "",
+    publicConsent: false,
+  });
+  // Ohne gültige Telefonnummer ebenfalls nicht.
+  await assert.rejects(
+    submitClosing(db, bob, checkin({ expectedRevision: 0 })),
+    /Telefonnummer/,
+  );
+  await givePhone(bob);
+  await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const state = await ownState(db, bob);
   assert.equal(state.participant.public_consent, false);
   assert.equal((await loadOwnRecords(db, bob.userId)).results.length, 2);
@@ -649,7 +712,7 @@ test("failed outbox write rolls back checkin, audit and idempotency receipt toge
   );
   await db.query("UPDATE sync_outbox SET revision=99");
   const value = checkin({ counts: { ...counts(), attempts: 555 } });
-  await assert.rejects(saveCheckin(db, alice, value));
+  await assert.rejects(submitClosing(db, alice, value));
   assert.deepEqual(
     await db.query("SELECT counts,revision FROM checkins"),
     before,
@@ -675,17 +738,28 @@ test("private contact inventory is restricted to admins", async () => {
     company: "Firma",
     role: "Sales",
     publicConsent: true,
-    phone: "Private phone",
+    phone: "+49 170 5550199",
     contactOptIn: false,
   });
+  await assert.rejects(
+    updateAccount(db, alice, {
+      name: "Alice",
+      company: "Firma",
+      role: "Sales",
+      publicConsent: true,
+      phone: "Private phone",
+      contactOptIn: false,
+    }),
+    /Ländervorwahl/,
+  );
   await assert.rejects(adminContacts(db, bob), /Verwaltung/);
   const contacts = await adminContacts(db, admin);
   assert.equal(contacts[0].verified_email, alice.email);
-  assert.equal(contacts[0].phone, "Private phone");
+  assert.equal(contacts[0].phone, "+491705550199");
   assert.ok(
     !JSON.stringify(
       await publicRanking(db, berlinDate(), berlinDate()),
-    ).includes("Private phone"),
+    ).includes("5550199"),
   );
 });
 test("session capacity, ownership and cancellation are guarded inside a transaction", async () => {
@@ -725,7 +799,8 @@ test("onboarding creates a private member who can immediately save and retain ow
     role: "Setter",
     publicConsent: false,
   });
-  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  await givePhone(bob);
+  await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const state = await ownState(db, bob);
   assert.equal(state.participant.id, result.id);
   assert.equal(state.participant.name, "Bob Caller");
@@ -749,7 +824,7 @@ test("an open takeover request blocks a second empty profile", async () => {
     /wird gerade geprüft/,
   );
   await assert.rejects(
-    saveCheckin(db, alice, checkin()),
+    submitClosing(db, alice, checkin()),
     /wird gerade geprüft/,
   );
   assert.equal(
@@ -842,7 +917,7 @@ test("repeated submissions never create a second request or a second profile", a
     (await db.query("SELECT count(*)::int AS n FROM onboarding_requests"))[0].n,
     1,
   );
-  await bindConfirmedRequest(db, alice);
+  await bindConfirmedRequest(db, alice, undefined);
   // Auch nach der Bestätigung entsteht nichts Zweites: die laufende Anfrage
   // wird weiter aktualisiert, nicht dupliziert.
   const again = await send();
@@ -867,14 +942,15 @@ test("a new member's released numbers reach the public ranking and replace the d
     role: "Closer",
     publicConsent: true,
   });
-  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  await givePhone(bob);
+  await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const today = berlinDate();
   let ranking = await publicRanking(db, today, today);
   assert.equal(ranking.length, 1);
   assert.equal(ranking[0].counts.attempts, 100);
 
   // Korrektur ersetzt den Tagesstand, sie addiert nicht.
-  await saveCheckin(
+  await submitClosing(
     db,
     bob,
     checkin({
@@ -902,7 +978,8 @@ test("a private profile never becomes public on its own", async () => {
     role: "",
     publicConsent: false,
   });
-  await saveCheckin(db, bob, checkin({ expectedRevision: 0 }));
+  await givePhone(bob);
+  await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const today = berlinDate();
   assert.equal((await publicRanking(db, today, today)).length, 0);
   // Die eigenen Zahlen sind trotzdem für das eigene Konto da.

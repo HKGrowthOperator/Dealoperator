@@ -24,7 +24,8 @@ export async function loadOwnRecords(db: Database, owner: string) {
       win: "",
       next: "",
       help: "",
-      energy: 7,
+      // Übernommene Stände haben keine Reflexion; nichts erfinden.
+      energy: null,
       ...r.reflection,
       shared: false,
     });

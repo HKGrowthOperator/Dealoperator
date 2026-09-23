@@ -10,7 +10,6 @@ import {
   ownState,
   previewImport,
   rateLimit,
-  saveCheckin,
   setSearchable,
   updateAccount,
 } from "@/server/operator";
@@ -57,7 +56,10 @@ export async function POST(request: Request) {
     if (value.action === "onboard")
       return json(await createMember(db, actor, value.value));
     if (value.action === "checkin")
-      return json(await saveCheckin(db, actor, value.value));
+      throw new AppError(
+        "Tageszahlen gehen jetzt über den Tagesabschluss mit kurzer Reflexion.",
+        410,
+      );
     if (value.action === "account")
       return json(await updateAccount(db, actor, value.value));
     if (!actor.admin)
