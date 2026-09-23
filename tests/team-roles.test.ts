@@ -10,7 +10,7 @@ import { requestPause } from "../server/closing";
 import { issueClaim } from "../server/operator";
 import { decidePause, saveCommitmentRules, teamInbox } from "../server/admin";
 import { notificationStatus } from "../server/notify";
-import { dispatch, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent } from "../server/notify";
+import { dispatch, enqueue, ensureAdminPrefs, notificationPrefs, savePrefs, subscribe, teamEvent } from "../server/notify";
 import { recheck } from "../server/scheduler";
 import { isTeamMember, setTeamRole, teamList, teamRecipients } from "../server/roles";
 
@@ -228,4 +228,40 @@ test("a rejected push counts as failed, an expired hint keeps its reason, old-ke
   const status = await notificationStatus(db);
   assert.equal(status.counts.failed, 1);
   assert.equal(status.counts.expired, 1);
+});
+
+test("an ended subscription is no failure: team hints wait, and a re-enabled device gets them", async () => {
+  await signup("new-6");
+  await subscribe(db, owner, { endpoint: endpoint(11), keys }, "iPhone");
+  await dispatch(db, recheck, new Date(), (async () => {
+    throw Object.assign(new Error("gone"), { statusCode: 410 });
+  }) as any);
+  let [push] = await db.query("SELECT status,detail FROM notifications WHERE recipient='owner' AND channel='push'");
+  assert.equal(push.status, "pending");
+  assert.match(push.detail, /Kein Gerät mehr/);
+  let [item] = await teamInbox(db, owner);
+  assert.ok(item.delivery.some((d) => d.channel === "push" && d.state === "waiting_device"));
+  // Dasselbe Gerät stimmt neu zu: der Hinweis geht doch noch hinaus.
+  await subscribe(db, owner, { endpoint: endpoint(11), keys }, "iPhone");
+  await db.query("UPDATE notifications SET next_attempt_at=now()");
+  let sends = 0;
+  await dispatch(db, recheck, new Date(), (async () => {
+    sends++;
+    return { statusCode: 201 };
+  }) as any);
+  assert.equal(sends, 1);
+  [push] = await db.query("SELECT status FROM notifications WHERE recipient='owner' AND channel='push'");
+  assert.equal(push.status, "sent");
+  [item] = await teamInbox(db, owner);
+  assert.ok(item.delivery.some((d) => d.channel === "push" && d.state === "delivered"));
+
+  // Eine gewöhnliche Push-Nachricht an ein beendetes Abo ist kein Fehler.
+  await subscribe(db, alice, { endpoint: endpoint(12), keys }, "iPhone");
+  await enqueue(db, { dedupeKey: "test:gone", recipient: "alice", channel: "push", kind: "test", title: "x", body: "y" });
+  await dispatch(db, recheck, new Date(), (async () => {
+    throw Object.assign(new Error("gone"), { statusCode: 410 });
+  }) as any);
+  const [plain] = await db.query("SELECT status FROM notifications WHERE dedupe_key='test:gone'");
+  assert.equal(plain.status, "skipped");
+  assert.equal((await notificationStatus(db)).counts.failed, 0);
 });

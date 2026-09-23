@@ -32,11 +32,20 @@ export default async function Page({
   // genau der gewählten Auswahl. Eine ältere, unbestätigte Anfrage aus diesem
   // Browser wird dann nicht gebunden, und der Team-Hinweis kommt mit der
   // Übernahme statt doppelt.
-  const toClaim =
-    new URL(next, "https://operator.invalid").pathname === "/profil-uebernehmen";
+  const target = new URL(next, "https://operator.invalid");
+  const toClaim = target.pathname === "/profil-uebernehmen";
   const requestId = (await cookies()).get(ONBOARDING_COOKIE)?.value;
-  const bound = toClaim ? null : await bindConfirmedRequest(db, actor, requestId);
-  if (!bound && !toClaim) await noteConfirmedAccount(db, actor);
+  // Aus der Übernahme heraus nur eine Anfrage für genau das gewählte Profil
+  // binden; dann geht es direkt zum Status.
+  const bound = await bindConfirmedRequest(
+    db,
+    actor,
+    requestId,
+    toClaim ? target.searchParams.get("profil") || "" : undefined,
+  );
+  // Das Team sieht das Konto auch dann, wenn die Übernahme nicht abgeschickt
+  // wird; Push und E-Mail kommen in diesem Fall erst mit der Anfrage.
+  if (!bound) await noteConfirmedAccount(db, actor, toClaim);
   const state = await ownState(db, actor);
 
   // Bereits freigegebenes Profil: direkt in den eigenen Bereich.

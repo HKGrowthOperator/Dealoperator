@@ -532,9 +532,22 @@ async function pushToOwner(
         "SELECT status FROM notification_deliveries WHERE notification_id=$1 AND subscription_id=$2",
         [n.id, s.id],
       );
-      if (prior?.status === "sent") already++;
-      else unclear++;
-      continue;
+      if (prior?.status === "sent") {
+        already++;
+        continue;
+      }
+      // Ein früher beendetes oder abgelehntes, inzwischen wieder
+      // eingerichtetes Abo bekommt einen neuen Versuch.
+      const retry = await db.query(
+        `UPDATE notification_deliveries SET status='sending'
+          WHERE notification_id=$1 AND subscription_id=$2 AND status IN ('gone','failed')
+          RETURNING subscription_id`,
+        [n.id, s.id],
+      );
+      if (!retry.length) {
+        unclear++;
+        continue;
+      }
     }
     try {
       await send(
@@ -579,11 +592,20 @@ async function pushToOwner(
     }
   }
   const anyDelivered = delivered > 0 || already > 0;
+  // Alle Geräte haben ihr Abo beendet: wie „kein Gerät“ behandeln. Ein
+  // Team-Hinweis wartet dann auf ein neu eingerichtetes Gerät, eine
+  // Erinnerung entfällt, beides ohne als Fehler zu gelten.
+  const allGone = !anyDelivered && gone > 0 && gone === subs.length;
+  if (allGone)
+    return {
+      delivered: false,
+      noDevice: true,
+      failed: false,
+      detail: "Kein Gerät mehr: das Abo wurde auf dem Gerät beendet.",
+    };
   return {
     delivered: anyDelivered,
-    // Alle Geräte haben ihr Abo beendet: wie „kein Gerät“ behandeln, damit
-    // ein Team-Hinweis auf ein neu eingerichtetes Gerät warten kann.
-    noDevice: !anyDelivered && gone > 0 && gone === subs.length,
+    noDevice: false,
     failed: !anyDelivered,
     detail: delivered
       ? `${delivered} Gerät(e)`
@@ -657,7 +679,8 @@ export function deliveryState(
 ): DeliveryState {
   const detail = r.detail || "";
   if (r.status === "sent") return "delivered";
-  if (r.status === "failed" || detail.startsWith("Zustellung fehlgeschlagen")) return "failed";
+  if (r.status === "failed" || (r.status === "skipped" && detail.startsWith("Zustellung fehlgeschlagen")))
+    return "failed";
   if (r.status === "skipped") {
     if (!detail.startsWith("Zu spät")) return "skipped";
     if (/RESEND_API_KEY|NOTIFY_FROM/.test(detail)) return "expired_config";

@@ -245,3 +245,20 @@ test("a takeover via registration alerts the team even after an earlier sign-in 
   assert.equal(bound?.kind, "claim");
   assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind='team:claim'"), 2);
 });
+
+test("signing in from a takeover binds only a request for the same profile and tells the team quietly", async () => {
+  const p = await profile("Alice B.");
+  const q = await profile("Alice Q.");
+  const base = { kind: "claim", email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" };
+  const forP = await startRequest(db, { ...base, participantId: p });
+  // Anmeldung mit Ziel Q: die P-Anfrage bleibt unbestätigt liegen.
+  assert.equal(await bindConfirmedRequest(db, alice, forP.id, q), null);
+  assert.equal((await db.query("SELECT status FROM onboarding_requests WHERE id=$1", [forP.id]))[0].status, "awaiting_email");
+  // Anmeldung mit Ziel P: genau diese Anfrage wird zur Übernahme.
+  const bound = await bindConfirmedRequest(db, alice, forP.id, p);
+  assert.equal(bound?.participant, p);
+  // Ohne passende Anfrage sieht das Team das Konto, aber ohne Push und E-Mail.
+  await noteConfirmedAccount(db, bob, true);
+  assert.equal(await count("SELECT count(*) AS n FROM team_inbox WHERE dedupe_key='account:bob'"), 1);
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE ref='account:bob'"), 0);
+});

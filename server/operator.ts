@@ -513,17 +513,14 @@ export async function rateLimit(
   key: string,
   max: number,
   windowSeconds = 60,
+  message = "Zu viele Versuche in kurzer Zeit. Bitte warte etwa 15 Minuten und probiere es dann erneut. Deine Angaben bleiben gespeichert.",
 ) {
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
   const [r] = await db.query(
     "INSERT INTO rate_limits(key,bucket,hits) VALUES($1,$2,1) ON CONFLICT(key,bucket) DO UPDATE SET hits=rate_limits.hits+1 RETURNING hits",
     [hash(key), bucket],
   );
-  if (r.hits > max)
-    throw new AppError(
-      "Zu viele Versuche in kurzer Zeit. Bitte warte etwa 15 Minuten und probiere es dann erneut. Deine Angaben bleiben gespeichert.",
-      429,
-    );
+  if (r.hits > max) throw new AppError(message, 429);
 }
 
 /**

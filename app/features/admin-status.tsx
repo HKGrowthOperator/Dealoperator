@@ -137,7 +137,7 @@ export function NotificationsPanel({
             ["waitingDevice", "warten auf ein Gerät mit Push"],
             ["open", "in der Warteschlange"],
             ["expired", "abgelaufen"],
-            ["skipped", "bewusst nicht gesendet"],
+            ["skipped", "nicht gesendet (z. B. ausgeschaltet oder kein Gerät)"],
             ["failed", "fehlgeschlagen"],
           ] as const
         ).map(([key, label]) => (

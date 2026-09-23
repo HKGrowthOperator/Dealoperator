@@ -198,6 +198,8 @@ export async function bindConfirmedRequest(
   db: Database,
   actor: Actor,
   requestId: string | null | undefined,
+  /** Nur eine Anfrage für genau dieses Profil binden (Anmeldung aus der Übernahme). */
+  onlyParticipant?: string,
 ) {
   // Bevorzugt wird die Anfrage aus DIESEM Browser (httpOnly-Cookie aus dem
   // Registrierungsschritt). Öffnet jemand den Link in einem anderen Browser,
@@ -224,6 +226,7 @@ export async function bindConfirmedRequest(
           [actor.email],
         );
     if (!request) return null;
+    if (onlyParticipant !== undefined && request.participant !== onlyParticipant) return null;
     // Wer schon ein eigenes Profil hat, bekommt keine zweite Übernahme.
     const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
       actor.userId,
@@ -303,7 +306,12 @@ export async function bindConfirmedRequest(
  * „Anmelden“ mit neuer Adresse): das Team erfährt es genau einmal je Konto.
  * Derselbe Schlüssel wie bei der Registrierung, also nie doppelt.
  */
-export async function noteConfirmedAccount(db: Database, actor: Actor) {
+export async function noteConfirmedAccount(
+  db: Database,
+  actor: Actor,
+  /** Nur Inbox-Eintrag, ohne Push und E-Mail (der Hinweis kommt mit der Übernahme). */
+  silent = false,
+) {
   const [known] = await db.query(
     `SELECT 1 FROM participants WHERE owner=$1
      UNION ALL SELECT 1 FROM onboarding_requests WHERE owner=$1 LIMIT 1`,
@@ -317,8 +325,10 @@ export async function noteConfirmedAccount(db: Database, actor: Actor) {
       ref: actor.userId,
       state: "confirmed",
       title: `Neue Anmeldung bestätigt: ${actor.email}`,
-      body: "E-Mail bestätigt, Profil wird gerade eingerichtet.",
-      alert: { key: `signup:${actor.userId}`, kind: "new" },
+      body: silent
+        ? "E-Mail bestätigt, die Übernahme eines Profils wird gerade angefragt."
+        : "E-Mail bestätigt, Profil wird gerade eingerichtet.",
+      alert: silent ? false : { key: `signup:${actor.userId}`, kind: "new" },
     }),
   );
 }
@@ -580,7 +590,13 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
   if (!phone.ok) throw new AppError(phone.reason);
   // Nur das Konto zählt. Der öffentliche Profilzähler des anonymen Starts
   // darf die Anfrage des angemeldeten Inhabers nicht blockieren.
-  await rateLimit(db, `claim-account:${actor.userId}`, 10, 3600);
+  await rateLimit(
+    db,
+    `claim-account:${actor.userId}`,
+    10,
+    3600,
+    "Zu viele Anfragen in kurzer Zeit. Bitte versuche es in einer Stunde noch einmal.",
+  );
 
   return db.transaction(async (tx) => {
     // Dieselbe Sperre wie bei Profilanlage und Bindung: pro Konto läuft immer
@@ -692,7 +708,13 @@ const answerSchema = z
  */
 export async function answerInfoRequest(db: Database, actor: Actor, raw: unknown) {
   const v = answerSchema.parse(raw);
-  await rateLimit(db, `claim-answer:${actor.userId}`, 5, 3600);
+  await rateLimit(
+    db,
+    `claim-answer:${actor.userId}`,
+    5,
+    3600,
+    "Zu viele Antworten in kurzer Zeit. Bitte versuche es in einer Stunde noch einmal.",
+  );
   return db.transaction(async (tx) => {
     const [request] = await tx.query(
       `SELECT id,full_name FROM onboarding_requests
