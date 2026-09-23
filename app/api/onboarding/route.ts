@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cookies } from "next/headers";
 import { authClient, authReady, getCurrentUser } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
@@ -6,6 +7,7 @@ import { AppError } from "@/server/operator";
 import {
   profileForSelection,
   requestForActor,
+  ONBOARDING_COOKIE,
   searchProfiles,
   startRequest,
 } from "@/server/onboarding";
@@ -95,6 +97,15 @@ export async function POST(request: Request) {
         },
         429,
       );
+    // Merkt sich in diesem Browser, welche Anfrage gerade gestellt wurde.
+    // Damit wird beim Bestätigungslink genau diese Anfrage gebunden.
+    (await cookies()).set(ONBOARDING_COOKIE, created.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.APP_URL?.startsWith("https://") ?? false,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 2,
+    });
     return json({ ok: true, resubmitted: created.resubmitted });
   } catch (e) {
     return errorResponse(e);

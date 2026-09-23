@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Database } from "./database";
 import type { Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
+import { teamEvent } from "./notify";
 import { normalisePhone } from "../lib/phone";
 
 /**
@@ -102,6 +103,9 @@ function inviteHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** httpOnly-Cookie mit der ID der in diesem Browser gestellten Anfrage. */
+export const ONBOARDING_COOKIE = "do_onboarding";
+
 /**
  * Schritt 1: Kontaktdaten aufnehmen und die Anfrage anlegen, BEVOR die E-Mail
  * bestätigt ist. Die Auswahl überlebt dadurch den Bestätigungslink, ohne dass
@@ -155,6 +159,10 @@ export async function startRequest(db: Database, raw: unknown) {
       [id, v.kind, participant, v.email, v.fullName, phone.value, v.phone, v.hint],
     );
     await log(tx, id, v.email, "submitted", "");
+    // Noch kein Team-Eintrag: die E-Mail ist unbestätigt und kann vertippt
+    // oder fremd sein. Die Verwaltung sieht unbestätigte Registrierungen
+    // gesammelt (siehe unconfirmedRegistrations); Eintrag, Push und E-Mail
+    // entstehen erst bei der Bestätigung in bindConfirmedRequest.
     return { id, participant, resubmitted: false };
   });
 }
@@ -177,18 +185,48 @@ async function log(
  * gebunden. Für den Weg „Ich bin neu" entsteht direkt ein eigenes Profil; eine
  * Profilübernahme geht in die Teamprüfung.
  */
-export async function bindConfirmedRequest(db: Database, actor: Actor) {
+export async function bindConfirmedRequest(
+  db: Database,
+  actor: Actor,
+  requestId: string | null | undefined,
+) {
+  // Bevorzugt wird die Anfrage aus DIESEM Browser (httpOnly-Cookie aus dem
+  // Registrierungsschritt). Öffnet jemand den Link in einem anderen Browser,
+  // gilt nur eine frische Anfrage (zwei Stunden, so lange wie der Link). Eine
+  // alte, von fremder Hand angelegte Anfrage hängt sich so nicht an den
+  // nächsten normalen Login.
   return db.transaction(async (tx) => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `owner:${actor.userId}`,
     ]);
-    const [request] = await tx.query(
-      `SELECT * FROM onboarding_requests
-       WHERE lower(email)=$1 AND status='awaiting_email'
-       ORDER BY created_at DESC LIMIT 1 FOR UPDATE`,
-      [actor.email],
-    );
+    const [request] = requestId
+      ? await tx.query(
+          `SELECT * FROM onboarding_requests
+            WHERE id=$2 AND lower(email)=$1 AND status='awaiting_email'
+            FOR UPDATE`,
+          [actor.email, requestId],
+        )
+      : await tx.query(
+          `SELECT * FROM onboarding_requests
+            WHERE lower(email)=$1 AND status='awaiting_email'
+              AND updated_at > now() - interval '2 hours'
+            ORDER BY updated_at DESC LIMIT 1
+            FOR UPDATE`,
+          [actor.email],
+        );
     if (!request) return null;
+    // Wer schon ein eigenes Profil hat, bekommt keine zweite Übernahme.
+    const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
+      actor.userId,
+    ]);
+    if (owned) {
+      await tx.query(
+        `UPDATE onboarding_requests SET owner=$2,status='superseded',updated_at=now() WHERE id=$1`,
+        [request.id, actor.userId],
+      );
+      await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits ein Profil.");
+      return null;
+    }
     // Die Bindung an das Konto ist die Stelle, an der aus einer anonymen
     // Eingabe eine belegte Anfrage wird.
     await tx.query(
@@ -203,6 +241,25 @@ export async function bindConfirmedRequest(db: Database, actor: Actor) {
       [actor.userId, actor.email, request.phone],
     );
     await log(tx, request.id, actor.userId, "email_confirmed", "");
+    // Der Übergang awaiting_email → bestätigt passiert unter Sperre genau
+    // einmal. Spätere Logins, Magic-Links oder Neuladen finden keine offene
+    // awaiting_email-Anfrage mehr und lösen deshalb nichts aus.
+    await teamEvent(tx, {
+      dedupeKey: `registration:${request.id}`,
+      kind: "registration",
+      ref: request.id,
+      state: request.kind === "claim" ? "review_ready" : "confirmed",
+      title:
+        request.kind === "claim"
+          ? `Profilübernahme prüfbereit: ${request.full_name}`
+          : `Neue Registrierung bestätigt: ${request.full_name}`,
+      body:
+        request.kind === "claim"
+          ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
+          : "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden.",
+      // Einmal je Konto, egal wie viele Anfragen es später noch stellt.
+      alert: { key: `signup:${actor.userId}`, kind: request.kind === "claim" ? "claim" : "new" },
+    });
     return {
       id: request.id as string,
       kind: request.kind as RequestKind,

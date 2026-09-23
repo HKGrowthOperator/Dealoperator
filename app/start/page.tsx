@@ -1,8 +1,9 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser, safeNext } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
-import { bindConfirmedRequest } from "@/server/onboarding";
+import { bindConfirmedRequest, ONBOARDING_COOKIE } from "@/server/onboarding";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberOnboarding from "../features/member-onboarding";
 export const dynamic = "force-dynamic";
@@ -22,7 +23,8 @@ export default async function Page({
   if (!actor) redirect(`/anmelden?next=${encodeURIComponent(next)}`);
 
   const db = database();
-  const bound = await bindConfirmedRequest(db, actor);
+  const requestId = (await cookies()).get(ONBOARDING_COOKIE)?.value;
+  const bound = await bindConfirmedRequest(db, actor, requestId);
   const state = await ownState(db, actor);
 
   // Bereits freigegebenes Profil: direkt in den eigenen Bereich.
