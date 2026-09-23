@@ -7,7 +7,7 @@ import PageMotion from "./features/page-motion";
 export const metadata: Metadata = {
   title: "Deal Operator — Gemeinsam dranbleiben.",
   description:
-    "Deal Operator ist ein kostenfreies Werkzeug fürs gemeinsame Callen: jeden Calling-Tag Zahlen und Learnings festhalten, Fortschritt sehen und dranbleiben.",
+    "Deal Operator ist ein Werkzeug fürs gemeinsame Callen: jeden Calling-Tag Zahlen und Learnings festhalten, Fortschritt sehen und dranbleiben.",
   icons: { icon: "/favicon.svg" },
 };
 export default function RootLayout({

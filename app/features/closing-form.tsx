@@ -350,11 +350,8 @@ export function EligibilityChecklist({
           key: "profile",
           done: !needs.has("profile") && !needs.has("login"),
           title: "Eigenes persönliches Profil",
-          text: "Lege ein neues Profil an oder übernimm dein Profil, wenn deine Zahlen schon auf der Seite stehen.",
-          links: [
-            { href: `/start?next=${encodeURIComponent(next)}`, label: "Profil anlegen" },
-            { href: "/profil-uebernehmen", label: "Meine Zahlen sind schon auf der Seite" },
-          ],
+          text: "Lege dein eigenes Profil an. Stehen deine Zahlen schon im Ranking, sag vorher kurz dem Team Bescheid, damit es sie deinem Konto zuordnet.",
+          links: [{ href: `/start?next=${encodeURIComponent(next)}`, label: "Profil anlegen" }],
         },
     {
       key: "phone",
@@ -963,7 +960,7 @@ export default function ClosingForm({
       return `Dieser Tag liegt vor deinem Start im Tagesabschluss (${formatShortDay(state.trackingStart)}). Er zählt nicht für Serien.`;
     if (paused) return "Dieser Tag liegt in einer bestätigten Pause. Ein Abschluss ist freiwillig.";
     if (!due)
-      return "Kein Calling-Tag: Am Wochenende ist ein Abschluss freiwillig. Er zählt als Bonus, deine Serien bleiben unberührt.";
+      return "Kein Calling-Tag: Ein Abschluss ist freiwillig. Er zählt als Bonus, deine Serien bleiben unberührt.";
     if (submitted) return null;
     if (deadline && nowMs < deadline.getTime())
       return `Calling-Tag. Rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;

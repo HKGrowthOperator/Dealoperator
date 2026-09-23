@@ -21,13 +21,13 @@ const VIEW: Record<
     icon: <XCircle />,
     tone: "",
     title: "Diese Übernahme wurde nicht freigegeben.",
-    lead: "Du kannst jederzeit mit einem eigenen neuen Profil starten.",
+    lead: "Melde dich kurz beim Team, dann richten wir dir ein eigenes Profil ein.",
   },
   superseded: {
     icon: <XCircle />,
     tone: "",
     title: "Dieses Profil wurde bereits zugeordnet.",
-    lead: "Ein anderes Konto wurde für dieses Profil freigegeben. Du kannst mit einem eigenen Profil starten.",
+    lead: "Ein anderes Konto wurde für dieses Profil freigegeben. Melde dich kurz beim Team, dann richten wir dir ein eigenes Profil ein.",
   },
   approved: {
     icon: <Check />,
@@ -82,9 +82,10 @@ export default function RequestStatus({
           <strong>Was jetzt passiert.</strong>
           <p>
             Wir gleichen deine Angaben mit der Person ab, die wir bereits
-            kennen — zum Beispiel über den bestehenden Kontakt. Erst nach dieser
-            Freigabe siehst du die Zahlen und kannst sie bearbeiten. Bis dahin
-            sind das öffentliche Ranking und Discord wie gewohnt nutzbar.
+            kennen — zum Beispiel über den bestehenden Kontakt. Nach der
+            Freigabe trägst du neue Tage selbst ein; Korrekturen an übernommenen
+            Tagen laufen über das Team. Das öffentliche Ranking kannst du schon
+            jetzt ansehen.
           </p>
         </div>
       )}

@@ -803,7 +803,7 @@ export default function CommunityApp({
           />
         </label>
         <fieldset>
-          <legend>Deine Call-Tage</legend>
+          <legend>Deine Call-Tage (nur zur Planung)</legend>
           <div className="day-checks">
             {[1, 2, 3, 4, 5, 6, 0].map((day) => (
               <label
@@ -934,7 +934,7 @@ export default function CommunityApp({
           </label>
         </div>
         <fieldset>
-          <legend>Deine geplanten Call-Tage</legend>
+          <legend>Deine geplanten Call-Tage (nur zur Planung)</legend>
           <div className="day-checks">
             {[1, 2, 3, 4, 5, 6, 0].map((day) => (
               <label
@@ -967,7 +967,9 @@ export default function CommunityApp({
             <small>
               Andere angemeldete Nutzer sehen Name, Rolle, Zielgruppe,
               Call-Zeit, Wochenziel, Call-Tage, bevorzugten Kanal und
-              Beschreibung. Deine E-Mail und Reflexionen bleiben privat.
+              Beschreibung. Deine E-Mail und Telefonnummer bleiben privat.
+              Eingereichte Reflexionen stehen unabhängig davon unter
+              Reflexionen.
             </small>
           </span>
         </label>
@@ -1055,7 +1057,7 @@ export default function CommunityApp({
             <strong>Dein persönlicher Bereich</strong>
             <span className="mode-description">
               {" "}
-              – deine Einträge bleiben privat.
+              – was andere sehen, steht beim Tagesabschluss.
             </span>
           </span>
           <Link href="/ranking">Zum Ranking</Link>
@@ -1720,7 +1722,7 @@ export default function CommunityApp({
                   <PageHeading
                     eyebrow="ZUSÄTZLICH MIT CALL-PARTNERN"
                     title="Übungstermine & Call-Blöcke."
-                    text="Roleplay, Feedback oder ein zusätzlicher Block mit deinen Call-Partnern, ergänzend zum gemeinsamen Callen."
+                    text="Roleplay, Feedback oder ein zusätzlicher Block mit deinen Call-Partnern, ergänzend zum gemeinsamen Callen. Termine sehen alle Angemeldeten, dabei ist, wer zusagt (höchstens sechs Plätze)."
                   >
                     <button className="btn primary" onClick={openNewSession}>
                       <Plus size={18} />
@@ -2006,10 +2008,11 @@ export default function CommunityApp({
                       <section className="card padded">
                         <h3>Dein persönlicher Bereich</h3>
                         <p>
-                          Deine Zahlen und Reflexionen sind nur für dich
-                          sichtbar. Du kannst Tageszahlen bewusst in deinem
-                          Profil freigeben und Reflexionen in deine Gruppe
-                          kopieren.
+                          Entwürfe und deinen Unterstützungswunsch sehen nur
+                          du und das Team. Eingereichte Reflexionen lesen alle
+                          Angemeldeten mit eigenem Profil und Telefonnummer.
+                          Deine Zahlen erscheinen nur mit deiner Zustimmung im
+                          Ranking.
                         </p>
                         <p>
                           Du kannst dein sichtbares Profil jederzeit ausblenden.
@@ -2148,8 +2151,9 @@ export default function CommunityApp({
                     <div className="rules">
                       <p>
                         <Check />
-                        An deinen Calling-Tagen zählt ein Tagesabschluss für
-                        deine Serie. Wochenenden sind freiwillig.
+                        An den Calling-Tagen (standardmäßig Montag bis Freitag)
+                        zählt ein Tagesabschluss für deine Serie. Andere Tage
+                        sind freiwillig.
                       </p>
                       <p>
                         <Check />
@@ -2249,7 +2253,7 @@ export default function CommunityApp({
             <DialogDescription>
               {demo
                 ? "Du bist in der Vorschau. Personen, Termine und Einträge sind Beispiele."
-                : "Dein Bereich. Du bestimmst, was du teilst."}
+                : "Dein Bereich. Was andere sehen, steht beim Tagesabschluss."}
             </DialogDescription>
           </DialogHeader>
           {modal === "metrics" ? (
@@ -2404,7 +2408,7 @@ export default function CommunityApp({
                   <input
                     type="number"
                     min={2}
-                    max={100}
+                    max={6}
                     required
                     value={newSession.capacity}
                     onChange={(e) =>

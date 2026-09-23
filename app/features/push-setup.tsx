@@ -397,8 +397,8 @@ export default function PushSetup({
           noch für deine laufende Serie zählt.
         </li>
         <li>
-          <BellOff size={16} aria-hidden="true" /> Nie am Wochenende, nie in deiner Ruhezeit oder
-          Pause, nie nach eingereichtem Abschluss.
+          <BellOff size={16} aria-hidden="true" /> Nie an freien Tagen, nie in deiner Ruhezeit oder
+          einer bestätigten Pause, nie nach eingereichtem Abschluss.
         </li>
       </ul>
 

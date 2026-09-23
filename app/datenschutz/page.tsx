@@ -107,18 +107,28 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>6. Gemeldete Zahlen und öffentliches Ranking</h2>
+          <h2>6. Gemeldete Zahlen, Reflexionen und öffentliches Ranking</h2>
           <p>
             Im persönlichen Bereich lassen sich Tageszahlen, persönliche Ziele und
-            Reflexionen festhalten. Reflexionen, Notizen, E-Mail-Adressen und
-            Telefonnummern sind privat und erscheinen nie im öffentlichen
-            Ranking.
+            Reflexionen festhalten. E-Mail-Adressen, Telefonnummern, Notizen und
+            Entwürfe sind privat, Unterstützungswünsche sieht nur das Team. Nichts
+            davon erscheint im öffentlichen Ranking.
           </p>
           <p>
-            Öffentlich sichtbar sind ausschließlich Anzeigename, die dafür
-            freigegebenen Kennzahlen und das Meldedatum. Die Veröffentlichung
-            wird getrennt gewählt und lässt sich jederzeit widerrufen.
-            Rechtsgrundlage ist Art. 6 Abs. 1 lit. a DSGVO.
+            Ein eingereichter Tagesabschluss (Anzeigename, Tag, Energie, was gut
+            lief, nächster Schritt) ist unter „Reflexionen“ für angemeldete
+            Nutzer sichtbar, die ihre E-Mail bestätigt, ein eigenes Profil
+            angelegt und eine Telefonnummer hinterlegt haben. Die Zahlen des
+            Tages stehen dort nur bei gewählter öffentlicher Anzeige. Darauf weist
+            das Formular vor dem Einreichen hin.
+          </p>
+          <p>
+            Öffentlich sichtbar sind nur bei gewählter öffentlicher Anzeige:
+            Anzeigename, Firma und Rolle, die freigegebenen Kennzahlen mit
+            Meldedatum sowie in der Übersicht der Serien die Calling- und
+            Reflexions-Serie und die Zahl aktiver und abgeschlossener Tage. Die
+            Veröffentlichung wird getrennt gewählt und lässt sich jederzeit
+            widerrufen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. a DSGVO.
           </p>
         </section>
 
@@ -136,9 +146,18 @@ export default function Page() {
           <p>
             Die Website verlinkt auf einen Discord-Server. Discord ist ein
             eigenständiger Dienst der Discord Netherlands B.V. Mit dem Aufruf
-            des Links gilt deren Datenschutzerklärung. Es findet derzeit{" "}
-            <strong>keine</strong> automatische Übertragung von Daten zwischen
-            Deal Operator und Discord statt.
+            des Links gilt deren Datenschutzerklärung.
+          </p>
+          <p>
+            Sobald der Betreiber sie eingerichtet hat, gibt es zwei freiwillige
+            Zusatzfunktionen: Du kannst dein Discord-Konto verknüpfen
+            (gespeichert werden Discord-ID und Discord-Name), und du kannst
+            einen eingereichten Tagesabschluss zusätzlich im Discord-Channel
+            teilen (Anzeigename, Tag, Energie, was gut lief, nächster Schritt,
+            Zahlen nur bei öffentlicher Anzeige, Unterstützungswünsche nie).
+            Dort liest jede Person mit, die auf dem Server ist. Ohne diese
+            ausdrückliche Wahl werden{" "}
+            <strong>keine</strong> Daten an Discord übertragen.
           </p>
         </section>
 

@@ -1236,9 +1236,9 @@ export default function RankingBoard({
                 <div>
                   <h2>Deine Zahlen stehen schon im Ranking?</h2>
                   <p>
-                    Wenn du sie selbst eintragen und korrigieren möchtest,
-                    kannst du sie übernehmen, nach E-Mail-Bestätigung und
-                    kurzer Prüfung durch das Team.
+                    Wenn du deine Zahlen künftig selbst eintragen möchtest,
+                    kannst du dein Profil übernehmen, nach E-Mail-Bestätigung
+                    und kurzer Prüfung durch das Team.
                   </p>
                 </div>
                 <Link className="btn primary" href="/starten">

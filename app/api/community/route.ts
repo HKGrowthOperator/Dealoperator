@@ -32,7 +32,8 @@ const sessionSchema = z.object({
   date: validDate,
   time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   minutes: z.number().int().min(15).max(180),
-  capacity: z.number().int().min(2).max(100),
+  // Kleine Absprachen unter Call-Partnern, keine eigene Call-Runde.
+  capacity: z.number().int().min(2).max(6),
   url: z.union([
     z.literal(""),
     z
