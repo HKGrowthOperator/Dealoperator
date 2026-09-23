@@ -11,6 +11,7 @@ import {
   type Metric,
 } from "@/lib/kpis";
 import CheckinEditor from "./features/checkin-editor";
+import { StreakStrip } from "./features/commitment-dashboard";
 import RankProgress from "./features/rank-progress";
 import AccountSettings from "./features/account-settings";
 import BuddyInbox from "./features/buddy-inbox";
@@ -118,7 +119,7 @@ const blankRecord = (): RecordDay => ({
   attempts: 0,
   conversations: 0,
   meetings: 0,
-  energy: 7,
+  energy: null,
   win: "",
   next: "",
   help: "",
@@ -190,16 +191,18 @@ function FieldSelect({
   onChange,
   options,
   label,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   label: string;
+  placeholder?: string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger aria-label={label}>
-        <SelectValue />
+        <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
         {options.map((o) => (
@@ -294,7 +297,7 @@ function MiniChart({
             type="button"
             className="chart-col"
             key={date}
-            aria-label={`Check-in für ${prettyDate(date)} öffnen`}
+            aria-label={`Tagesabschluss für ${prettyDate(date)} öffnen`}
             onClick={() => onSelect?.(date)}
           >
             <div className="bar-space">
@@ -597,9 +600,13 @@ export default function CommunityApp({
     if (initialView === "zahlen") setModal("metrics");
     else router.push(href("zahlen"));
   }
-  function openReflection() {
-    setRecord(data.records.find((r) => r.date === dateKey()) || blankRecord());
-    setModal("reflection");
+  // Zahlen und Reflexion laufen über den Tagesabschluss (/api/closing).
+  function openClosing(date?: string) {
+    router.push(
+      date && date !== dateKey()
+        ? `/tagesabschluss?tag=${date}`
+        : "/tagesabschluss",
+    );
   }
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -621,22 +628,22 @@ export default function CommunityApp({
       attempts: r.attempts,
       legacyMeetings: r.meetings,
     };
-    return `Mein Call-Check-in · ${prettyDate(r.date)}\n${metrics
+    return `Mein Tagesabschluss · ${prettyDate(r.date)}\n${metrics
       .filter((k) => counts[k] !== null)
       .map((k) => `${metricLabels[k]}: ${counts[k]}`)
       .join(
         " · ",
-      )}\nEnergie: ${r.energy}/10\nMein Learning: ${r.win || "–"}\nNächster Schritt: ${r.next}\nWobei ich Hilfe suche: ${r.help || "–"}`;
+      )}${r.energy != null ? `\nEnergie: ${r.energy}/10` : ""}\nMein Learning: ${r.win || "–"}\nNächster Schritt: ${r.next}\nWobei ich Hilfe suche: ${r.help || "–"}`;
   }
   async function copyReflection(r: RecordDay) {
     const text = reflectionText(r);
     try {
       await navigator.clipboard.writeText(text);
-      toast.success("Kopiert. Teile den Text jetzt bewusst in deiner Gruppe.");
+      toast.success("Kopiert.");
     } catch {
       setShareText(text);
       toast.info(
-        "Markiere den Text im geöffneten Fenster und kopiere ihn für deine Gruppe.",
+        "Markiere den Text im geöffneten Fenster und kopiere ihn.",
       );
     }
   }
@@ -654,7 +661,7 @@ export default function CommunityApp({
           return [
             r.date,
             ...metrics.map((k) => (c[k] === null ? "" : String(c[k]))),
-            String(r.energy),
+            r.energy == null ? "" : String(r.energy),
           ];
         }),
     ];
@@ -746,17 +753,9 @@ export default function CommunityApp({
   function reflectionForm() {
     return (
       <CheckinEditor
-        records={data.records}
         initialDate={record.date}
-        demo={demo}
-        onSaved={async (r) => {
-          if (demo)
-            setData((d) => ({
-              ...d,
-              records: [...d.records.filter((x) => x.date !== r.date), r],
-            }));
-          else await refresh(true);
-          setModal(null);
+        onSubmitted={async () => {
+          if (!demo) await refresh(true);
         }}
       />
     );
@@ -921,9 +920,16 @@ export default function CommunityApp({
             Dein Community-Kanal
             <FieldSelect
               label="Community-Kanal"
-              value={profile.channel}
+              // Ein älterer gespeicherter Wert wird nicht mehr angeboten und
+              // zeigt deshalb nur den Platzhalter.
+              value={
+                ["Discord", "Telegram"].includes(profile.channel)
+                  ? profile.channel
+                  : ""
+              }
+              placeholder="Bitte wählen"
               onChange={(v) => setProfile({ ...profile, channel: v })}
-              options={["WhatsApp", "Telegram", "Discord"]}
+              options={["Discord", "Telegram"]}
             />
           </label>
         </div>
@@ -1110,11 +1116,8 @@ export default function CommunityApp({
                         dranbleiben.
                       </p>
                     </div>
-                    <button className="btn primary" onClick={openReflection}>
-                      <Plus size={18} />
-                      {doneToday ? "Check-in bearbeiten" : "Täglicher Check-in"}
-                    </button>
                   </div>
+                  <StreakStrip />
                   <div className="dashboard-top">
                     <div className="week-banner">
                       <span className="round-icon">
@@ -1182,15 +1185,7 @@ export default function CommunityApp({
                         ></Link>
                       </div>
                       <MiniChart
-                        onSelect={(date) => {
-                          setRecord(
-                            data.records.find((r) => r.date === date) || {
-                              ...blankRecord(),
-                              date,
-                            },
-                          );
-                          setModal("reflection");
-                        }}
+                        onSelect={(date) => openClosing(date)}
                         records={data.records}
                       />
                       <div className="chart-footer">
@@ -1297,12 +1292,12 @@ export default function CommunityApp({
                               ? "Heute reflektiert. Stark."
                               : "Zahlen rein. Kopf frei."}
                           </strong>
-                          <p>2 Minuten für deinen täglichen Check-in</p>
+                          <p>Zahlen und Reflexion in einem Tagesabschluss</p>
                         </div>
                         <button
                           className="icon-button"
-                          aria-label="Tägliche Reflexion öffnen"
-                          onClick={openReflection}
+                          aria-label="Tagesabschluss öffnen"
+                          onClick={() => openClosing()}
                         ></button>
                       </div>
                       <div className="routine-row">
@@ -1372,9 +1367,12 @@ export default function CommunityApp({
                         <Download size={17} />
                         CSV exportieren
                       </button>
-                      <button className="btn primary" onClick={openReflection}>
+                      <button
+                        className="btn primary"
+                        onClick={() => openClosing()}
+                      >
                         <Plus size={18} />
-                        Zahlen eintragen
+                        Tagesabschluss
                       </button>
                     </div>
                   </PageHeading>
@@ -1416,15 +1414,7 @@ export default function CommunityApp({
                       />
                     </div>
                     <MiniChart
-                      onSelect={(date) => {
-                        setRecord(
-                          data.records.find((r) => r.date === date) || {
-                            ...blankRecord(),
-                            date,
-                          },
-                        );
-                        setModal("reflection");
-                      }}
+                      onSelect={(date) => openClosing(date)}
                       records={data.records}
                       days={Number(recordPeriod)}
                     />
@@ -1452,8 +1442,8 @@ export default function CommunityApp({
                   <section className="card">
                     <div className="card-heading padded">
                       <div>
-                        <h2>Deine Check-ins</h2>
-                        <p>Wähle einen Tag, um deinen Eintrag zu bearbeiten.</p>
+                        <h2>Deine Tage</h2>
+                        <p>Wähle einen Tag, um ihn im Tagesabschluss zu öffnen.</p>
                       </div>
                       <Tag>{data.records.length} Einträge</Tag>
                     </div>
@@ -1481,10 +1471,7 @@ export default function CommunityApp({
                                   </div>
                                   <button
                                     className="btn secondary"
-                                    onClick={() => {
-                                      setRecord(r);
-                                      setModal("reflection");
-                                    }}
+                                    onClick={() => openClosing(r.date)}
                                   >
                                     <Settings2 size={15} />
                                     Bearbeiten
@@ -1500,13 +1487,17 @@ export default function CommunityApp({
                                 </dl>
                                 <details className="checkin-card-more">
                                   <summary>
-                                    Energie {r.energy}/10
+                                    {r.energy != null
+                                      ? `Energie ${r.energy}/10`
+                                      : "Übernommener Stand, ohne Reflexion"}
                                     {notes.length
                                       ? ` · ${notes.length} ${notes.length === 1 ? "Notiz" : "Notizen"}`
                                       : ""}
                                   </summary>
                                   <div>
-                                    <Progress value={(r.energy ?? 0) * 10} />
+                                    {r.energy != null && (
+                                      <Progress value={r.energy * 10} />
+                                    )}
                                     {notes.length ? (
                                       <>
                                         {r.win && (
@@ -1544,7 +1535,7 @@ export default function CommunityApp({
                       <Empty
                         icon={BarChart3}
                         title="Jede Routine hat einen ersten Tag."
-                        text="Trage deinen ersten Check-in ein. Danach siehst du hier deine Entwicklung."
+                        text="Reiche deinen ersten Tagesabschluss ein. Danach siehst du hier deine Entwicklung."
                       />
                     )}
                   </section>
@@ -1561,7 +1552,7 @@ export default function CommunityApp({
                   <div className="two-columns">
                     <section className="card padded">
                       <div className="card-heading">
-                        <h2>Dein täglicher Check-in</h2>
+                        <h2>Dein Tagesabschluss</h2>
                         <Tag tone="green">Kostenfrei</Tag>
                       </div>
                       {reflectionForm()}
@@ -1587,7 +1578,8 @@ export default function CommunityApp({
                             .map((r) => (
                               <div className="reflection-snippet" key={r.date}>
                                 <small>
-                                  {prettyDate(r.date)} · Energie {r.energy}/10
+                                  {prettyDate(r.date)}
+                                  {r.energy != null ? ` · Energie ${r.energy}/10` : ""}
                                 </small>
                                 <p>{r.win || "Kein Learning eingetragen."}</p>
                                 <button
@@ -1595,15 +1587,18 @@ export default function CommunityApp({
                                   onClick={() => copyReflection(r)}
                                 >
                                   <Copy size={14} />
-                                  Für die Gruppe kopieren
+                                  Text kopieren
                                 </button>
                               </div>
                             ))
                         ) : (
                           <p>
-                            Deine gespeicherten Reflexionen erscheinen hier.
+                            Deine eingereichten Reflexionen erscheinen hier.
                           </p>
                         )}
+                        <Link className="text-link" href="/reflexionen">
+                          Reflexionen der Crew ansehen
+                        </Link>
                       </div>
                     </aside>
                   </div>
@@ -2156,7 +2151,7 @@ export default function CommunityApp({
                       ],
                       [
                         "Austausch & Commitment",
-                        "Bleib über WhatsApp, Telegram oder Discord verbunden.",
+                        "Lies die Reflexionen der Crew und antworte auf Discord.",
                       ],
                     ].map(([title, text], i) => (
                       <div className="card padded" key={title}>
@@ -2172,13 +2167,13 @@ export default function CommunityApp({
                     <div className="rules">
                       <p>
                         <Check />
-                        Plane deine aktiven Tage und gib an diesen Tagen einen
-                        ehrlichen Check-in ab.
+                        Reiche an deinen Calling-Tagen einen ehrlichen
+                        Tagesabschluss ein. Wochenenden sind freiwillig.
                       </p>
                       <p>
                         <Check />
-                        Urlaub, Krankheit und Pausen sind okay. Kommuniziere sie
-                        deiner Gruppe.
+                        Urlaub, Krankheit und Pausen sind okay. Beantrage sie im
+                        Tagesabschluss, dann zählen die Tage nicht als Pflicht.
                       </p>
                       <p>
                         <Check />
@@ -2187,8 +2182,8 @@ export default function CommunityApp({
                       </p>
                       <p>
                         <Check />
-                        Bei längerer unangekündigter Inaktivität sprechen die
-                        Gruppenadmins dich an.
+                        Fehlen drei Abschlüsse, meldet sich das Team persönlich.
+                        Niemand wird automatisch ausgeschlossen.
                       </p>
                     </div>
                     <p className="hint">
@@ -2197,35 +2192,40 @@ export default function CommunityApp({
                     </p>
                   </section>
                   <section className="channels" id="discord">
-                    <h2>Dein Kanal. Dieselbe Routine.</h2>
+                    <h2>Ein Ort für Zahlen. Ein Ort für Gespräche.</h2>
                     <p>
-                      Die Website ist der gemeinsame Ort für deine Zahlen. Den
-                      Austausch führst du dort, wo deine Crew ist.
+                      Auf der Website stehen deine Zahlen und Reflexionen. Auf
+                      Discord antwortest du, findest Buddys und verabredest
+                      Call-Blöcke.
                     </p>
                     <div className="channel-grid">
-                      {["WhatsApp", "Telegram", "Discord"].map((channel) => (
-                        <div className="card padded" key={channel}>
-                          <MessageCircle size={25} />
-                          <h3>{channel}</h3>
-                          <p>
-                            {channel === "Discord"
-                              ? "Verabrede einen Fokusblock, übe einen Einwand oder bring dein Learning mit in die Runde."
-                              : "Check-in-Link öffnen und die fertige Reflexion bewusst mit deiner Gruppe teilen."}
-                          </p>
-                          {channel === "Discord" ? (
-                            <a
-                              className="text-link"
-                              href={discordUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              Discord öffnen
-                            </a>
-                          ) : (
-                            <Tag>Über deine bestehende Gruppe</Tag>
-                          )}
-                        </div>
-                      ))}
+                      <div className="card padded">
+                        <MessageCircle size={25} />
+                        <h3>Reflexionen</h3>
+                        <p>
+                          Lies die eingereichten Tagesabschlüsse der Crew und
+                          nimm Learnings für deinen nächsten Calling-Tag mit.
+                        </p>
+                        <Link className="text-link" href="/reflexionen">
+                          Reflexionen ansehen
+                        </Link>
+                      </div>
+                      <div className="card padded">
+                        <MessageCircle size={25} />
+                        <h3>Discord</h3>
+                        <p>
+                          Verabrede einen Fokusblock, übe einen Einwand oder
+                          bring dein Learning mit in die Runde.
+                        </p>
+                        <a
+                          className="text-link"
+                          href={discordUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Discord öffnen
+                        </a>
+                      </div>
                     </div>
                   </section>
                 </>
@@ -2252,7 +2252,7 @@ export default function CommunityApp({
               {modal === "metrics"
                 ? "Deine Woche im Detail"
                 : modal === "reflection"
-                  ? "Dein täglicher Check-in"
+                  ? "Dein Tagesabschluss"
                   : modal === "plan"
                     ? "Dein Wochenplan"
                     : modal === "profile"
@@ -2286,9 +2286,9 @@ export default function CommunityApp({
                 unabhängigen Tagesständen wird deshalb keine Qualitätsquote
                 abgeleitet.
               </p>
-              <button className="btn primary" onClick={openReflection}>
+              <button className="btn primary" onClick={() => openClosing()}>
                 <Plus size={17} />
-                Check-in eintragen
+                Tagesabschluss öffnen
               </button>
             </div>
           ) : modal === "reflection" ? (
@@ -2523,8 +2523,8 @@ export default function CommunityApp({
                 />
               </label>
               <p className="hint">
-                Die Anfrage erscheint in der Website. Es wird keine WhatsApp-,
-                Discord- oder E-Mail-Nachricht verschickt.
+                Die Anfrage erscheint in der Website. Es wird keine Nachricht
+                per Messenger, Discord oder E-Mail verschickt.
               </p>
               <button className="btn primary" disabled={saving}>
                 <Send size={17} />
@@ -2598,9 +2598,11 @@ export default function CommunityApp({
                     {member.days.map((d) => dayNames[d]).join(", ")}
                   </strong>
                 </span>
-                <span>
-                  Mein bevorzugter Kanal<strong>{member.channel}</strong>
-                </span>
+                {["Discord", "Telegram"].includes(member.channel) && (
+                  <span>
+                    Mein bevorzugter Kanal<strong>{member.channel}</strong>
+                  </span>
+                )}
               </div>
               <button
                 className="btn primary full"
@@ -2817,7 +2819,7 @@ export default function CommunityApp({
       <Dialog open={!!shareText} onOpenChange={(v) => !v && setShareText("")}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Check-in für deine Gruppe</DialogTitle>
+            <DialogTitle>Dein Tagesabschluss zum Kopieren</DialogTitle>
             <DialogDescription>
               Markiere und kopiere den Text. Er wird nicht automatisch
               versendet.
@@ -2825,7 +2827,7 @@ export default function CommunityApp({
           </DialogHeader>
           <textarea
             className="share-copy"
-            aria-label="Check-in zum Kopieren"
+            aria-label="Tagesabschluss zum Kopieren"
             readOnly
             rows={12}
             value={shareText}
@@ -2836,7 +2838,7 @@ export default function CommunityApp({
             onClick={async () => {
               try {
                 await navigator.clipboard.writeText(shareText);
-                toast.success("Check-in kopiert.");
+                toast.success("Text kopiert.");
               } catch {
                 toast.info(
                   "Bitte markiere den Text und nutze Kopieren im Browser.",

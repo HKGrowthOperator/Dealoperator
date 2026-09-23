@@ -52,7 +52,8 @@ export type RecordDay = {
   meetings: number | null;
   counts?: Counts;
   revision?: number;
-  energy: number;
+  /** null = keine Reflexion (z. B. übernommener Stand); nie erfinden. */
+  energy: number | null;
   win: string;
   next: string;
   help: string;
@@ -109,7 +110,7 @@ export const emptyProfile: Profile = {
   goal: 200,
   days: [1, 2, 3, 4, 5],
   listed: false,
-  channel: "WhatsApp",
+  channel: "Discord",
 };
 export const demoProfile: Profile = {
   ...emptyProfile,
@@ -142,7 +143,7 @@ export const demoMembers: Member[] = [
     goal: 150,
     days: [1, 3, 5],
     listed: true,
-    channel: "WhatsApp",
+    channel: "Telegram",
     color: "blue",
   },
   {
