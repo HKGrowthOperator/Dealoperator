@@ -286,8 +286,13 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                       maxLength={2000}
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
-                      placeholder="Wird im Prüfstatus angezeigt."
+                      placeholder="Wird im Prüfstatus angezeigt. Für eine Rückfrage steht hier die Frage."
                     />
+                    <small>
+                      Die Person sieht diese Nachricht auf ihrer Statusseite und
+                      kann dort auf eine Rückfrage antworten. Eine Benachrichtigung
+                      an die Person gibt es nicht.
+                    </small>
                   </label>
                   <div className="review-actions">
                     <button
@@ -304,7 +309,12 @@ export default function ReviewQueue({ admin }: { admin: boolean }) {
                     </button>
                     <button
                       className="btn secondary"
-                      disabled={!!busy}
+                      disabled={!!busy || reply.trim().length < 3}
+                      title={
+                        reply.trim().length < 3
+                          ? "Bitte zuerst die Frage unter „Nachricht an die Person“ eintragen."
+                          : undefined
+                      }
                       onClick={() => decide(r.id, "info")}
                     >
                       Rückfrage nötig

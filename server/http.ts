@@ -14,6 +14,17 @@ export function errorResponse(error: unknown) {
       { error: error.issues[0]?.message || "Bitte prüfe die Eingabe." },
       400,
     );
+  // Gleichzeitige Änderung an denselben Daten: kein Ausfall, sondern ein
+  // Zustand, den ein Neuladen auflöst.
+  const code = (error as { code?: string } | null)?.code;
+  if (code === "23505" || code === "40P01" || code === "40001")
+    return json(
+      {
+        error:
+          "Das wurde gerade gleichzeitig an anderer Stelle geändert. Bitte lade die Seite neu und prüfe den Stand.",
+      },
+      409,
+    );
   return json(
     {
       error:

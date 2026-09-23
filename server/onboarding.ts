@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
-import { isTeam, type Actor } from "./auth";
+import { isTeam, ownerIds, type Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
 import { teamEvent } from "./notify";
 import { normalisePhone } from "../lib/phone";
@@ -129,6 +129,10 @@ export async function startRequest(db: Database, raw: unknown) {
     await rateLimit(db, `onboarding-profile:${v.participantId}`, 12, 3600);
 
   return db.transaction(async (tx) => {
+    // Dieselbe Adresssperre wie bei der Übernahme mit Konto: gleichzeitige
+    // Anfragen derselben Adresse laufen nacheinander statt in den
+    // Eindeutigkeitsindex.
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${v.email}`]);
     let participant: string | null = null;
     if (v.kind === "claim") {
       const p = await profileForSelection(tx, v.participantId!, v.invite);
@@ -140,6 +144,11 @@ export async function startRequest(db: Database, raw: unknown) {
          AND status IN (${OPEN_LIST}) FOR UPDATE`,
       [v.email, participant],
     );
+    // Eine bestätigte, laufende Anfrage ändert dieser öffentliche Weg nicht:
+    // sonst könnte jeder, der die Adresse kennt, die Angaben überschreiben,
+    // die das Team gerade prüft.
+    if (existing && existing.status !== "awaiting_email")
+      return { id: existing.id as string, participant, resubmitted: true };
     if (existing) {
       // Erneutes Absenden aktualisiert die Angaben, statt eine zweite offene
       // Anfrage für dieselbe Person und dasselbe Profil anzulegen.
@@ -235,9 +244,11 @@ export async function bindConfirmedRequest(
       [actor.userId],
     );
     if (running) {
+      // Ohne owner: die abgelöste Zeile soll die laufende Anfrage auf der
+      // Statusseite nicht verdecken.
       await tx.query(
-        `UPDATE onboarding_requests SET owner=$2,status='superseded',updated_at=now() WHERE id=$1`,
-        [request.id, actor.userId],
+        `UPDATE onboarding_requests SET status='superseded',updated_at=now() WHERE id=$1`,
+        [request.id],
       );
       await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits eine offene Übernahme.");
       return null;
@@ -273,7 +284,10 @@ export async function bindConfirmedRequest(
           ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
           : "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden.",
       // Einmal je Konto, egal wie viele Anfragen es später noch stellt.
-      alert: { key: `signup:${actor.userId}`, kind: request.kind === "claim" ? "claim" : "new" },
+      alert:
+        request.kind === "claim"
+          ? { key: `claim:${request.id}`, kind: "claim" }
+          : { key: `signup:${actor.userId}`, kind: "new" },
     });
     return {
       id: request.id as string,
@@ -319,7 +333,8 @@ export async function requestForActor(db: Database, actor: Actor) {
               ORDER BY e.created_at DESC LIMIT 1) AS last_answer
      FROM onboarding_requests r
      LEFT JOIN participants p ON p.id=r.participant
-     WHERE r.owner=$1 ORDER BY r.created_at DESC LIMIT 1`,
+     WHERE r.owner=$1
+     ORDER BY (r.status IN ('pending','info_needed')) DESC, r.updated_at DESC LIMIT 1`,
     [actor.userId],
   );
   if (!r) return null;
@@ -385,12 +400,26 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
   if (!isTeam(actor))
     throw new AppError("Nur das Team kann Anfragen entscheiden.", 403);
   const v = decisionSchema.parse(raw);
+  if (v.decision === "info" && v.applicantMessage.length < 3)
+    throw new AppError("Bitte schreib die Rückfrage an die Person ins Nachrichtenfeld.");
   return db.transaction(async (tx) => {
+    // Feste Sperrreihenfolge: zuerst das Profil, dann die Anfrage. So können
+    // sich zwei gleichzeitige Entscheidungen nicht gegenseitig blockieren.
+    const [peek] = await tx.query(
+      "SELECT participant FROM onboarding_requests WHERE id=$1",
+      [v.id],
+    );
+    if (peek?.participant)
+      await tx.query("SELECT id FROM participants WHERE id=$1 FOR UPDATE", [peek.participant]);
     const [request] = await tx.query(
       "SELECT * FROM onboarding_requests WHERE id=$1 FOR UPDATE",
       [v.id],
     );
     if (!request) throw new AppError("Diese Anfrage gibt es nicht.", 404);
+    // Über die eigene Anfrage entscheidet jemand anderes im Team. Nur die feste
+    // Grundverwaltung darf das selbst, damit sie sich nicht aussperrt.
+    if (request.owner === actor.userId && !ownerIds().includes(actor.userId))
+      throw new AppError("Über deine eigene Anfrage entscheidet jemand anderes im Team.", 403);
     if (!["pending", "info_needed"].includes(request.status))
       throw new AppError(
         "Diese Anfrage wurde bereits abschließend entschieden.",
@@ -549,15 +578,17 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
   const v = claimSchema.parse(raw);
   const phone = normalisePhone(v.phone);
   if (!phone.ok) throw new AppError(phone.reason);
+  // Nur das Konto zählt. Der öffentliche Profilzähler des anonymen Starts
+  // darf die Anfrage des angemeldeten Inhabers nicht blockieren.
   await rateLimit(db, `claim-account:${actor.userId}`, 10, 3600);
-  await rateLimit(db, `onboarding-profile:${v.participantId}`, 12, 3600);
 
   return db.transaction(async (tx) => {
     // Dieselbe Sperre wie bei Profilanlage und Bindung: pro Konto läuft immer
-    // nur einer dieser Schritte.
+    // nur einer dieser Schritte. Dazu die Adresssperre aus startRequest.
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `owner:${actor.userId}`,
     ]);
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${actor.email}`]);
     const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
       actor.userId,
     ]);
@@ -590,6 +621,13 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
 
     // Prüft: noch frei, persönliches Profil, auffindbar oder gültige Einladung.
     const p = await profileForSelection(tx, v.participantId, v.invite);
+    // Wartet auf eine gerade laufende Freigabe und sieht danach deren Ergebnis.
+    const [still] = await tx.query("SELECT owner FROM participants WHERE id=$1 FOR SHARE", [p.id]);
+    if (still?.owner)
+      throw new AppError(
+        "Dieses Profil steht nicht mehr zur Übernahme bereit. Es wurde bereits einem Konto zugeordnet.",
+        409,
+      );
 
     // Eine noch unbestätigte Anfrage derselben Adresse für dasselbe Profil (etwa
     // aus einem anderen Browser) wird zu dieser Anfrage, statt eine zweite
@@ -604,7 +642,7 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       await tx.query(
         `UPDATE onboarding_requests
             SET owner=$2,status='pending',kind='claim',full_name=$3,phone=$4,phone_input=$5,
-                hint=$6,updated_at=now()
+                hint=$6,created_at=now(),updated_at=now()
           WHERE id=$1`,
         [id, actor.userId, v.fullName, phone.value, v.phone, v.hint],
       );

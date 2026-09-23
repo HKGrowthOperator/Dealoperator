@@ -352,7 +352,7 @@ export function EligibilityChecklist({
           title: "Eigenes persönliches Profil",
           text: "Lege ein neues Profil an oder frag die Übernahme an, wenn deine Zahlen schon im Ranking stehen.",
           links: [
-            { href: `/start?next=${encodeURIComponent(next)}`, label: "Profil anlegen" },
+            { href: `/start?weiter=eigen&next=${encodeURIComponent(next)}`, label: "Profil anlegen" },
             { href: "/profil-uebernehmen", label: "Meine Zahlen sind schon auf der Seite" },
           ],
         },

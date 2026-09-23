@@ -9,6 +9,7 @@ import {
   answerInfoRequest,
   bindConfirmedRequest,
   decideRequest,
+  noteConfirmedAccount,
   requestClaimSignedIn,
   requestForActor,
   reviewQueue,
@@ -19,6 +20,7 @@ import {
 const admin = { userId: "admin", email: "admin@example.invalid", admin: true };
 const alice = { userId: "alice", email: "alice@example.invalid", admin: false };
 const bob = { userId: "bob", email: "bob@example.invalid", admin: false };
+const mo = { userId: "mo", email: "mo@example.invalid", admin: false, moderator: true };
 let pg: PGlite, db: Database;
 
 before(async () => {
@@ -32,7 +34,7 @@ before(async () => {
 beforeEach(async () => {
   await pg.exec(
     `TRUNCATE participants,profiles,account_private,onboarding_requests,onboarding_events,claim_tokens,
-      team_inbox,notifications,notification_prefs,rate_limits,sync_outbox CASCADE`,
+      team_inbox,notifications,notification_prefs,rate_limits,sync_outbox,team_roles CASCADE`,
   );
 });
 after(async () => {
@@ -176,4 +178,70 @@ test("after a rejection the account can ask for another profile or start its own
   await decideRequest(db, admin, { id: next.id, decision: "reject" });
   const own = await createMember(db, alice, { name: "Alice", company: "", role: "", publicConsent: false });
   assert.ok(own.id);
+});
+
+test("a later confirmed link never hides the running takeover on the status page", async () => {
+  const p = await profile("Alice B.");
+  const q = await profile("Jemand Q.");
+  const r = await requestClaimSignedIn(db, alice, details(p));
+  await decideRequest(db, admin, { id: r.id, decision: "info", applicantMessage: "Welche Firma?" });
+  const other = await startRequest(db, {
+    kind: "claim", participantId: q, email: alice.email, fullName: "Fremd", phone: "+49 171 9999999",
+  });
+  assert.equal(await bindConfirmedRequest(db, alice, other.id), null);
+  const mine = await requestForActor(db, alice);
+  assert.equal(mine?.status, "info_needed");
+  assert.equal(mine?.participantName, "Alice B.");
+  // Die abgelöste Zeile hängt nicht am Konto.
+  assert.equal((await db.query("SELECT owner FROM onboarding_requests WHERE id=$1", [other.id]))[0].owner, null);
+  await answerInfoRequest(db, alice, { message: "Beispiel GmbH" });
+});
+
+test("an old unconfirmed request turned into a takeover counts as the newest", async () => {
+  const p = await profile("Alice B.");
+  const q = await profile("Alice Q.");
+  const base = { kind: "claim", email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" };
+  await startRequest(db, { ...base, participantId: p });
+  const forQ = await startRequest(db, { ...base, participantId: q });
+  // Q wird bestätigt und abgelehnt, danach fragt Alice angemeldet P an.
+  await db.query("UPDATE onboarding_requests SET status='superseded' WHERE participant=$1 AND id<>$2", [p, forQ.id]);
+  const bound = await bindConfirmedRequest(db, alice, forQ.id);
+  assert.ok(bound);
+  await decideRequest(db, admin, { id: forQ.id, decision: "reject" });
+  await requestClaimSignedIn(db, alice, details(p));
+  const mine = await requestForActor(db, alice);
+  assert.equal(mine?.status, "pending");
+  assert.equal(mine?.participantName, "Alice B.");
+});
+
+test("the public start cannot rewrite a request the team is already checking", async () => {
+  const p = await profile("Alice B.");
+  const r = await requestClaimSignedIn(db, alice, details(p));
+  await startRequest(db, {
+    kind: "claim", participantId: p, email: alice.email, fullName: "Mallory Fremd", phone: "+49 171 9999999",
+  });
+  const [row] = await db.query("SELECT full_name,phone FROM onboarding_requests WHERE id=$1", [r.id]);
+  assert.deepEqual({ ...row }, { full_name: "Alice Beispiel", phone: "+491701234567" });
+});
+
+test("nobody in the team decides about their own takeover, and a question needs a text", async () => {
+  const p = await profile("Fremde Person");
+  await db.query("INSERT INTO team_roles(owner,role,granted_by) VALUES('mo','moderator','admin')");
+  const r = await requestClaimSignedIn(db, mo, details(p, { fullName: "Mo Beispiel" }));
+  await assert.rejects(decideRequest(db, mo, { id: r.id, decision: "approve" }), /jemand anderes/);
+  await assert.rejects(decideRequest(db, admin, { id: r.id, decision: "info" }), /Rückfrage/);
+  assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, null);
+});
+
+test("a takeover via registration alerts the team even after an earlier sign-in alert", async () => {
+  const p = await profile("Alice B.");
+  await noteConfirmedAccount(db, alice);
+  const started = await startRequest(db, {
+    kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567",
+  });
+  // noteConfirmedAccount hat das Konto schon gemeldet; die Übernahme kommt trotzdem an.
+  await db.query("DELETE FROM onboarding_requests WHERE id<>$1", [started.id]);
+  const bound = await bindConfirmedRequest(db, alice, started.id);
+  assert.equal(bound?.kind, "claim");
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind='team:claim'"), 2);
 });

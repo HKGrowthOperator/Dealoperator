@@ -3,6 +3,7 @@ import OnboardingStart from "../features/onboarding-start";
 import { authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { profileForSelection } from "@/server/onboarding";
+import { AppError } from "@/server/operator";
 import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,8 @@ export default async function Page({
   // Direktlink aus einer persönlichen Einladung: Profil vorauswählen, sofern
   // es noch frei ist. Ein bereits übernommenes Profil fällt hier heraus.
   let preselected = null;
+  let problem = "";
+  let needsInvite = "";
   const invite = (search.einladung || "").slice(0, 200);
   if (search.profil && databaseReady()) {
     try {
@@ -38,8 +41,16 @@ export default async function Page({
         search.profil,
         invite || undefined,
       );
-    } catch {
+    } catch (e) {
+      // Nicht still verschlucken: die Person soll wissen, warum ihre Auswahl
+      // fehlt. Bei einem nur per Einladung erreichbaren Profil kann sie den
+      // Code aus der Einladung eingeben.
       preselected = null;
+      problem =
+        e instanceof AppError
+          ? e.message
+          : "Dieses Profil lässt sich gerade nicht auswählen.";
+      if (e instanceof AppError && e.status === 403) needsInvite = search.profil.slice(0, 100);
     }
   }
 
@@ -52,6 +63,8 @@ export default async function Page({
           preselected={preselected}
           invite={invite}
           linkError={(search.fehler || "").slice(0, 20)}
+          problem={problem}
+          needsInvite={needsInvite}
         />
       </main>
       <OperatorFooter />

@@ -28,9 +28,15 @@ export default async function Page({
   if (!actor) redirect(`/anmelden?next=${encodeURIComponent(next)}`);
 
   const db = database();
+  // Anmeldung aus der Profilübernahme heraus: dort entsteht die Anfrage mit
+  // genau der gewählten Auswahl. Eine ältere, unbestätigte Anfrage aus diesem
+  // Browser wird dann nicht gebunden, und der Team-Hinweis kommt mit der
+  // Übernahme statt doppelt.
+  const toClaim =
+    new URL(next, "https://operator.invalid").pathname === "/profil-uebernehmen";
   const requestId = (await cookies()).get(ONBOARDING_COOKIE)?.value;
-  const bound = await bindConfirmedRequest(db, actor, requestId);
-  if (!bound) await noteConfirmedAccount(db, actor);
+  const bound = toClaim ? null : await bindConfirmedRequest(db, actor, requestId);
+  if (!bound && !toClaim) await noteConfirmedAccount(db, actor);
   const state = await ownState(db, actor);
 
   // Bereits freigegebenes Profil: direkt in den eigenen Bereich.
@@ -42,16 +48,15 @@ export default async function Page({
   // eigenen Profil.
   const request = state.request as { kind?: string; status?: string } | null;
   const status = String(request?.status ?? "pending");
-  if (
-    (bound?.kind === "claim" || request?.kind === "claim") &&
-    (["pending", "info_needed"].includes(status) ||
-      (["rejected", "superseded"].includes(status) && search.weiter !== "eigen"))
-  )
-    redirect("/status");
+  const claim = bound?.kind === "claim" || request?.kind === "claim";
+  if (claim && ["pending", "info_needed"].includes(status)) redirect("/status");
 
-  // Anmeldung aus der Profilübernahme heraus: dorthin zurück, mit Auswahl.
-  if (new URL(next, "https://operator.invalid").pathname === "/profil-uebernehmen")
-    redirect(next);
+  // Anmeldung aus der Profilübernahme heraus: dorthin zurück, mit Auswahl
+  // und Einladung, auch nach einer früheren Ablehnung.
+  if (toClaim) redirect(next);
+
+  if (claim && ["rejected", "superseded"].includes(status) && search.weiter !== "eigen")
+    redirect("/status");
 
   return (
     <div className="operator-site">

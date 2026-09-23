@@ -39,11 +39,15 @@ export default function OnboardingStart({
   preselected,
   invite,
   linkError,
+  problem = "",
+  needsInvite = "",
 }: {
   ready: boolean;
   preselected: Profile | null;
   invite: string;
   linkError: string;
+  problem?: string;
+  needsInvite?: string;
 }) {
   // Mit vorausgewähltem Profil kann direkt erneut angefordert werden. Ohne
   // Auswahl bleibt es bei der Wegwahl: die Anfrage liegt serverseitig zur
@@ -63,7 +67,7 @@ export default function OnboardingStart({
   const [value, setValue] = useState(EMPTY);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
-    linkError ? LINK_ERROR[linkError] || LINK_ERROR.link : "",
+    linkError ? LINK_ERROR[linkError] || LINK_ERROR.link : problem,
   );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -194,6 +198,17 @@ export default function OnboardingStart({
         <p role="alert" className="form-error">
           {message}
         </p>
+      )}
+
+      {step === "choice" && needsInvite && (
+        <form className="form-stack" action="/starten" method="get">
+          <input type="hidden" name="profil" value={needsInvite} />
+          <label>
+            Code aus deiner Einladung
+            <input name="einladung" required maxLength={200} autoComplete="off" />
+          </label>
+          <button className="btn primary full">Profil mit Einladung öffnen</button>
+        </form>
       )}
 
       {step === "choice" && (

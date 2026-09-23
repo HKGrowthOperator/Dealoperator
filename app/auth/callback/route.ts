@@ -21,10 +21,14 @@ import { authClient, authReady, getCurrentUser, safeNext } from "@/server/auth";
  * Die Authentifizierung wird dadurch nicht abgeschwächt: ohne gültigen Code und
  * passenden Verifier entsteht weiterhin keine Sitzung.
  */
-function back(base: string, reason: string) {
-  const response = NextResponse.redirect(
-    new URL(`/starten?fehler=${reason}`, base),
-  );
+function back(base: string, reason: string, next: string | null) {
+  // Links aus „Anmelden“ tragen ein Ziel (next). Dann zurück zur Anmeldung mit
+  // demselben Ziel, damit z. B. Profil und Einladung einer Übernahme erhalten
+  // bleiben. Links aus der Registrierung haben kein Ziel.
+  const target = next
+    ? `/anmelden?fehler=${reason}&next=${encodeURIComponent(safeNext(next))}`
+    : `/starten?fehler=${reason}`;
+  const response = NextResponse.redirect(new URL(target, base));
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }
@@ -33,13 +37,14 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const base = process.env.APP_URL || url.origin;
   const code = url.searchParams.get("code");
+  const next = url.searchParams.get("next");
 
-  if (!authReady()) return back(base, "link");
+  if (!authReady()) return back(base, "link", next);
 
   // Supabase hängt bei abgelaufenem Einmal-Link einen Fehler an die Rückadresse.
   const errorCode = url.searchParams.get("error_code");
   if (errorCode)
-    return back(base, errorCode.includes("expired") ? "abgelaufen" : "link");
+    return back(base, errorCode.includes("expired") ? "abgelaufen" : "link", next);
 
   if (!code) {
     // Kein Code, aber bereits angemeldet: der Link wurde in diesem Browser
@@ -51,7 +56,7 @@ export async function GET(request: Request) {
       response.headers.set("Cache-Control", "private, no-store");
       return response;
     }
-    return back(base, "link");
+    return back(base, "link", next);
   }
 
   // Fehlt der Verifier, wurde der Link in einem anderen Browser geöffnet.
@@ -80,5 +85,5 @@ export async function GET(request: Request) {
     return response;
   }
 
-  return back(base, hasVerifier ? "verwendet" : "browser");
+  return back(base, hasVerifier ? "verwendet" : "browser", next);
 }

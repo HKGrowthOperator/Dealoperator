@@ -49,6 +49,7 @@ export default async function Page({
   let preselected: { id: string; name: string; company: string; role: string } | null =
     null;
   let problem = "";
+  let needsInvite = "";
   if (!owned && profil && profil !== "beispiel") {
     try {
       preselected = await profileForSelection(db, profil, invite || undefined);
@@ -57,6 +58,7 @@ export default async function Page({
         e instanceof AppError
           ? e.message
           : "Dieses Profil lässt sich gerade nicht auswählen.";
+      if (e instanceof AppError && e.status === 403) needsInvite = profil;
     }
   }
   const [contact] = await db.query(
@@ -86,6 +88,7 @@ export default async function Page({
             preselected={preselected}
             invite={invite}
             problem={problem}
+            needsInvite={needsInvite}
           />
         )}
       </main>

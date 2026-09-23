@@ -18,12 +18,14 @@ export default function ClaimRequest({
   preselected,
   invite,
   problem,
+  needsInvite = "",
 }: {
   email: string;
   phone: string;
   preselected: Profile | null;
   invite: string;
   problem: string;
+  needsInvite?: string;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>(preselected ? "confirm" : "search");
@@ -111,6 +113,17 @@ export default function ClaimRequest({
         </p>
       )}
 
+      {step === "search" && needsInvite && (
+        <form className="form-stack" action="/profil-uebernehmen" method="get">
+          <input type="hidden" name="profil" value={needsInvite} />
+          <label>
+            Code aus deiner Einladung
+            <input name="einladung" required maxLength={200} autoComplete="off" />
+          </label>
+          <button className="btn primary full">Profil mit Einladung öffnen</button>
+        </form>
+      )}
+
       {step === "search" && (
         <>
           <div className="form-stack">
@@ -164,7 +177,7 @@ export default function ClaimRequest({
               ))}
             </div>
           )}
-          <Link className="btn secondary full" href="/start">
+          <Link className="btn secondary full" href="/start?weiter=eigen">
             Stattdessen eigenes Profil anlegen
           </Link>
         </>

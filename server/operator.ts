@@ -167,7 +167,8 @@ export async function ownState(db: Database, actor: Actor) {
   const [request] = await db.query(
     `SELECT r.id,r.kind,r.status,r.applicant_message,r.created_at,r.decided_at,p.name AS participant_name
      FROM onboarding_requests r LEFT JOIN participants p ON p.id=r.participant
-     WHERE r.owner=$1 ORDER BY r.created_at DESC LIMIT 1`,
+     WHERE r.owner=$1
+     ORDER BY (r.status IN ('pending','info_needed')) DESC, r.updated_at DESC LIMIT 1`,
     [actor.userId],
   );
   return {
