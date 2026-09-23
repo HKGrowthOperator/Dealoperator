@@ -544,9 +544,9 @@ function clampDay(state: ClosingState, requested: string | undefined) {
 
 const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
   called:
-    "Fristgerecht mit Anwahlen: Der Tag zählt für deine Calling-Serie und deine Reflexions-Serie.",
+    "Rechtzeitig mit Anwahlen: Der Tag zählt für deine Calling-Serie und deine Reflexions-Serie.",
   reflected:
-    "Fristgerecht ohne Anwahlen: Der Tag hält deine Reflexions-Serie. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
+    "Rechtzeitig ohne Anwahlen: Der Tag hält deine Reflexions-Serie. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
   late: "Nach der Frist eingereicht: Deine Zahlen zählen, die Serien setzt dieser Tag nicht fort.",
   bonus:
     "Freiwilliger Abschluss an einem freien Tag: Deine Zahlen zählen, deine Serien bleiben davon unberührt.",
@@ -961,12 +961,12 @@ export default function ClosingForm({
     if (imported) return null;
     if (state.trackingStart && form.day < state.trackingStart && !submitted)
       return `Dieser Tag liegt vor deinem Start im Tagesabschluss (${formatShortDay(state.trackingStart)}). Er zählt nicht für Serien.`;
-    if (paused) return "Dieser Tag liegt in einer genehmigten Pause. Ein Abschluss ist freiwillig.";
+    if (paused) return "Dieser Tag liegt in einer bestätigten Pause. Ein Abschluss ist freiwillig.";
     if (!due)
-      return "Kein Pflicht-Tag: Am Wochenende ist ein Abschluss freiwillig. Er zählt als Bonus, deine Serien bleiben unberührt.";
+      return "Kein Calling-Tag: Am Wochenende ist ein Abschluss freiwillig. Er zählt als Bonus, deine Serien bleiben unberührt.";
     if (submitted) return null;
     if (deadline && nowMs < deadline.getTime())
-      return `Pflicht-Tag. Fristgerecht bis ${formatMoment(deadline.toISOString(), tz)}.`;
+      return `Calling-Tag. Rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
     if (deadline)
       return `Die Frist für diesen Tag ist am ${formatMoment(deadline.toISOString(), tz)} abgelaufen. Deine Zahlen zählen trotzdem, für die Serien zählt der Tag nicht mehr.`;
     return null;
@@ -1099,7 +1099,7 @@ export default function ClosingForm({
               <Lock size={14} aria-hidden="true" /> Übernommen
             </>
           ) : due ? (
-            status === "missed" ? "Frist vorbei" : status === "open" ? "Frist läuft" : "Pflicht-Tag"
+            status === "missed" ? "Frist vorbei" : status === "open" ? "Frist läuft" : "Calling-Tag"
           ) : paused ? (
             "Pause"
           ) : (
@@ -1146,9 +1146,8 @@ export default function ClosingForm({
           <Clock3 size={18} aria-hidden="true" />
           <div>
             <p>
-              Dein Abschluss für {formatLongDay(openEarlier.day)} ist noch offen. Fristgerecht
-              bis {formatMoment(openEarlier.deadline, tz)}.
-              {openEarlier.risk ? " Deine laufende Serie hängt daran." : ""}
+              Dein Abschluss für {formatLongDay(openEarlier.day)} ist noch offen. Bis{" "}
+              {formatMoment(openEarlier.deadline, tz)} zählt er noch für deine Serie.
             </p>
             <button
               type="button"

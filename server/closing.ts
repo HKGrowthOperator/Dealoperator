@@ -515,7 +515,7 @@ const pauseSchema = z
   .refine((v) => v.from <= v.to, "Das Ende der Pause liegt vor dem Beginn.")
   // Rückwirkende Pausen trägt nur das Team ein (nachvollziehbar in der
   // Verwaltung); Mitglieder beantragen ab heute.
-  .refine((v) => v.from >= berlinDate(), "Eine Pause kannst du ab heute beantragen. Für zurückliegende Tage sprich bitte das Team an.")
+  .refine((v) => v.from >= berlinDate(), "Eine Pause kannst du ab heute melden. Für zurückliegende Tage sprich bitte das Team an.")
   .refine(
     (v) => (Date.parse(v.to) - Date.parse(v.from)) / 86_400_000 <= 62,
     "Eine Pause kann höchstens zwei Monate am Stück dauern.",
@@ -531,7 +531,7 @@ export async function requestPause(db: Database, actor: Actor, raw: unknown) {
     [e.participant.id],
   );
   if (open.n >= 3)
-    throw new AppError("Es warten schon drei Pausenanträge auf das Team.", 409);
+    throw new AppError("Es warten schon drei Pausenmeldungen auf das Team.", 409);
   const id = randomUUID();
   await db.transaction(async (tx) => {
     await tx.query(
@@ -543,7 +543,7 @@ export async function requestPause(db: Database, actor: Actor, raw: unknown) {
       kind: "pause",
       ref: id,
       state: "requested",
-      title: `Pause beantragt: ${e.participant!.name}`,
+      title: `Pause gemeldet: ${e.participant!.name}`,
       body: `${v.from} bis ${v.to}${v.reason ? ` · ${v.reason}` : ""}`,
       alert: false,
     });
@@ -558,6 +558,6 @@ export async function withdrawPause(db: Database, actor: Actor, raw: unknown) {
       WHERE p.id=$1 AND p.participant=pa.id AND pa.owner=$2 AND p.status='requested' RETURNING p.id`,
     [id, actor.userId],
   );
-  if (!rows.length) throw new AppError("Dieser Antrag kann nicht mehr zurückgezogen werden.", 409);
+  if (!rows.length) throw new AppError("Diese Pausenmeldung kann nicht mehr zurückgezogen werden.", 409);
   return { ok: true };
 }

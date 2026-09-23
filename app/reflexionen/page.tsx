@@ -66,8 +66,8 @@ export default async function Page() {
               Team.
             </p>
             <p>
-              <MessageCircle size={15} aria-hidden="true" /> Geantwortet wird auf Discord, über
-              den Knopf an jeder Karte. Hier gibt es bewusst kein Antwortfeld.
+              <MessageCircle size={15} aria-hidden="true" /> Antworten kannst du zusätzlich auf
+              Discord, über den Knopf an jeder Karte. Hier gibt es bewusst kein Antwortfeld.
             </p>
           </section>
         </div>
@@ -83,8 +83,8 @@ export default async function Page() {
           <section className="cm-card cm-signin">
             <h2>Melde dich an, um die Reflexionen zu lesen.</h2>
             <p>
-              Das Konto ist kostenfrei. Mit einem eigenen Profil und hinterlegter Telefonnummer
-              liest du hier mit und reichst deinen eigenen Tagesabschluss ein.
+              Mit einem eigenen Profil und hinterlegter Telefonnummer liest du hier mit und
+              reichst deinen eigenen Tagesabschluss ein.
             </p>
             <div className="cm-actions">
               <Link className="btn primary" href="/anmelden?next=%2Freflexionen">

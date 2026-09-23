@@ -8,18 +8,18 @@ export default function DiscordNudge({
 }) {
   const copy = {
     buddy: {
-      title: "Aus einem Kontakt wird ein Call-Buddy.",
-      text: "Stimmt euch auf Discord ab und macht euren nächsten gemeinsamen Call-Block fest.",
-      link: "Auf Discord verabreden",
+      title: "Call-Partner auch auf Discord finden.",
+      text: "Zusätzlich kannst du auf Discord nach einem Call-Partner fragen und dich dort abstimmen.",
+      link: "Discord öffnen",
     },
     reflection: {
       title: "Ein Learning, das anderen helfen könnte?",
-      text: "Nimm es mit in den Austausch auf Discord. Du entscheidest, was du dort teilst.",
-      link: "Im Discord austauschen",
+      text: "Zusätzlich kannst du es auf Discord teilen oder dort auf Reflexionen antworten. Du entscheidest, was du teilst.",
+      link: "Discord öffnen",
     },
     community: {
-      title: "Die Gespräche gehen auf Discord weiter.",
-      text: "Finde einen Call-Buddy, hol dir Feedback zu einem Einwand oder verabrede den nächsten Fokusblock.",
+      title: "Zusätzlich kannst du auf Discord Feedback holen.",
+      text: "Frag nach Feedback zu einem Einwand, antworte auf Reflexionen oder such einen Call-Partner.",
       link: "Discord öffnen",
     },
   }[context];

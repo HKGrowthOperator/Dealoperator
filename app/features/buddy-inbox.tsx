@@ -44,7 +44,7 @@ export default function BuddyInbox({
     if (ok)
       toast.success(
         status === "accepted"
-          ? "Ihr seid verbunden. Stimmt euren ersten Call-Block ab."
+          ? "Ihr seid verbunden. Stimmt ab, wie ihr euch unterstützen wollt."
           : "Anfrage abgelehnt.",
       );
   }
@@ -60,7 +60,7 @@ export default function BuddyInbox({
             )}
           </h2>
           <p>
-            Anfragen beantworten und euren nächsten gemeinsamen Block planen.
+            Anfragen beantworten und abstimmen, wann ihr übt oder euch Feedback gebt.
           </p>
         </div>
         <MessageCircle size={25} />
@@ -185,8 +185,8 @@ export default function BuddyInbox({
             <div className="conversation-start">
               <MessageCircle size={23} />
               <p>
-                Ihr seid verbunden. Klärt Zeit, Kanal und euren Fokus für den
-                ersten Call-Block.
+                Ihr seid verbunden. Klärt Zeit, Kanal und Fokus, zum Beispiel für
+                ein Roleplay, Feedback oder einen zusätzlichen Block.
               </p>
             </div>
             {data.messages
@@ -248,7 +248,7 @@ export default function BuddyInbox({
               rows={2}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder="Wann passt dir ein gemeinsamer Call-Block?"
+              placeholder="Wann passt es dir für ein Roleplay oder kurzes Feedback?"
             />
             <button
               className="btn primary"

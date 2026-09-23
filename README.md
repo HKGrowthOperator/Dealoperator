@@ -1,6 +1,6 @@
 # Deal Operator
 
-Kostenfreie Sales-Community für aktive Caller. Tageszahlen festhalten, den eigenen Fortschritt sehen, vorbereitete Profile übernehmen und sich über Discord gegenseitig beim Dranbleiben unterstützen.
+Kostenfreies Werkzeug fürs gemeinsame Callen: Tageszahlen und Learnings festhalten, den eigenen Fortschritt sehen, vorbereitete Profile übernehmen und dranbleiben. Das Callen selbst findet in der bestehenden Runde statt; Deal Operator ergänzt es. Discord ist ein optionaler Zusatz für Antworten auf Reflexionen und die Suche nach Call-Partnern.
 
 **Für die Weiterarbeit:** [START-IN-CLAUDE.md](START-IN-CLAUDE.md). **Deployment:** [Coolify & Supabase](docs/DEPLOYMENT.md). **Discord:** [Integrationsvertrag](docs/DISCORD.md).
 
@@ -20,7 +20,7 @@ Vorschau: http://localhost:5173. Ohne Konfiguration bleibt die Anmeldung deaktiv
 - Öffentliche Rangliste: Zeitraum, Kennzahl, Suche, Profilfenster und gleiche Ränge bei gleichen Werten. Ausschließlich freigegebene Angaben, keine Kontaktfelder oder Reflexionen.
 - E-Mail-Anmeldung über Supabase Auth mit PKCE, bestätigter E-Mail und serverseitig erneuerter Sitzung. Abmeldung funktioniert unabhängig von der Datenbankverfügbarkeit.
 - Einstieg nach Bestätigung: vorbereitetes Profil übernehmen oder eigenes Profil anlegen. Zur E-Mail passende Importprofile werden angeboten; ein bewusster Neustart überschreibt sie nicht.
-- Eigene Zahlen, Reflexionen, persönliche Ziele, Crew-Profil, Buddy-Anfragen und Nachrichten, Sessions und Wissensaustausch benötigen ein bestätigtes Mitgliedskonto. `?modus=demo` ist eine eigenständige Vorschau ohne echte Konten.
+- Eigene Zahlen, Reflexionen, persönliche Ziele, sichtbares Profil, Buddy-Anfragen und Nachrichten, Sessions und Wissensaustausch benötigen ein bestätigtes Konto. `?modus=demo` ist eine eigenständige Vorschau ohne echte Konten.
 - Sieben getrennte KPIs, vier unabhängige Rangreihen, Korrekturen mit Revisionsprüfung und wiederholbare Speichervorgänge ohne Doppelzählung.
 - CSV-/JSON-Importvorschau, atomarer Betreiberimport und private Kontaktübersicht. Verwaltungsrechte stammen ausschließlich aus `OPERATOR_ADMIN_IDS`.
 - Profilübernahme über bestätigte passende E-Mail oder einen zufälligen, einmal verwendbaren Code. Codes werden gehasht gespeichert, sind sieben Tage gültig und werden bei Neuausstellung widerrufen.
@@ -43,16 +43,16 @@ Das Repository ist vorbereitet; **eine erfolgreiche echte Anmeldung ist erst nac
 
 ## Routen
 
-| Bereich                                 | Adresse                                                                                     |
-| --------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Einstieg / Ranking                      | `/`, `/ranking`                                                                             |
-| E-Mail-Anmeldung / Callback             | `/beitreten`, `/auth/callback`                                                              |
-| Profil einrichten / übernehmen          | `/start`, `/profil-uebernehmen`                                                             |
-| Mitgliederbereich                       | `/heute`, `/zahlen`, `/reflexion`, `/crew`, `/sessions`, `/wissen`, `/profil`, `/community` |
-| Verwaltung                              | `/verwaltung`                                                                               |
-| Prozessstatus / Verbindungsbereitschaft | `/api/health`, `/api/ready`                                                                 |
+| Bereich                                 | Adresse                                                                                               |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Einstieg / Ranking                      | `/`, `/ranking`                                                                                       |
+| E-Mail-Anmeldung / Callback             | `/beitreten`, `/auth/callback`                                                                        |
+| Profil einrichten / übernehmen          | `/start`, `/profil-uebernehmen`                                                                       |
+| Persönlicher Bereich                    | `/heute`, `/zahlen`, `/reflexion`, `/partner`, `/sessions`, `/wissen`, `/profil`, `/so-funktionierts` |
+| Verwaltung                              | `/verwaltung`                                                                                         |
+| Prozessstatus / Verbindungsbereitschaft | `/api/health`, `/api/ready`                                                                           |
 
-Mitglieder-Routen ohne `modus=demo` führen zur Anmeldung und anschließend in den eigenen Bereich. Kontaktinformationen sind weder im öffentlichen Ranking noch in der Website-Ausgabe der Startseite enthalten. Eine bestätigte E-Mail verifiziert die Kontrolle über diese Adresse, nicht die bürgerliche Identität; Telefonnummern sind freiwillig und nicht SMS-verifiziert.
+Frühere Adressen des persönlichen Bereichs leiten auf die neuen Pfade weiter. Routen des persönlichen Bereichs ohne `modus=demo` führen zur Anmeldung und anschließend in den eigenen Bereich. Kontaktinformationen sind weder im öffentlichen Ranking noch in der Website-Ausgabe der Startseite enthalten. Eine bestätigte E-Mail verifiziert die Kontrolle über diese Adresse, nicht die bürgerliche Identität; Telefonnummern sind freiwillig und nicht SMS-verifiziert.
 
 ## Prüfen
 

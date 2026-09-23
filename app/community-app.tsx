@@ -356,7 +356,7 @@ export default function CommunityApp({
   const [filter, setFilter] = useState("Alle");
   const [sessionFilter, setSessionFilter] = useState("Alle");
   const [message, setMessage] = useState(
-    "Hey, ich würde gern gemeinsam mit dir callen. Passt dir ein Call-Block diese Woche?",
+    "Hey, hast du Lust, zusammen zu üben oder einen Extra-Block zu machen? Passt dir diese Woche ein Termin?",
   );
   const [newSession, setNewSession] = useState({
     title: "",
@@ -711,7 +711,7 @@ export default function CommunityApp({
         new Date(s.startsAt || `${s.date}T${s.time}`) > new Date(),
     )
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
-  const name = data.profile.name.split(" ")[0] || "Operator";
+  const name = data.profile.name.split(" ")[0] || "";
   function downloadCalendar(s: Session) {
     const start = new Date(s.startsAt || `${s.date}T${s.time}`);
     const end = new Date(start.getTime() + s.minutes * 60000);
@@ -899,7 +899,7 @@ export default function CommunityApp({
             rows={3}
             value={profile.bio}
             onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-            placeholder="Zum Beispiel: einen festen Buddy für Dienstag und Donnerstag …"
+            placeholder="Zum Beispiel: einen festen Call-Partner für Dienstag und Donnerstag …"
           />
         </label>
         <div className="form-grid">
@@ -1001,9 +1001,7 @@ export default function CommunityApp({
             </SidebarMenu>
           </SidebarGroup>
           <SidebarGroup>
-            <SidebarGroupLabel>
-              MITEINANDER <span className="free-mini">KOSTENFREI</span>
-            </SidebarGroupLabel>
+            <SidebarGroupLabel>AUSTAUSCH</SidebarGroupLabel>
             <SidebarMenu>
               {(["partner", "sessions", "wissen"] as View[]).map(nav)}
             </SidebarMenu>
@@ -1013,11 +1011,7 @@ export default function CommunityApp({
               <Heart size={15} />
             </span>
             <strong>Hier zählt, dass du dranbleibst.</strong>
-            <p>
-              Gute Tage. Zähe Tage.
-              <br />
-              Gemeinsam weiter.
-            </p>
+            <p>Dranbleiben, auch an zähen Tagen.</p>
             <Link href={href("so-funktionierts")}>So funktioniert’s</Link>
           </div>
         </SidebarContent>
@@ -1025,9 +1019,9 @@ export default function CommunityApp({
           <Link href={href("profil")} className="profile-nav">
             <Avatar name={name} color="green" small />
             <span>
-              <strong>{name}</strong>
+              <strong>{name || "Dein Profil"}</strong>
               <small>
-                {demo ? "Beispielprofil" : "Dein kostenfreier Bereich"}
+                {demo ? "Beispielprofil" : "Dein persönlicher Bereich"}
               </small>
             </span>
             <Settings2 size={17} />
@@ -1043,10 +1037,6 @@ export default function CommunityApp({
             </span>
           </div>
           <div className="topbar-right">
-            <span className="free-status">
-              <span />
-              Kostenfrei nutzbar
-            </span>
             <button
               className="icon-button"
               onClick={() => setModal("about")}
@@ -1072,17 +1062,17 @@ export default function CommunityApp({
         </div>
         <main className="main-content">
           <div className="signup-inline">
-            <p>Gemeinsam wird Dranbleiben sichtbar.</p>
+            <p>Dein Fortschritt wird sichtbar.</p>
             <Link href="/ranking">Ranking ansehen</Link>
           </div>
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
               title="Dein Fortschritt beginnt hier."
-              text="Melde dich an und starte mit deinen eigenen Zahlen. Die Funktionen hier sind kostenfrei."
+              text="Melde dich an und starte mit deinen eigenen Zahlen."
             >
               <button className="btn primary" onClick={own}>
-                Kostenfrei anmelden
+                Anmelden
               </button>
             </Empty>
           ) : loading ? (
@@ -1109,11 +1099,11 @@ export default function CommunityApp({
                         DEIN TAG. DEINE ZAHLEN. DEIN FORTSCHRITT.
                       </p>
                       <h1>
-                        Nicht allein am Hörer<span className="lime-dot">.</span>
+                        Dein Tag im Blick<span className="lime-dot">.</span>
                       </h1>
                       <p>
-                        Hey {name}, schön, dass du da bist. Lass uns heute
-                        dranbleiben.
+                        Hey{name ? ` ${name}` : ""}, schön, dass du da bist.
+                        Lass uns heute dranbleiben.
                       </p>
                     </div>
                   </div>
@@ -1198,7 +1188,7 @@ export default function CommunityApp({
                     </section>
                     <section className="session-spotlight">
                       <div className="spotlight-top">
-                        <Tag tone="dark">DEIN NÄCHSTER CALL-BLOCK</Tag>
+                        <Tag tone="dark">DEIN NÄCHSTER TERMIN</Tag>
                         <Headphones size={23} />
                       </div>
                       <div className="spotlight-art">
@@ -1211,12 +1201,12 @@ export default function CommunityApp({
                       <h2>
                         {nextSession
                           ? nextSession.title
-                          : "Zusammen fällt der erste Call leichter."}
+                          : "Noch kein zusätzlicher Termin geplant."}
                       </h2>
                       <p>
                         {nextSession
                           ? `${sessionDay(nextSession.date)}, ${nextSession.time} Uhr · ${nextSession.minutes} Minuten`
-                          : "Leg einen gemeinsamen Call-Block an und lade andere Caller ein."}
+                          : "Wenn du mit einem Call-Partner üben oder einen Extra-Block machen willst, kannst du ihn hier anlegen."}
                       </p>
                       {nextSession && (
                         <div className="session-people">
@@ -1244,9 +1234,9 @@ export default function CommunityApp({
                             : openNewSession()
                         }
                       >
-                        {nextSession ? "Session ansehen" : "Call-Block anlegen"}
+                        {nextSession ? "Session ansehen" : "Termin anlegen"}
                       </button>
-                      <small>Kostenfrei. Gemeinsam. Verbindlich.</small>
+                      <small>Zusage jederzeit änderbar.</small>
                     </section>
                   </div>
                   <div className="dashboard-bottom">
@@ -1304,7 +1294,9 @@ export default function CommunityApp({
                         <span className="step-number">3</span>
                         <div>
                           <strong>Hol dir Rückenwind von anderen Callern</strong>
-                          <p>Ein Learning teilen oder einen Buddy finden</p>
+                          <p>
+                            Ein Learning teilen oder einen Call-Partner finden
+                          </p>
                         </div>
                         <Link
                           className="icon-button"
@@ -1315,7 +1307,7 @@ export default function CommunityApp({
                     </section>
                     <section className="card buddy-teaser">
                       <div className="card-heading">
-                        <h2>Finde deinen Call-Buddy.</h2>
+                        <h2>Finde einen Call-Partner.</h2>
                         <Users size={21} />
                       </div>
                       <p>
@@ -1342,10 +1334,6 @@ export default function CommunityApp({
                       <Link className="text-link" href={href("partner")}>
                         Call-Partner finden
                       </Link>
-                      <span className="free-line">
-                        <Check size={14} />
-                        Buddy-Suche ist immer kostenfrei.
-                      </span>
                     </section>
                   </div>
                 </>
@@ -1553,7 +1541,6 @@ export default function CommunityApp({
                     <section className="card padded">
                       <div className="card-heading">
                         <h2>Dein Tagesabschluss</h2>
-                        <Tag tone="green">Kostenfrei</Tag>
                       </div>
                       {reflectionForm()}
                     </section>
@@ -1608,9 +1595,9 @@ export default function CommunityApp({
               {initialView === "partner" && (
                 <>
                   <PageHeading
-                    eyebrow="GEMEINSAM IST ES EINFACHER."
-                    title="Call-Partner mit ähnlichem Rhythmus."
-                    text="Finde Menschen, die deinen Alltag verstehen und mit dir am Hörer bleiben."
+                    eyebrow="CALL-PARTNER"
+                    title="Finde Call-Partner mit ähnlichem Rhythmus."
+                    text="Zum Üben, für ehrliches Feedback oder einen zusätzlichen Block, ergänzend zum gemeinsamen Callen."
                   >
                     <button
                       className="btn secondary"
@@ -1620,7 +1607,7 @@ export default function CommunityApp({
                       }}
                     >
                       <Plus size={17} />
-                      Mein Buddy-Profil
+                      Mein Profil
                     </button>
                   </PageHeading>
                   <DiscordNudge context="buddy" url={discordUrl} />
@@ -1660,7 +1647,7 @@ export default function CommunityApp({
                         <article className="card member-card" key={m.id}>
                           <div className="member-top">
                             <Avatar name={m.name} color={m.color} />
-                            <Tag tone="green">Buddy gesucht</Tag>
+                            <Tag tone="green">Sucht Call-Partner</Tag>
                           </div>
                           <h2>{m.name}</h2>
                           <span className="member-role">{m.role}</span>
@@ -1731,13 +1718,13 @@ export default function CommunityApp({
               {initialView === "sessions" && (
                 <>
                   <PageHeading
-                    eyebrow="AUS VORSÄTZEN WERDEN TERMINE."
-                    title="Zusammen an den Hörer."
-                    text="Feste Call-Blöcke, ehrliches Roleplay und Platz für deinen Wochenrückblick."
+                    eyebrow="ZUSÄTZLICH MIT CALL-PARTNERN"
+                    title="Übungstermine & Call-Blöcke."
+                    text="Roleplay, Feedback oder ein zusätzlicher Block mit deinen Call-Partnern, ergänzend zum gemeinsamen Callen."
                   >
                     <button className="btn primary" onClick={openNewSession}>
                       <Plus size={18} />
-                      Session anbieten
+                      Session anlegen
                     </button>
                   </PageHeading>
                   <Tabs value={sessionFilter} onValueChange={setSessionFilter}>
@@ -1823,8 +1810,8 @@ export default function CommunityApp({
                   {!data.sessions.filter((s) => matchesSession(s)).length && (
                     <Empty
                       icon={CalendarDays}
-                      title="Platz für deinen nächsten Call-Block."
-                      text="Biete eine Session mit Datum, Uhrzeit und einem optionalen Raum-Link an."
+                      title="Noch keine zusätzlichen Termine."
+                      text="Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an, mit Datum, Uhrzeit und optionalem Raum-Link."
                     >
                       <button className="btn primary" onClick={openNewSession}>
                         Erste Session anlegen
@@ -1836,7 +1823,7 @@ export default function CommunityApp({
                       <Headphones size={23} />
                       <h3>Call-Block</h3>
                       <p>
-                        Kurz einchecken. Gemeinsam fokussieren. Jeder führt
+                        Mit Call-Partnern kurz einchecken. Danach führt jeder
                         seine eigenen Calls.
                       </p>
                     </div>
@@ -1987,7 +1974,7 @@ export default function CommunityApp({
                       <section className="feedback-banner">
                         <div>
                           <Tag tone="green">AUS DER PRAXIS.</Tag>
-                          <h2>Du musst nicht alles allein herausfinden.</h2>
+                          <h2>Feedback zu deinem Einstieg holen.</h2>
                           <p>
                             Bring deinen echten Gesprächseinstieg ins nächste
                             Roleplay.
@@ -2011,7 +1998,7 @@ export default function CommunityApp({
                   <PageHeading
                     eyebrow="DEIN RHYTHMUS. DEINE ENTSCHEIDUNG."
                     title="So passt Deal Operator zu dir."
-                    text="Ein klares Profil hilft dir, passende Call-Buddys und realistische Ziele zu finden."
+                    text="Ein klares Profil hilft dir, passende Call-Partner und realistische Ziele zu finden."
                   />
                   <div className="two-columns">
                     <section className="card padded">{profileForm()}</section>
@@ -2028,7 +2015,6 @@ export default function CommunityApp({
                           Du kannst dein sichtbares Profil jederzeit ausblenden.
                           Dein privater Fortschritt bleibt erhalten.
                         </p>
-                        <Tag tone="green">Alle Funktionen hier kostenfrei</Tag>
                       </section>
                       <section className="card padded requests">
                         <h3>Deine Buddy-Anfragen</h3>
@@ -2108,14 +2094,14 @@ export default function CommunityApp({
                   <PageHeading
                     eyebrow="FÜR ALLE, DIE REGELMÄSSIG CALLEN."
                     title="Gemeinsam dranbleiben."
-                    text="Deal Operator begleitet das gemeinsame Callen. Hier zählen Aktivität, ehrlicher Austausch und gegenseitiger Rückenwind."
+                    text="Deal Operator begleitet das gemeinsame Callen: Zahlen festhalten, kurz reflektieren, dranbleiben."
                   />
                   <div className="community-manifest">
                     <span className="manifest-number">01—06</span>
                     <h2>
-                      Alle sechs Bereiche sind kostenfrei.
+                      Sechs Bereiche.
                       <br />
-                      Der Einsatz kommt von dir.
+                      Nutze, was dir hilft.
                     </h2>
                     <p>
                       Ziele setzen, callen, reflektieren und einander helfen.
@@ -2134,65 +2120,61 @@ export default function CommunityApp({
                         "Teile Learnings und deinen nächsten Schritt.",
                       ],
                       [
-                        "Call-Partner & Buddy-Suche",
-                        "Finde Menschen mit ähnlichem Rhythmus.",
+                        "Call-Partner",
+                        "Finde Call-Partner mit ähnlichem Rhythmus.",
                       ],
                       [
-                        "Call-Blöcke & Roleplay",
-                        "Arbeite gemeinsam und übe in einem sicheren Rahmen.",
+                        "Sessions & Roleplay",
+                        "Übungstermine und zusätzliche Blöcke mit deinen Call-Partnern.",
                       ],
                       [
                         "Wissen & Feedback",
                         "Tausche Erfahrungen, Fragen und konkrete Tipps aus.",
                       ],
                       [
-                        "Austausch & Commitment",
-                        "Lies die Reflexionen der anderen und antworte auf Discord.",
+                        "Austausch",
+                        "Lies die Reflexionen der anderen. Antworten kannst du zusätzlich auf Discord.",
                       ],
                     ].map(([title, text], i) => (
                       <div className="card padded" key={title}>
                         <span className="principle-index">0{i + 1}</span>
                         <h3>{title}</h3>
                         <p>{text}</p>
-                        <Tag tone="green">Kostenfrei</Tag>
                       </div>
                     ))}
                   </div>
                   <section className="card padded">
-                    <h2>Worauf es ankommt</h2>
+                    <h2>Gut zu wissen</h2>
                     <div className="rules">
                       <p>
                         <Check />
-                        Reiche an deinen Calling-Tagen einen ehrlichen
-                        Tagesabschluss ein. Wochenenden sind freiwillig.
+                        An deinen Calling-Tagen zählt ein Tagesabschluss für
+                        deine Serie. Wochenenden sind freiwillig.
                       </p>
                       <p>
                         <Check />
-                        Urlaub, Krankheit und Pausen sind okay. Beantrage sie im
-                        Tagesabschluss, dann zählen die Tage nicht als Pflicht.
+                        Urlaub, Krankheit und Pausen sind okay. Melde eine Pause
+                        im Tagesabschluss, dann zählen die Tage nicht für deine
+                        Serie. Das Team bestätigt sie kurz.
                       </p>
                       <p>
                         <Check />
-                        Hilf konkret, respektiere ein Nein und teile keine
-                        vertraulichen Kundendaten.
+                        Konkrete Tipps helfen am meisten. Ein Nein ist okay,
+                        vertrauliche Kundendaten bleiben draußen.
                       </p>
                       <p>
                         <Check />
-                        Fehlen drei Abschlüsse, meldet sich das Team persönlich.
-                        Niemand wird automatisch ausgeschlossen.
+                        Fehlen einmal drei Abschlüsse, fragt das Team kurz nach,
+                        ob alles passt. Nachtragen oder pausieren geht jederzeit.
                       </p>
                     </div>
-                    <p className="hint">
-                      Die endgültigen Aktivitätsregeln und Einladungen legt die
-                      jeweilige Gruppe gemeinsam mit ihren Admins fest.
-                    </p>
                   </section>
                   <section className="channels" id="discord">
-                    <h2>Ein Ort für Zahlen. Ein Ort für Gespräche.</h2>
+                    <h2>Zahlen hier, Austausch wie du magst.</h2>
                     <p>
                       Auf der Website stehen deine Zahlen und Reflexionen. Auf
-                      Discord antwortest du, findest Buddys und verabredest
-                      Call-Blöcke.
+                      Discord kannst du zusätzlich auf Reflexionen antworten
+                      oder einen Call-Partner suchen.
                     </p>
                     <div className="channel-grid">
                       <div className="card padded">
@@ -2211,8 +2193,8 @@ export default function CommunityApp({
                         <MessageCircle size={25} />
                         <h3>Discord</h3>
                         <p>
-                          Verabrede einen Fokusblock, übe einen Einwand oder
-                          bring dein Learning mit in die Runde.
+                          Antworte auf Reflexionen, übe einen Einwand oder
+                          teile dein Learning mit den anderen Callern.
                         </p>
                         <a
                           className="text-link"
@@ -2257,15 +2239,15 @@ export default function CommunityApp({
                       : modal === "create-session"
                         ? editSessionId
                           ? "Deine Session bearbeiten"
-                          : "Neue Session anbieten"
+                          : "Neue Session anlegen"
                         : modal === "buddy"
-                          ? "Gemeinsam starten"
+                          ? "Call-Partner anfragen"
                           : "Hier zählt, dass du dranbleibst."}
             </DialogTitle>
             <DialogDescription>
               {demo
                 ? "Du bist in der Vorschau. Personen, Termine und Einträge sind Beispiele."
-                : "Kostenfreier Bereich. Du bestimmst, was du teilst."}
+                : "Dein Bereich. Du bestimmst, was du teilst."}
             </DialogDescription>
           </DialogHeader>
           {modal === "metrics" ? (
@@ -2363,7 +2345,7 @@ export default function CommunityApp({
                   onChange={(e) =>
                     setNewSession({ ...newSession, title: e.target.value })
                   }
-                  placeholder="Zum Beispiel: Gemeinsam in den Dienstag"
+                  placeholder="Zum Beispiel: Extra-Block am Dienstag"
                 />
               </label>
               <label>
@@ -2531,8 +2513,8 @@ export default function CommunityApp({
           ) : (
             <div className="form-stack">
               <p>
-                Sechs kostenfreie Bereiche helfen dir, aktiv zu bleiben:
-                Zahlen, Reflexion, Buddys, Sessions, Wissen und Austausch.
+                Sechs Bereiche für Zahlen, Reflexion, Call-Partner, Sessions,
+                Wissen und Austausch. Nutze, was dir hilft.
               </p>
               <Link
                 className="btn primary"
@@ -2551,7 +2533,7 @@ export default function CommunityApp({
       >
         <SheetContent className="member-sheet">
           <SheetHeader>
-            <SheetTitle>Dein nächster Call-Buddy?</SheetTitle>
+            <SheetTitle>Dein nächster Call-Partner?</SheetTitle>
             <SheetDescription>
               {demo
                 ? "Fiktives Beispielprofil"
@@ -2626,7 +2608,7 @@ export default function CommunityApp({
             <DialogDescription>
               {demo
                 ? "Fiktiver Beispieltermin · keine echte Veranstaltung"
-                : `Eine kostenfreie Session mit ${session?.host}`}
+                : `Eine Session mit ${session?.host}`}
             </DialogDescription>
           </DialogHeader>
           {session && (
@@ -2650,7 +2632,7 @@ export default function CommunityApp({
                 {session.kind === "Call-Block"
                   ? "Zum Start ein kurzer Check-in. Danach arbeitet jeder fokussiert an den eigenen Calls, zum Schluss teilt jeder ein Learning."
                   : session.kind === "Roleplay"
-                    ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Geübt wird in kleinen Runden, mit konkretem und respektvollem Feedback."
+                    ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Geübt wird im kleinen Kreis, mit konkretem und respektvollem Feedback."
                     : "Was lief gut? Was war schwer? Teile einen Gedanken und nimm einen konkreten nächsten Schritt mit."}
               </p>
               <button
@@ -2779,7 +2761,7 @@ export default function CommunityApp({
                 <p className="hint">
                   {demo
                     ? "Der Demo-Termin hat keinen echten Raum-Link."
-                    : "Noch kein Raum-Link hinterlegt. Stimmt den Treffpunkt in eurer Gruppe ab."}
+                    : "Noch kein Raum-Link hinterlegt. Stimmt den Treffpunkt direkt miteinander ab."}
                 </p>
               )}
             </div>
@@ -2808,7 +2790,7 @@ export default function CommunityApp({
             href={href("sessions")}
             onClick={() => setResource(null)}
           >
-            Gemeinsam ausprobieren
+            Mit Call-Partnern üben
           </Link>
         </DialogContent>
       </Dialog>

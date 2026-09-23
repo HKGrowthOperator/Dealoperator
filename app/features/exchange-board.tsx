@@ -139,7 +139,7 @@ export default function ExchangeBoard({
           <p>
             {data.posts.length
               ? "Ändere den Filter oder deinen Suchbegriff."
-              : "Teile die erste Frage oder eine Erfahrung aus deinem heutigen Call-Block."}
+              : "Teile die erste Frage oder eine Erfahrung aus deinen heutigen Calls."}
           </p>
           <button
             className="btn secondary"

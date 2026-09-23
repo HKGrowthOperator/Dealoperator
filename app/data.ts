@@ -126,7 +126,7 @@ export const demoMembers: Member[] = [
     role: "Recruiting & Vertrieb",
     niche: "Handwerk",
     time: "Vormittags",
-    bio: "Suche einen festen Call-Buddy für zwei Fokusblöcke pro Woche. Tausche mich gern über Gesprächseinstiege aus.",
+    bio: "Suche einen festen Call-Partner zum Üben, gern zweimal pro Woche. Tausche mich gern über Gesprächseinstiege aus.",
     goal: 250,
     days: [1, 2, 3, 4, 5],
     listed: true,
@@ -139,7 +139,7 @@ export const demoMembers: Member[] = [
     role: "Webdesign & Akquise",
     niche: "Lokale Unternehmen",
     time: "Nachmittags",
-    bio: "Gute Websites brauchen gute Gespräche. Lust auf ehrliches Feedback und gemeinsame Call-Blöcke?",
+    bio: "Gute Websites brauchen gute Gespräche. Lust auf ehrliches Feedback und einen Extra-Block zu zweit?",
     goal: 150,
     days: [1, 3, 5],
     listed: true,
@@ -217,7 +217,7 @@ export function demoData(): AppData {
     sessions: [
       {
         id: "demo-s1",
-        title: "Gemeinsam an den Hörer",
+        title: "Extra-Block am Vormittag",
         kind: "Call-Block",
         date: offset(1),
         time: "09:00",
@@ -245,7 +245,7 @@ export function demoData(): AppData {
       },
       {
         id: "demo-s3",
-        title: "Dein erster gemeinsamer Call-Block",
+        title: "Extra-Block zum Einstieg",
         kind: "Call-Block",
         date: offset(2),
         time: "10:00",
@@ -259,7 +259,7 @@ export function demoData(): AppData {
       },
       {
         id: "demo-s4",
-        title: "Gemeinsamer Wochenrückblick",
+        title: "Kurzer Wochenrückblick",
         kind: "Reflexion",
         date: offset(3),
         time: "17:30",
@@ -301,7 +301,7 @@ export const resources = [
       "Sag kurz, wer du bist und weshalb du anrufst. Ein verständlicher Anlass hilft mehr als eine lange Vorstellung.",
       "Beispiel: „Hallo, hier ist Alex von [Firma]. Ich melde mich, weil wir [konkretes Thema] lösen. Ist gerade ein kurzer Moment, um zu schauen, ob das für Sie überhaupt relevant ist?“",
       "Stelle anschließend eine offene Frage zur aktuellen Situation. Höre zu, bevor du eine Lösung anbietest. Wenn es nicht passt, akzeptiere das und beende das Gespräch freundlich.",
-      "Deine Übung: Schreibe einen Einstieg in zwei Sätzen. Probiere ihn im Roleplay und bitte deinen Buddy, dir den verstandenen Anlass in eigenen Worten zu erklären.",
+      "Deine Übung: Schreibe einen Einstieg in zwei Sätzen. Probiere ihn im Roleplay und bitte deinen Call-Partner, dir den verstandenen Anlass in eigenen Worten zu erklären.",
     ],
   },
   {

@@ -131,7 +131,7 @@ export default function ImportConsole({
         value: { rows, key, expected: preview },
       });
       setSuccess(
-        `${d.count} Tagesmeldungen gespeichert. Freigegebene Zahlen erscheinen im Community-Ranking.`,
+        `${d.count} Tagesmeldungen gespeichert. Freigegebene Zahlen erscheinen im Ranking.`,
       );
       setRows([]);
       setPreview([]);
@@ -156,11 +156,20 @@ export default function ImportConsole({
   return (
     <main className="admin-layout">
       <span className="section-kicker">DEAL OPERATOR · VERWALTUNG</span>
-      <h1>Aus ersten Zahlen wird Fortschritt.</h1>
-      <p>
-        Teilnehmer vorbereiten, Tagesstände prüfen und später sicher an ihre
-        Konten übergeben.
-      </p>
+      {admin ? (
+        <>
+          <h1>Aus ersten Zahlen wird Fortschritt.</h1>
+          <p>
+            Teilnehmer vorbereiten, Tagesstände prüfen und später sicher an
+            ihre Konten übergeben.
+          </p>
+        </>
+      ) : (
+        <>
+          <h1>Bereich für das Deal-Operator-Team.</h1>
+          <p>Hier werden gemeldete Tagesstände geprüft.</p>
+        </>
+      )}
       {!admin && (
         <div className="notice">
           <strong>Import-Vorschau</strong>

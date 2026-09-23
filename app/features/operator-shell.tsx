@@ -45,8 +45,11 @@ export function OperatorHeader({
 }
 export function OperatorFooter({
   discordUrl = DISCORD_INVITE,
+  showAdmin = false,
 }: {
   discordUrl?: string;
+  /** Link zur Verwaltung; standardmäßig aus, nur für das Team gedacht. */
+  showAdmin?: boolean;
 }) {
   return (
     <footer className="operator-footer op-shell-footer">
@@ -57,7 +60,7 @@ export function OperatorFooter({
       >
         <OperatorWordmark />
       </Link>
-      <p>Zusammen callen. Gemeinsam dranbleiben. Kostenfrei.</p>
+      <p>Zusammen callen. Gemeinsam dranbleiben.</p>
       <div>
         <Link href="/tagesabschluss">Tagesabschluss</Link>
         <Link href="/ranking">Ergebnisse</Link>
@@ -66,7 +69,7 @@ export function OperatorFooter({
           Discord
         </a>
         <Link href="/#so-funktionierts">So funktioniert’s</Link>
-        <Link href="/verwaltung">Verwaltung</Link>
+        {showAdmin && <Link href="/verwaltung">Verwaltung</Link>}
         <Link href="/impressum">Impressum</Link>
         <Link href="/datenschutz">Datenschutz</Link>
       </div>

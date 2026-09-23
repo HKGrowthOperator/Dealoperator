@@ -220,7 +220,7 @@ export default function OnboardingStart({
               }}
             >
               <Search size={20} />
-              <strong>Meine Zahlen sind schon dabei</strong>
+              <strong>Meine Zahlen sind schon auf der Seite</strong>
               <small>
                 Finde dein vorbereitetes Profil und mach mit deinem bisherigen
                 Stand weiter.
@@ -241,7 +241,7 @@ export default function OnboardingStart({
         <>
           <div className="form-stack">
             <label>
-              Dein Name im Ranking
+              Dein Name
               <input
                 autoFocus
                 value={query}
@@ -439,7 +439,7 @@ export default function OnboardingStart({
           </button>
           <small>
             Kein Passwort nötig. Durch die Anmeldung abonnierst du keine
-            Werbung. Alles bleibt kostenfrei.
+            Werbung.
           </small>
           <button
             type="button"

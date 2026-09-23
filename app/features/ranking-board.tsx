@@ -148,9 +148,8 @@ function placeCommitment(rows: CommitmentRow[]) {
 const steps = [
   {
     icon: Headphones,
-    title: "Zusammen callen",
-    text: "Verabrede Call-Blöcke mit anderen oder such dir einen Buddy. Zu zweit fällt der nächste Anruf leichter.",
-    discord: "Auf Discord verabreden",
+    title: "Beim Callen dranbleiben",
+    text: "Du callst mit den anderen? Hier hältst du fest, was dabei rauskommt, und siehst, wie du vorankommst.",
   },
   {
     icon: ClipboardCheck,
@@ -170,7 +169,7 @@ const steps = [
   {
     icon: HeartHandshake,
     title: "Sich gegenseitig stützen",
-    text: "Lies die Learnings der anderen und antworte auf Discord. Dort besprecht ihr auch, was heute nicht lief.",
+    text: "Lies die Learnings der anderen. Antworten kannst du zusätzlich auf Discord.",
     reflections: true,
     discord: "Discord öffnen",
   },
@@ -432,7 +431,7 @@ export default function RankingBoard({
           <section className="rr-intro rr-hero" aria-labelledby="rr-title">
             <div className="rr-intro-copy">
               <span className="rr-eyebrow">
-                <span className="rr-live-dot" /> KOSTENFREI FÜRS GEMEINSAME CALLEN
+                <span className="rr-live-dot" /> FÜRS GEMEINSAME CALLEN
               </span>
               <h1 id="rr-title">
                 Zusammen callen.
@@ -482,7 +481,7 @@ export default function RankingBoard({
                           {"reflections" in step && (
                             <Link href="/reflexionen">Reflexionen lesen</Link>
                           )}
-                          {"discord" in step && (
+                          {"discord" in step && typeof step.discord === "string" && (
                             <a
                               href={discord}
                               target="_blank"
@@ -755,7 +754,7 @@ export default function RankingBoard({
                     </span>
                     <h2>
                       {commitmentView
-                        ? "Wer bleibt dran?"
+                        ? "Serien"
                         : monthly
                           ? "Monatsranking"
                           : event
@@ -1135,9 +1134,9 @@ export default function RankingBoard({
                       {commitmentView ? (
                         <>
                           <span>
-                            Serien zählen fristgerecht eingereichte
-                            Tagesabschlüsse an Pflicht-Tagen. Wochenenden sind
-                            keine Pflicht-Tage. Die Calling-Serie wächst nur
+                            Serien zählen rechtzeitig eingereichte
+                            Tagesabschlüsse an Calling-Tagen. Wochenenden sind
+                            keine Calling-Tage. Die Calling-Serie wächst nur
                             mit Anwahlen, die Reflexions-Serie auch an Tagen
                             ohne Anwahlen.
                           </span>
@@ -1209,11 +1208,12 @@ export default function RankingBoard({
                         <span className="rr-eyebrow">
                           <MessagesSquare size={14} /> AUSTAUSCH
                         </span>
-                        <h3>Learnings teilen, Buddy finden.</h3>
+                        <h3>Learnings teilen, Call-Partner finden.</h3>
                         <p>
-                          Wer angemeldet ist, liest unter Reflexionen, was
-                          bei anderen funktioniert hat. Antworten, Buddy-Suche
-                          und gemeinsame Call-Blöcke laufen auf Discord.
+                          Mit eigenem Profil liest du unter Reflexionen, was
+                          bei anderen funktioniert hat. Antworten und die Suche
+                          nach einem Call-Partner sind zusätzlich auf Discord
+                          möglich.
                         </p>
                         <div className="rr-exchange-links">
                           <Link href="/reflexionen">Reflexionen lesen</Link>

@@ -57,7 +57,7 @@ export function RulesPanel({
   const days = form.callingWeekdays.toSorted((a, b) => a - b);
   const warningMinutes = form.streakWarning.hour * 60 + form.streakWarning.minute;
   const localProblem = !days.length
-    ? "Wähle mindestens einen Pflicht-Tag."
+    ? "Wähle mindestens einen Calling-Tag."
     : warningMinutes >= form.deadlineHour * 60
       ? "Die Serien-Warnung muss vor der Frist liegen."
       : "";
@@ -115,7 +115,7 @@ export function RulesPanel({
       </div>
 
       <fieldset className="adm-fieldset">
-        <legend>Pflicht-Tage</legend>
+        <legend>Calling-Tage</legend>
         <p className="adm-hint">
           An diesen Wochentagen wird ein Tagesabschluss erwartet. Andere Tage
           sind frei: keine Erinnerung, kein Serienverlust. Ein freiwilliger
@@ -138,7 +138,7 @@ export function RulesPanel({
 
       <div className="adm-grid">
         <label className="adm-field">
-          <span>Frist am nächsten Pflicht-Tag</span>
+          <span>Frist am nächsten Calling-Tag</span>
           <select
             value={form.deadlineHour}
             onChange={(e) => update({ deadlineHour: Number(e.target.value) })}
@@ -165,7 +165,7 @@ export function RulesPanel({
             }}
           />
           <small>
-            Push am Pflicht-Tag, wenn der eigene Abschluss noch fehlt. Nie am
+            Push am Calling-Tag, wenn der eigene Abschluss noch fehlt. Nie am
             Wochenende, in der Ruhezeit, während einer Pause oder nach dem
             Einreichen.
           </small>
@@ -181,7 +181,7 @@ export function RulesPanel({
             }}
           />
           <small>
-            Am nächsten Pflicht-Tag vor der Frist, nur wenn eine laufende Serie
+            Am nächsten Calling-Tag vor der Frist, nur wenn eine laufende Serie
             wirklich in Gefahr ist. Muss vor der Frist liegen.
           </small>
         </label>
@@ -203,7 +203,7 @@ export function RulesPanel({
             }
           />
           <small>
-            Mehr als so viele abgelaufene Pflicht-Tage in Folge ohne Anwahlen
+            Mehr als so viele abgelaufene Calling-Tage in Folge ohne Anwahlen
             führen zum Status „inaktiv“. Nur sichtbar für die Person und das
             Team.
           </small>
@@ -255,7 +255,7 @@ export function RulesPanel({
         <strong>So wirkt es gerade</strong>
         <ul>
           <li>
-            Pflicht-Tage:{" "}
+            Calling-Tage:{" "}
             {days.length
               ? days.map((d) => weekdayName(d)).join(", ")
               : "keine ausgewählt"}
@@ -265,7 +265,7 @@ export function RulesPanel({
           </li>
           {example && (
             <li>
-              Frist: {two(form.deadlineHour)}:00 Uhr am nächsten Pflicht-Tag.{" "}
+              Frist: {two(form.deadlineHour)}:00 Uhr am nächsten Calling-Tag.{" "}
               {example}
             </li>
           )}
@@ -275,7 +275,7 @@ export function RulesPanel({
             Gerätezustimmung.
           </li>
           <li>
-            Inaktiv nach mehr als {form.inactivityAfterDays} Pflicht-Tagen ohne
+            Inaktiv nach mehr als {form.inactivityAfterDays} Calling-Tagen ohne
             Anwahlen. Teamprüfung ab {form.reviewAfterMissing} offenen fehlenden
             Abschlüssen.
           </li>

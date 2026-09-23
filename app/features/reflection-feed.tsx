@@ -135,7 +135,7 @@ function Card({ card }: { card: ReflectionCard }) {
         {card.reply.kind === "invite" && (
           <small>
             Zu diesem Abschluss gibt es noch keinen Discord-Beitrag. Über den Einladungslink kommst
-            du in den Austausch.
+            du auf den Discord-Server und kannst dort antworten.
           </small>
         )}
       </footer>

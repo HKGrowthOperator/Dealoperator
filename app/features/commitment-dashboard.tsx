@@ -35,14 +35,14 @@ import "../commitment.css";
  */
 
 const STATUS: Record<DayStatus, { label: string; legend: string }> = {
-  called: { label: "Calling-Tag", legend: "Fristgerecht mit Anwahlen" },
-  reflected: { label: "Reflektiert", legend: "Fristgerecht, ohne Anwahlen" },
+  called: { label: "Gecallt", legend: "Rechtzeitig mit Anwahlen" },
+  reflected: { label: "Reflektiert", legend: "Rechtzeitig, ohne Anwahlen" },
   late: { label: "Verspätet", legend: "Nach der Frist: Zahlen zählen, Serie nicht" },
   missed: { label: "Fehlt", legend: "Frist vorbei, kein Abschluss" },
   open: { label: "Offen", legend: "Frist läuft noch" },
   bonus: { label: "Bonus", legend: "Freiwillig am freien Tag" },
-  free: { label: "Frei", legend: "Kein Pflicht-Tag" },
-  paused: { label: "Pause", legend: "Genehmigte Pause" },
+  free: { label: "Frei", legend: "Kein Calling-Tag" },
+  paused: { label: "Pause", legend: "Bestätigte Pause" },
   "before-start": { label: "Vor dem Start", legend: "Vor deinem Start" },
   future: { label: "Noch nicht", legend: "Liegt in der Zukunft" },
 };
@@ -58,9 +58,9 @@ const LEGEND: DayStatus[] = [
 ];
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const PAUSE_LABEL: Record<PauseEntry["status"], string> = {
-  requested: "Beantragt",
-  approved: "Genehmigt",
-  rejected: "Nicht genehmigt",
+  requested: "Gemeldet",
+  approved: "Bestätigt",
+  rejected: "Nicht bestätigt",
 };
 
 function shiftMonth(month: string, n: number) {
@@ -110,7 +110,7 @@ export function StreakStrip() {
     : !state.eligibility.participant
       ? "Für deinen Tagesabschluss fehlt noch ein persönliches Profil."
       : risk
-        ? `Offen: ${formatShortDay(risk.day)}, fristgerecht bis ${formatMoment(risk.deadline, state.settings.timeZone)}.`
+        ? `Offen: ${formatShortDay(risk.day)}, rechtzeitig bis ${formatMoment(risk.deadline, state.settings.timeZone)}.`
         : todayClosed
           ? "Heute eingereicht. Dein Tag zählt."
           : hasDraft
@@ -299,7 +299,7 @@ export default function CommitmentDashboard({
       setPauseForm({ from: "", to: "", reason: "" });
       setPauseMessage({
         tone: "ok",
-        text: "Dein Antrag ist beim Team. Bis zur Freigabe gelten die Tage weiter als Pflicht-Tage.",
+        text: "Deine Pause ist beim Team gemeldet. Bis das Team sie bestätigt, zählen die Tage weiter als Calling-Tage.",
       });
       await load(month);
     } catch (err) {
@@ -314,7 +314,7 @@ export default function CommitmentDashboard({
     setPauseMessage(null);
     try {
       await postJson("/api/closing", { action: "withdrawPause", value: { id } });
-      setPauseMessage({ tone: "ok", text: "Der Antrag ist zurückgezogen." });
+      setPauseMessage({ tone: "ok", text: "Deine Pausenmeldung ist zurückgezogen." });
       await load(month);
     } catch (err) {
       setPauseMessage({ tone: "error", text: (err as Error).message });
@@ -331,8 +331,9 @@ export default function CommitmentDashboard({
           <h2 id={`${uid}-title`}>Deine Serien</h2>
         </div>
         <p className="cm-muted">
-          Pflicht-Tage sind {workdays}. Frist ist {settings.deadlineHour}:00 Uhr am nächsten
-          Pflicht-Tag, Freitag also bis Montagvormittag. Wochenenden zählen nicht.
+          Calling-Tage sind {workdays}. Rechtzeitig ist ein Abschluss bis{" "}
+          {settings.deadlineHour}:00 Uhr am nächsten Calling-Tag, für Freitag also bis
+          Montagvormittag. Wochenenden zählen nicht.
         </p>
       </header>
 
@@ -343,7 +344,7 @@ export default function CommitmentDashboard({
             <strong>{summary.calling.current}</strong>
             <span>Bestwert {summary.calling.best}</span>
           </dd>
-          <p>Fristgerecht abgeschlossene Pflicht-Tage mit Anwahlen in Folge.</p>
+          <p>Rechtzeitig abgeschlossene Calling-Tage mit Anwahlen in Folge.</p>
         </div>
         <div>
           <dt>Reflexions-Serie</dt>
@@ -351,7 +352,7 @@ export default function CommitmentDashboard({
             <strong>{summary.reflection.current}</strong>
             <span>Bestwert {summary.reflection.best}</span>
           </dd>
-          <p>Fristgerecht abgeschlossene Pflicht-Tage, auch ohne Anwahlen.</p>
+          <p>Rechtzeitig abgeschlossene Calling-Tage, auch ohne Anwahlen.</p>
         </div>
         <div>
           <dt>Aktive Tage</dt>
@@ -380,11 +381,11 @@ export default function CommitmentDashboard({
           <Clock3 size={18} aria-hidden="true" />
           <div>
             <p>
-              Dein Abschluss für {formatShortDay(summary.atRisk.day)} ist noch offen. Fristgerecht
-              bis {formatMoment(summary.atRisk.deadline, tz)}. Deine laufende Serie hängt daran.
+              Dein Abschluss für {formatShortDay(summary.atRisk.day)} ist noch offen. Bis{" "}
+              {formatMoment(summary.atRisk.deadline, tz)} zählt er noch für deine Serie.
             </p>
             <Link className="btn primary" href={`/tagesabschluss?tag=${summary.atRisk.day}`}>
-              Jetzt abschließen
+              {formatShortDay(summary.atRisk.day)} abschließen
             </Link>
           </div>
         </div>
@@ -393,24 +394,24 @@ export default function CommitmentDashboard({
         <div className="cm-alert info">
           <Users size={18} aria-hidden="true" />
           <p>
-            Dir fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team meldet
-            sich persönlich bei dir und fragt, ob alles passt. Das ist nur eine Nachfrage. Du kannst
-            fehlende Tage jederzeit nachtragen oder eine Pause beantragen.
+            Dir fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team fragt
+            kurz nach, ob alles passt. Nachtragen oder pausieren geht jederzeit.
           </p>
         </div>
       ) : summary.missingOpen > 0 ? (
         <p className="cm-muted">
-          Es fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")} nach Frist. Nachgetragen
-          zählen die Zahlen, die Serie beginnt mit dem nächsten fristgerechten Tag neu.
+          Es fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")} nach der Frist.
+          Nachgetragen zählen die Zahlen, die Serie beginnt mit dem nächsten rechtzeitig
+          abgeschlossenen Tag neu.
         </p>
       ) : null}
       {summary.inactive && (
         <div className="cm-alert info">
           <Flame size={18} aria-hidden="true" />
           <p>
-            Zuletzt gab es mehr als {settings.inactivityAfterDays} Pflicht-Tage ohne dokumentierte
+            Zuletzt gab es mehr als {settings.inactivityAfterDays} Calling-Tage ohne dokumentierte
             Anwahlen. Das passiert. Ein kurzer Calling-Block reicht, um wieder einzusteigen. Wenn du
-            gerade Abstand brauchst, beantrage unten eine Pause.
+            gerade Abstand brauchst, melde unten eine Pause.
           </p>
         </div>
       )}
@@ -496,7 +497,7 @@ export default function CommitmentDashboard({
                   <span>
                     {formatShortDay(d.day)} ·{" "}
                     {d.status === "open" && d.deadline
-                      ? `fristgerecht bis ${formatMoment(d.deadline, tz)}`
+                      ? `rechtzeitig bis ${formatMoment(d.deadline, tz)}`
                       : "Frist vorbei, Nachtragen zählt für die Zahlen"}
                   </span>
                   <Link className="btn secondary" href={`/tagesabschluss?tag=${d.day}`}>
@@ -510,15 +511,15 @@ export default function CommitmentDashboard({
       </div>
 
       <div className="cm-pauses">
-        <h3>Pause beantragen</h3>
+        <h3>Pause melden</h3>
         <p className="cm-muted">
-          Urlaub, Krankheit oder bewusster Abstand: Genehmigte Pausen nehmen die Tage aus der
-          Pflicht, deine Serie wartet so lange. Eine Pause beginnt frühestens heute und dauert
-          höchstens zwei Monate am Stück. Das Team gibt den Antrag frei; für vergangene Tage wende
-          dich direkt an das Team.
+          Urlaub, Krankheit oder bewusster Abstand sind okay. In einer bestätigten Pause zählen die
+          Tage nicht für deine Serie, sie wartet so lange. Eine Pause beginnt frühestens heute und
+          dauert höchstens zwei Monate am Stück. Das Team bestätigt sie kurz; für vergangene Tage
+          wende dich direkt an das Team.
         </p>
         {pauses.some((p) => p.from <= today && today <= p.to) && (
-          <p className="cm-alert info">Du bist gerade in einer genehmigten Pause.</p>
+          <p className="cm-alert info">Du bist gerade in einer bestätigten Pause.</p>
         )}
         <form className="cm-pause-form" onSubmit={requestPause}>
           <label>
@@ -553,7 +554,7 @@ export default function CommitmentDashboard({
           </label>
           <button type="submit" className="btn secondary" disabled={pauseBusy}>
             {pauseBusy && <LoaderCircle className="spin" size={16} aria-hidden="true" />}
-            Pause beantragen
+            Pause melden
           </button>
         </form>
         {pauseMessage && (

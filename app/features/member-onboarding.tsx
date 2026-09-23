@@ -97,8 +97,8 @@ export default function MemberOnboarding({
           />
           <span>
             Meine selbst gemeldeten Zahlen mit Anzeigename, Unternehmen und
-            Rolle im öffentlichen Ranking zeigen. Meine E-Mail, Telefonnummer
-            und Reflexionen bleiben privat.
+            Rolle im öffentlichen Ranking zeigen. Meine E-Mail und
+            Telefonnummer bleiben privat.
           </span>
         </label>
         {error && (
@@ -117,8 +117,7 @@ export default function MemberOnboarding({
           )}
         </button>
         <small>
-          Deine Sichtbarkeit kannst du später in deinem Profil ändern. Alles
-          bleibt kostenfrei.
+          Deine Sichtbarkeit kannst du später in deinem Profil ändern.
         </small>
       </form>
     </section>
