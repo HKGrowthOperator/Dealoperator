@@ -74,16 +74,21 @@ class Statement {
     return { meta: { changes: r.rowCount ?? r.affectedRows ?? 0 } };
   }
 }
-let instance: Database | undefined;
+// Auf globalThis, damit der Scheduler aus instrumentation.ts und die
+// Route-Handler denselben Pool teilen, auch wenn sie in getrennten Bundles
+// laufen. Sonst entstünden zwei Pools mit je 8 Verbindungen.
+const shared = globalThis as typeof globalThis & {
+  __dealOperatorDatabase?: Database;
+};
 export function databaseReady() {
   return !!process.env.DATABASE_URL;
 }
 export function database() {
   if (!databaseReady())
     throw Error("Die Anmeldung und Speicherung werden gerade eingerichtet.");
-  if (instance) return instance;
+  if (shared.__dealOperatorDatabase) return shared.__dealOperatorDatabase;
   const pool = new Pool(connectionOptions());
-  instance = new Database(pool, async (fn) => {
+  const instance = new Database(pool, async (fn) => {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
@@ -97,5 +102,6 @@ export function database() {
       client.release();
     }
   });
+  shared.__dealOperatorDatabase = instance;
   return instance;
 }
