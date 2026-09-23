@@ -125,3 +125,18 @@ test("every admin and moderator gets each team alert once; a removed role stops 
   assert.equal(moPush.status, "skipped");
   assert.match(moPush.detail, /Team-Rolle/);
 });
+
+test("switching off team pushes keeps the separate email safeguard", async () => {
+  await setTeamRole(db, owner, { owner: "mo", role: "moderator" });
+  await db.query("UPDATE notification_prefs SET team_alerts=false WHERE owner='mo'");
+  await signup("new-2");
+  await dispatch(db, recheck, new Date(), (async () => ({ statusCode: 201 })) as any);
+  const rows = await db.query(
+    "SELECT channel,status FROM notifications WHERE recipient='mo' ORDER BY channel",
+  );
+  // Ohne Mail-Konfiguration wartet die E-Mail; der Push ist bewusst aus.
+  assert.deepEqual(rows.map((r) => [r.channel, r.status]), [
+    ["email", "pending"],
+    ["push", "skipped"],
+  ]);
+});

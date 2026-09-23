@@ -332,7 +332,7 @@ export async function ensureAdminPrefs(db: Database, actor: Actor) {
 
 export type Recheck = (
   db: Database,
-  n: { kind: string; recipient: string; ref: string },
+  n: { kind: string; recipient: string; ref: string; channel?: string },
 ) => Promise<string | null>;
 
 type Row = {

@@ -189,7 +189,10 @@ export const recheck: Recheck = async (db, n) => {
       "SELECT team_alerts FROM notification_prefs WHERE owner=$1",
       [n.recipient],
     );
-    if (prefs && prefs.team_alerts === false) return "Team-Benachrichtigungen ausgeschaltet.";
+    // Der Push-Schalter gilt nur für Pushs; die E-Mail hat einen eigenen
+    // Schalter (team_email), den der Versand selbst prüft.
+    if (n.channel !== "email" && prefs && prefs.team_alerts === false)
+      return "Team-Pushs ausgeschaltet.";
     return null;
   }
   return null;
