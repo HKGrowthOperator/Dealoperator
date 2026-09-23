@@ -77,7 +77,8 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const actor = await admin();
-    const raw = await body(request, 250_000);
+    // Der Wins-Import nimmt auch den ganzen Gruppenverlauf an (bis 1 Mio. Zeichen).
+    const raw = await body(request, 3_000_000);
     const db = database();
     await rateLimit(db, `admin:${actor.userId}`, 60);
     const v = raw?.value;

@@ -210,7 +210,7 @@ test("explicit day references win; a weekday mid-sentence does not", () => {
   );
 });
 
-test("the latest value per metric wins across messages; a later lower value is a review case", () => {
+test("the latest value per metric wins across messages; a later lower value is a review case for that metric only", () => {
   const merged = parseWins({
     text: [
       "22.09.26, 18:00 - Anna Beispiel: 50 Anwahlen, 2 Settings",
@@ -239,7 +239,14 @@ test("the latest value per metric wins across messages; a later lower value is a
     defaultDay: "2026-09-22",
     directory,
   });
-  assert.equal(lowered.at(-1)!.status, "review");
+  // Nur die betroffene Kennzahl wird geprüft; bis dahin bleibt der höhere Wert.
+  const last = lowered.at(-1)!;
+  assert.equal(last.status, "ok");
+  assert.equal(last.metrics.attempts, 50);
+  assert.deepEqual(
+    last.conflicts.map((c) => [c.metric, c.from, c.to]),
+    [["attempts", 50, 30]],
+  );
 });
 
 test("thousand separators are whole numbers, not decimals", () => {

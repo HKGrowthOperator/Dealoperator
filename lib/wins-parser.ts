@@ -110,7 +110,9 @@ export type WinsEntry = {
   applicable: boolean;
   /** Ausdrückliche Korrektur oder bearbeitete Nachricht. */
   correction: boolean;
-  /** Spätere Meldungen mit niedrigerem Wert, je Kennzahl. */
+  /** Absender eindeutig einem Einzelprofil zugeordnet (voller Name oder Alias). */
+  identified: boolean;
+  /** Spätere Meldungen mit niedrigerem Wert, je Kennzahl (Prüffall nur für diese Kennzahl). */
   conflicts: FieldConflict[];
   reasons: string[];
   notes: string[];
@@ -886,6 +888,7 @@ export function parseWins({
       days,
       applicable,
       correction,
+      identified: !personProblem,
       conflicts: [],
       reasons,
       notes,
@@ -928,11 +931,9 @@ export function parseWins({
     latest.metrics = merged;
     latest.observations = observations;
     if (takenFrom.length) latest.notes.push(`Zusammengeführt: ${takenFrom.join(", ")}.`);
-    if (latest.conflicts.length) {
-      latest.status = "review";
-      latest.review = "value";
-      latest.reasons.push(...latest.conflicts.map(conflictReason));
-    }
+    // Ein späterer niedrigerer Wert sperrt nicht den ganzen Tag: die übrigen
+    // Kennzahlen gelten, für die betroffene entsteht ein eigener Prüffall
+    // (latest.conflicts, siehe server/wins-import.ts).
     for (const e of group.slice(0, -1)) {
       e.status = "superseded";
       e.notes.push(

@@ -282,12 +282,13 @@ test("reminders are planned once, and skipped when the closing arrived in betwee
   );
 });
 
-test("wins import: preview, commit, repeat without changes; members' days stay theirs", async () => {
+test("wins import: preview, commit, repeat without changes; claimed profiles keep getting their numbers", async () => {
   const anna = randomUUID();
   await db.query("INSERT INTO participants(id,name,kind) VALUES($1,'Anna Beispiel','person')", [anna]);
   const claimed = await member(bob, "Bert Probe");
-  // Bert hat sein Profil vor drei Tagen übernommen: ab dann zählen nur seine
-  // eigenen Abschlüsse.
+  // Bert hat sein Profil vor drei Tagen übernommen. Seine Zahlen aus der
+  // Gruppe landen trotzdem auf seinem Profil; nur ein eigener Abschluss für
+  // denselben Tag geht vor (tests/wins-import.test.ts).
   await db.query("UPDATE participants SET claimed_at=now()-interval '3 days' WHERE id=$1", [claimed]);
   const day = dayOffset(-1);
   const [y, m, d] = day.split("-");
@@ -299,11 +300,11 @@ test("wins import: preview, commit, repeat without changes; members' days stay t
   const preview = await previewWins(db, admin, { text, day });
   assert.deepEqual(
     preview.rows.map((r) => r.action),
-    ["neu", "übersprungen", "prüffall"],
+    ["neu", "neu", "prüffall"],
   );
   const expected = preview.rows.filter((r) => r.key).map((r) => ({ key: r.key!, revision: r.revision }));
   const result = await commitWins(db, admin, { text, day, key: randomUUID(), expected });
-  assert.equal(result.written, 1);
+  assert.equal(result.written, 2);
   assert.equal(result.cases, 1);
   const again = await previewWins(db, admin, { text, day });
   assert.equal(again.rows[0].action, "unverändert");
@@ -315,11 +316,12 @@ test("wins import: preview, commit, repeat without changes; members' days stay t
   });
   assert.equal(second.written, 0);
   assert.equal(second.cases, 0);
-  assert.equal((await db.query("SELECT * FROM checkins WHERE participant=$1", [claimed])).length, 0);
+  const bert = await db.query("SELECT counts,origin FROM checkins WHERE participant=$1", [claimed]);
+  assert.deepEqual(bert.map((c) => [c.origin, c.counts.attempts]), [["import", 70]]);
   await assert.rejects(previewWins(db, alice, { text, day }), /Team/);
 });
 
-test("a review case resolved as alias makes the next import of the same text count", async () => {
+test("a review case resolved as alias takes over its numbers and makes the next import of the same text count", async () => {
   const anna = randomUUID();
   await db.query("INSERT INTO participants(id,name,kind) VALUES($1,'Anna Beispiel','person')", [anna]);
   const day = dayOffset(-2);
@@ -330,8 +332,11 @@ test("a review case resolved as alias makes the next import of the same text cou
   assert.equal(first.rows[0].action, "prüffall");
   const [c] = await db.query("SELECT id FROM import_review_cases");
   await resolveReviewCase(db, admin, { id: c.id, decision: "alias", participantId: anna });
+  // Die Werte des Prüffalls sind mit der Zuordnung übernommen.
+  const [row] = await db.query("SELECT counts FROM checkins WHERE participant=$1 AND day=$2", [anna, day]);
+  assert.equal(row.counts.attempts, 30);
   const next = await previewWins(db, admin, { text, day });
-  assert.equal(next.rows[0].action, "neu");
+  assert.equal(next.rows[0].action, "unverändert");
   assert.equal(next.rows[0].participantId, anna);
 });
 
