@@ -33,7 +33,7 @@ export default async function Page() {
       <main className="cm-page">
         <div className="cm-page-head">
           <p className="cm-kicker">AUSTAUSCH</p>
-          <h1>Reflexionen aus der Crew</h1>
+          <h1>Reflexionen</h1>
           <p>
             Echte Tagesabschlüsse: was gut lief und was beim nächsten Calling-Tag besser werden
             soll. Zum Mitlesen, Lernen und Antworten.
@@ -46,9 +46,9 @@ export default async function Page() {
               <Eye size={18} aria-hidden="true" /> Wer liest mit?
             </h2>
             <p>
-              Lesen können alle angemeldeten Mitglieder mit bestätigter E-Mail, hinterlegter
-              Telefonnummer und eigenem Profil. Die Telefonnummer wird nicht per SMS geprüft; neue
-              Mitglieder können sich selbst registrieren.
+              Lesen können alle Angemeldeten mit bestätigter E-Mail, hinterlegter Telefonnummer und
+              eigenem Profil. Die Telefonnummer wird nicht per SMS geprüft; wer neu ist, kann sich
+              selbst registrieren.
             </p>
             <p>
               Zahlen stehen nur auf den Karten von Personen, die der öffentlichen Anzeige
@@ -83,7 +83,7 @@ export default async function Page() {
           <section className="cm-card cm-signin">
             <h2>Melde dich an, um die Reflexionen zu lesen.</h2>
             <p>
-              Mitmachen ist kostenfrei. Mit einem eigenen Profil und hinterlegter Telefonnummer
+              Das Konto ist kostenfrei. Mit einem eigenen Profil und hinterlegter Telefonnummer
               liest du hier mit und reichst deinen eigenen Tagesabschluss ein.
             </p>
             <div className="cm-actions">

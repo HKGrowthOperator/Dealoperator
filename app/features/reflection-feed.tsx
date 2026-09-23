@@ -206,7 +206,7 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
   if (feed && !feed.allowed)
     return (
       <section className="cm-card cm-feed-locked">
-        <h2>Die Reflexionen sind für verifizierte Mitglieder.</h2>
+        <h2>Die Reflexionen sind nur mit vollständigem Konto lesbar.</h2>
         <EligibilityChecklist
           missing={feed.missing ?? []}
           next="/reflexionen"

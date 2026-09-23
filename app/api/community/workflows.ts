@@ -178,7 +178,7 @@ export async function handleWorkflow(
         v.thread,
         owner,
         now,
-        JSON.stringify({ name: name || "Mitglied", body: v.body }),
+        JSON.stringify({ name: name || "Caller", body: v.body }),
       )
       .run();
     return result({ ok: true });
@@ -372,7 +372,7 @@ export async function handleWorkflow(
       const entry = JSON.parse(row.data);
       if (!entry.intro)
         return result(
-          { error: "Das Mitglied bietet für diese Beziehung keine Intros an." },
+          { error: "Diese Person bietet für diese Beziehung keine Intros an." },
           409,
         );
       const existing = await db

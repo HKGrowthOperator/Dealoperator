@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       return json(
         {
           error:
-            "Die Anmeldung wird gerade eingerichtet. Du kannst die Community bereits in der Vorschau erkunden.",
+            "Die Anmeldung wird gerade eingerichtet. Die öffentlichen Ergebnisse kannst du schon ansehen.",
         },
         503,
       );

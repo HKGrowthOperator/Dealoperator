@@ -107,11 +107,11 @@ const icons = {
   heute: LayoutDashboard,
   zahlen: BarChart3,
   reflexion: MessageCircle,
-  crew: Users,
+  partner: Users,
   sessions: Headphones,
   wissen: BookOpen,
   profil: Settings2,
-  community: Info,
+  "so-funktionierts": Info,
 };
 const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const blankRecord = (): RecordDay => ({
@@ -491,7 +491,7 @@ export default function CommunityApp({
       {
         name: "open_caller_section",
         description:
-          "Open a section of the caller community. Does not save or submit data.",
+          "Open a section of the caller workspace. Does not save or submit data.",
         inputSchema: {
           type: "object",
           properties: { section: { type: "string", enum: views } },
@@ -520,10 +520,10 @@ export default function CommunityApp({
         void Promise.resolve(
           ctx.registerTool(tool, { signal: lifecycle.signal }),
         ).catch(() =>
-          console.warn("Community tools are unavailable in this browser."),
+          console.warn("Caller tools are unavailable in this browser."),
         );
       } catch {
-        console.warn("Community tools are unavailable in this browser.");
+        console.warn("Caller tools are unavailable in this browser.");
       }
     }
     return () => lifecycle.abort();
@@ -578,7 +578,7 @@ export default function CommunityApp({
   function openNewSession() {
     if (!data.profile.name) {
       toast.info(
-        "Ergänze zuerst deinen Anzeigenamen, damit die Crew weiß, wer die Session anbietet.",
+        "Ergänze zuerst deinen Anzeigenamen, damit die anderen sehen, wer die Session anbietet.",
       );
       setProfile(data.profile);
       setModal("profile");
@@ -719,7 +719,7 @@ export default function CommunityApp({
       d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const esc = (v: string) =>
       v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, "\\$&");
-    const value = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Deal Operator//Community//DE\r\nBEGIN:VEVENT\r\nUID:${s.id}@aktivecaller\r\nDTSTAMP:${fmt(new Date())}\r\nDTSTART:${fmt(start)}\r\nDTEND:${fmt(end)}\r\nSUMMARY:${esc((demo ? "[DEMO] " : "") + s.title)}\r\nDESCRIPTION:${esc(demo ? "Fiktiver Beispieltermin. Keine echte Session." : s.kind + " mit " + s.host)}\r\n${s.url ? "URL:" + s.url + "\r\n" : ""}END:VEVENT\r\nEND:VCALENDAR`;
+    const value = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Deal Operator//Sessions//DE\r\nBEGIN:VEVENT\r\nUID:${s.id}@aktivecaller\r\nDTSTAMP:${fmt(new Date())}\r\nDTSTART:${fmt(start)}\r\nDTEND:${fmt(end)}\r\nSUMMARY:${esc((demo ? "[DEMO] " : "") + s.title)}\r\nDESCRIPTION:${esc(demo ? "Fiktiver Beispieltermin. Keine echte Session." : s.kind + " mit " + s.host)}\r\n${s.url ? "URL:" + s.url + "\r\n" : ""}END:VEVENT\r\nEND:VCALENDAR`;
     const url = URL.createObjectURL(
       new Blob([value], { type: "text/calendar" }),
     );
@@ -893,7 +893,7 @@ export default function CommunityApp({
           </label>
         </div>
         <label>
-          Das suchst du in der Community
+          Das suchst du beim gemeinsamen Callen
           <textarea
             maxLength={500}
             rows={3}
@@ -917,9 +917,9 @@ export default function CommunityApp({
             />
           </label>
           <label>
-            Dein Community-Kanal
+            Dein bevorzugter Kanal
             <FieldSelect
-              label="Community-Kanal"
+              label="Bevorzugter Kanal"
               // Ein älterer gespeicherter Wert wird nicht mehr angeboten und
               // zeigt deshalb nur den Platzhalter.
               value={
@@ -963,9 +963,9 @@ export default function CommunityApp({
             onCheckedChange={(v) => setProfile({ ...profile, listed: !!v })}
           />
           <span>
-            Mein Profil in der Crew anzeigen
+            Mein Profil bei den Call-Partnern anzeigen
             <small>
-              Andere angemeldete Mitglieder sehen Name, Rolle, Zielgruppe,
+              Andere angemeldete Nutzer sehen Name, Rolle, Zielgruppe,
               Call-Zeit, Wochenziel, Call-Tage, bevorzugten Kanal und
               Beschreibung. Deine E-Mail und Reflexionen bleiben privat.
             </small>
@@ -1002,10 +1002,10 @@ export default function CommunityApp({
           </SidebarGroup>
           <SidebarGroup>
             <SidebarGroupLabel>
-              DEINE COMMUNITY <span className="free-mini">KOSTENFREI</span>
+              MITEINANDER <span className="free-mini">KOSTENFREI</span>
             </SidebarGroupLabel>
             <SidebarMenu>
-              {(["crew", "sessions", "wissen"] as View[]).map(nav)}
+              {(["partner", "sessions", "wissen"] as View[]).map(nav)}
             </SidebarMenu>
           </SidebarGroup>
           <div className="sidebar-note">
@@ -1018,7 +1018,7 @@ export default function CommunityApp({
               <br />
               Gemeinsam weiter.
             </p>
-            <Link href={href("community")}>Unsere Community</Link>
+            <Link href={href("so-funktionierts")}>So funktioniert’s</Link>
           </div>
         </SidebarContent>
         <SidebarFooter>
@@ -1039,18 +1039,18 @@ export default function CommunityApp({
           <div className="topbar-left">
             <SidebarTrigger />
             <span className="breadcrumb">
-              Community <strong>{labels[initialView]}</strong>
+              Dein Bereich <strong>{labels[initialView]}</strong>
             </span>
           </div>
           <div className="topbar-right">
             <span className="free-status">
               <span />
-              Community ist kostenfrei
+              Kostenfrei nutzbar
             </span>
             <button
               className="icon-button"
               onClick={() => setModal("about")}
-              aria-label="So funktioniert die Community"
+              aria-label="So funktioniert Deal Operator"
             >
               <Info size={19} />
             </button>
@@ -1068,18 +1068,18 @@ export default function CommunityApp({
               – deine Einträge bleiben privat.
             </span>
           </span>
-          <Link href="/ranking">Zum Community-Ranking</Link>
+          <Link href="/ranking">Zum Ranking</Link>
         </div>
         <main className="main-content">
           <div className="signup-inline">
             <p>Gemeinsam wird Dranbleiben sichtbar.</p>
-            <Link href="/ranking">Community-Ranking ansehen</Link>
+            <Link href="/ranking">Ranking ansehen</Link>
           </div>
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
               title="Dein Fortschritt beginnt hier."
-              text="Melde dich an und starte mit deinen eigenen Zahlen. Die Community-Funktionen sind kostenfrei."
+              text="Melde dich an und starte mit deinen eigenen Zahlen. Die Funktionen hier sind kostenfrei."
             >
               <button className="btn primary" onClick={own}>
                 Kostenfrei anmelden
@@ -1106,7 +1106,7 @@ export default function CommunityApp({
                   <div className="page-heading">
                     <div>
                       <p className="eyebrow">
-                        DEIN TAG. DEINE CREW. DEIN FORTSCHRITT.
+                        DEIN TAG. DEINE ZAHLEN. DEIN FORTSCHRITT.
                       </p>
                       <h1>
                         Nicht allein am Hörer<span className="lime-dot">.</span>
@@ -1216,7 +1216,7 @@ export default function CommunityApp({
                       <p>
                         {nextSession
                           ? `${sessionDay(nextSession.date)}, ${nextSession.time} Uhr · ${nextSession.minutes} Minuten`
-                          : "Leg einen gemeinsamen Call-Block an und lade deine Crew ein."}
+                          : "Leg einen gemeinsamen Call-Block an und lade andere Caller ein."}
                       </p>
                       {nextSession && (
                         <div className="session-people">
@@ -1303,13 +1303,13 @@ export default function CommunityApp({
                       <div className="routine-row">
                         <span className="step-number">3</span>
                         <div>
-                          <strong>Hol dir Rückenwind von deiner Crew</strong>
+                          <strong>Hol dir Rückenwind von anderen Callern</strong>
                           <p>Ein Learning teilen oder einen Buddy finden</p>
                         </div>
                         <Link
                           className="icon-button"
-                          href={href("crew")}
-                          aria-label="Crew öffnen"
+                          href={href("partner")}
+                          aria-label="Call-Partner öffnen"
                         ></Link>
                       </div>
                     </section>
@@ -1335,12 +1335,12 @@ export default function CommunityApp({
                         ))}
                         {data.members.length === 0 && (
                           <span className="quiet-text">
-                            Deine Crew kann hier wachsen.
+                            Hier erscheinen Call-Partner, sobald sie ihr Profil zeigen.
                           </span>
                         )}
                       </div>
-                      <Link className="text-link" href={href("crew")}>
-                        Crew entdecken
+                      <Link className="text-link" href={href("partner")}>
+                        Call-Partner finden
                       </Link>
                       <span className="free-line">
                         <Check size={14} />
@@ -1597,7 +1597,7 @@ export default function CommunityApp({
                           </p>
                         )}
                         <Link className="text-link" href="/reflexionen">
-                          Reflexionen der Crew ansehen
+                          Reflexionen der anderen ansehen
                         </Link>
                       </div>
                     </aside>
@@ -1605,12 +1605,12 @@ export default function CommunityApp({
                 </>
               )}
 
-              {initialView === "crew" && (
+              {initialView === "partner" && (
                 <>
                   <PageHeading
                     eyebrow="GEMEINSAM IST ES EINFACHER."
-                    title="Deine Crew. Dein Rückenwind."
-                    text="Finde Menschen, die deinen Alltag verstehen – und mit dir am Hörer bleiben."
+                    title="Call-Partner mit ähnlichem Rhythmus."
+                    text="Finde Menschen, die deinen Alltag verstehen und mit dir am Hörer bleiben."
                   >
                     <button
                       className="btn secondary"
@@ -1628,7 +1628,7 @@ export default function CommunityApp({
                     <div className="search-input">
                       <Search size={18} />
                       <input
-                        aria-label="Crew durchsuchen"
+                        aria-label="Call-Partner durchsuchen"
                         placeholder="Name, Zielgruppe oder Thema suchen …"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
@@ -1705,12 +1705,12 @@ export default function CommunityApp({
                       title={
                         data.members.length
                           ? "Noch kein passender Treffer."
-                          : "Die Crew beginnt mit dir."
+                          : "Noch keine Call-Partner sichtbar."
                       }
                       text={
                         data.members.length
                           ? "Probiere ein anderes Thema oder eine andere Call-Zeit."
-                          : "Erstelle dein Profil und gib es für andere angemeldete Mitglieder frei. In der privaten Vorschau gibt es noch keine weiteren Mitglieder."
+                          : "Erstelle dein Profil und gib es für andere angemeldete Nutzer frei. In der privaten Vorschau gibt es noch keine weiteren Profile."
                       }
                     />
                   )}
@@ -1865,13 +1865,11 @@ export default function CommunityApp({
                   <PageHeading
                     eyebrow="WAS EINEM HILFT, BRINGT ALLE WEITER."
                     title="Besser werden. Wissen teilen."
-                    text="Echte Erfahrungen aus der Crew und kurze Impulse für deinen nächsten Call-Block."
+                    text="Echte Erfahrungen anderer Caller und kurze Impulse für deinen nächsten Call-Block."
                   />
                   <Tabs value={knowledgeTab} onValueChange={setKnowledgeTab}>
                     <TabsList>
-                      <TabsTrigger value="Austausch">
-                        Community-Austausch
-                      </TabsTrigger>
+                      <TabsTrigger value="Austausch">Austausch</TabsTrigger>
                       <TabsTrigger value="Bibliothek">
                         Impulse & Merkliste
                       </TabsTrigger>
@@ -1988,7 +1986,7 @@ export default function CommunityApp({
                       )}
                       <section className="feedback-banner">
                         <div>
-                          <Tag tone="green">VON DER CREW. FÜR DIE CREW.</Tag>
+                          <Tag tone="green">AUS DER PRAXIS.</Tag>
                           <h2>Du musst nicht alles allein herausfinden.</h2>
                           <p>
                             Bring deinen echten Gesprächseinstieg ins nächste
@@ -2012,7 +2010,7 @@ export default function CommunityApp({
                   <AccountSettings key={demo ? "demo" : "own"} demo={demo} />
                   <PageHeading
                     eyebrow="DEIN RHYTHMUS. DEINE ENTSCHEIDUNG."
-                    title="Mach die Community zu deiner."
+                    title="So passt Deal Operator zu dir."
                     text="Ein klares Profil hilft dir, passende Call-Buddys und realistische Ziele zu finden."
                   />
                   <div className="two-columns">
@@ -2023,23 +2021,21 @@ export default function CommunityApp({
                         <p>
                           Deine Zahlen und Reflexionen sind nur für dich
                           sichtbar. Du kannst Tageszahlen bewusst in deinem
-                          Crew-Profil freigeben und Reflexionen in deine Gruppe
+                          Profil freigeben und Reflexionen in deine Gruppe
                           kopieren.
                         </p>
                         <p>
-                          Du kannst dein Crew-Profil jederzeit ausblenden. Dein
-                          privater Fortschritt bleibt erhalten.
+                          Du kannst dein sichtbares Profil jederzeit ausblenden.
+                          Dein privater Fortschritt bleibt erhalten.
                         </p>
-                        <Tag tone="green">
-                          Alle Community-Funktionen kostenfrei
-                        </Tag>
+                        <Tag tone="green">Alle Funktionen hier kostenfrei</Tag>
                       </section>
                       <section className="card padded requests">
                         <h3>Deine Buddy-Anfragen</h3>
                         {!data.buddies.length ? (
                           <p>
-                            Noch keine Anfragen. Entdecke die Crew und finde
-                            einen passenden Rhythmus.
+                            Noch keine Anfragen. Schau bei den Call-Partnern
+                            vorbei und finde einen passenden Rhythmus.
                           </p>
                         ) : (
                           data.buddies.map((b: any) => (
@@ -2107,24 +2103,24 @@ export default function CommunityApp({
                   </div>
                 </>
               )}
-              {initialView === "community" && (
+              {initialView === "so-funktionierts" && (
                 <>
                   <PageHeading
-                    eyebrow="FÜR MENSCHEN, DIE WIRKLICH CALLEN."
+                    eyebrow="FÜR ALLE, DIE REGELMÄSSIG CALLEN."
                     title="Gemeinsam dranbleiben."
-                    text="Eine Sales-Community, in der Aktivität, ehrlicher Austausch und gegenseitiger Rückenwind zählen."
+                    text="Deal Operator begleitet das gemeinsame Callen. Hier zählen Aktivität, ehrlicher Austausch und gegenseitiger Rückenwind."
                   />
                   <div className="community-manifest">
                     <span className="manifest-number">01—06</span>
                     <h2>
-                      Die Community ist kostenfrei.
+                      Alle sechs Bereiche sind kostenfrei.
                       <br />
                       Der Einsatz kommt von dir.
                     </h2>
                     <p>
-                      Wir setzen uns Ziele, callen, reflektieren und helfen
-                      einander. Ein schlechter Tag ist kein Ausschlussgrund.
-                      Dauerhaft nur mitlesen passt nicht zu dieser Community.
+                      Ziele setzen, callen, reflektieren und einander helfen.
+                      Ein schlechter Tag gehört dazu. Am meisten bringt dir
+                      Deal Operator, wenn du deine Zahlen regelmäßig einträgst.
                     </p>
                   </div>
                   <div className="principle-grid">
@@ -2138,7 +2134,7 @@ export default function CommunityApp({
                         "Teile Learnings und deinen nächsten Schritt.",
                       ],
                       [
-                        "Crew & Buddy-Suche",
+                        "Call-Partner & Buddy-Suche",
                         "Finde Menschen mit ähnlichem Rhythmus.",
                       ],
                       [
@@ -2151,7 +2147,7 @@ export default function CommunityApp({
                       ],
                       [
                         "Austausch & Commitment",
-                        "Lies die Reflexionen der Crew und antworte auf Discord.",
+                        "Lies die Reflexionen der anderen und antworte auf Discord.",
                       ],
                     ].map(([title, text], i) => (
                       <div className="card padded" key={title}>
@@ -2163,7 +2159,7 @@ export default function CommunityApp({
                     ))}
                   </div>
                   <section className="card padded">
-                    <h2>Unsere gemeinsame Basis</h2>
+                    <h2>Worauf es ankommt</h2>
                     <div className="rules">
                       <p>
                         <Check />
@@ -2203,8 +2199,9 @@ export default function CommunityApp({
                         <MessageCircle size={25} />
                         <h3>Reflexionen</h3>
                         <p>
-                          Lies die eingereichten Tagesabschlüsse der Crew und
-                          nimm Learnings für deinen nächsten Calling-Tag mit.
+                          Lies die eingereichten Tagesabschlüsse der anderen
+                          und nimm Learnings für deinen nächsten Calling-Tag
+                          mit.
                         </p>
                         <Link className="text-link" href="/reflexionen">
                           Reflexionen ansehen
@@ -2236,7 +2233,7 @@ export default function CommunityApp({
             <span>
               Deal Operator <span>Gemeinsam dranbleiben.</span>
             </span>
-            <Link href={href("community")}>So funktioniert’s</Link>
+            <Link href={href("so-funktionierts")}>So funktioniert’s</Link>
           </footer>
         </main>
       </div>
@@ -2260,7 +2257,7 @@ export default function CommunityApp({
                       : modal === "create-session"
                         ? editSessionId
                           ? "Deine Session bearbeiten"
-                          : "Eine Session für deine Crew"
+                          : "Neue Session anbieten"
                         : modal === "buddy"
                           ? "Gemeinsam starten"
                           : "Hier zählt, dass du dranbleibst."}
@@ -2268,7 +2265,7 @@ export default function CommunityApp({
             <DialogDescription>
               {demo
                 ? "Du bist in der Vorschau. Personen, Termine und Einträge sind Beispiele."
-                : "Kostenfreier Community-Bereich. Du bestimmst, was du teilst."}
+                : "Kostenfreier Bereich. Du bestimmst, was du teilst."}
             </DialogDescription>
           </DialogHeader>
           {modal === "metrics" ? (
@@ -2351,7 +2348,7 @@ export default function CommunityApp({
                       ? "Session aktualisiert."
                       : demo
                         ? "Beispielsession angelegt."
-                        : "Deine Session ist für die Community sichtbar.",
+                        : "Deine Session ist jetzt für andere Angemeldete sichtbar.",
                   );
                 }
               }}
@@ -2450,7 +2447,7 @@ export default function CommunityApp({
               <p className="hint">
                 Zeiten gelten in deiner lokalen Zeitzone (
                 {Intl.DateTimeFormat().resolvedOptions().timeZone}). Der
-                Raum-Link wird angemeldeten Mitgliedern angezeigt.
+                Raum-Link wird angemeldeten Nutzern angezeigt.
               </p>
               <button className="btn primary full" disabled={saving}>
                 {editSessionId ? "Änderungen speichern" : "Session anlegen"}{" "}
@@ -2471,7 +2468,7 @@ export default function CommunityApp({
                   )
                 ) {
                   toast.info(
-                    "Zu dieser Person besteht bereits eine Verbindung oder offene Anfrage. Du findest sie unter Crew & Buddys.",
+                    "Zu dieser Person besteht bereits eine Verbindung oder offene Anfrage. Du findest sie unter Call-Partner.",
                   );
                   setModal(null);
                   setMember(null);
@@ -2503,7 +2500,7 @@ export default function CommunityApp({
                   toast.success(
                     demo
                       ? "Demo-Anfrage vorgemerkt. Es wurde niemand kontaktiert."
-                      : "Anfrage gespeichert. Sie ist im Profil des Mitglieds sichtbar.",
+                      : "Anfrage gespeichert. Die Person sieht sie in ihrem Profil.",
                   );
                 }
               }}
@@ -2534,16 +2531,15 @@ export default function CommunityApp({
           ) : (
             <div className="form-stack">
               <p>
-                Sechs kostenfreie Community-Bereiche helfen dir, aktiv zu
-                bleiben: Zahlen, Reflexion, Buddys, Sessions, Wissen und
-                Austausch.
+                Sechs kostenfreie Bereiche helfen dir, aktiv zu bleiben:
+                Zahlen, Reflexion, Buddys, Sessions, Wissen und Austausch.
               </p>
               <Link
                 className="btn primary"
-                href={href("community")}
+                href={href("so-funktionierts")}
                 onClick={() => setModal(null)}
               >
-                Mehr über die Community
+                So funktioniert’s
               </Link>
             </div>
           )}
@@ -2559,7 +2555,7 @@ export default function CommunityApp({
             <SheetDescription>
               {demo
                 ? "Fiktives Beispielprofil"
-                : "Freiwillig geteiltes Community-Profil"}
+                : "Freiwillig geteiltes Profil"}
             </SheetDescription>
           </SheetHeader>
           {member && (
@@ -2652,9 +2648,9 @@ export default function CommunityApp({
               </div>
               <p>
                 {session.kind === "Call-Block"
-                  ? "Wir starten mit einem kurzen Check-in, arbeiten dann fokussiert an unseren eigenen Calls und teilen zum Schluss ein Learning."
+                  ? "Zum Start ein kurzer Check-in. Danach arbeitet jeder fokussiert an den eigenen Calls, zum Schluss teilt jeder ein Learning."
                   : session.kind === "Roleplay"
-                    ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Wir üben in kleinen Runden und geben konkretes, respektvolles Feedback."
+                    ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Geübt wird in kleinen Runden, mit konkretem und respektvollem Feedback."
                     : "Was lief gut? Was war schwer? Teile einen Gedanken und nimm einen konkreten nächsten Schritt mit."}
               </p>
               <button

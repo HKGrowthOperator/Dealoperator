@@ -76,7 +76,7 @@ export default async function Page({
           </p>
           <nav className="cm-page-links" aria-label="Weiter">
             <Link href="/reflexionen">
-              <MessageCircle size={16} aria-hidden="true" /> Reflexionen der Crew
+              <MessageCircle size={16} aria-hidden="true" /> Reflexionen der anderen
             </Link>
             <Link href="/heute?modus=eigen">
               <LayoutDashboard size={16} aria-hidden="true" /> Meine Übersicht

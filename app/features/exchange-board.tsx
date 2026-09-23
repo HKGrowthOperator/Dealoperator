@@ -56,11 +56,11 @@ export default function ExchangeBoard({
     <section className="exchange-board">
       <div className="workflow-heading">
         <div>
-          <span className="eyebrow">AUS EUREM ALLTAG</span>
+          <span className="eyebrow">AUS DEM CALL-ALLTAG</span>
           <h2>Learnings, Fragen & ehrliches Feedback.</h2>
           <p>
             Dein Gesprächseinstieg. Ein schwieriger Einwand. Ein kleiner
-            Fortschritt. Bring ihn in die Crew.
+            Fortschritt. Bring es in den Austausch.
           </p>
         </div>
         <button
@@ -86,7 +86,7 @@ export default function ExchangeBoard({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            aria-label="Community-Beiträge durchsuchen"
+            aria-label="Beiträge durchsuchen"
             placeholder="Beiträge durchsuchen …"
           />
         </div>
@@ -152,11 +152,11 @@ export default function ExchangeBoard({
       <Dialog open={writing} onOpenChange={setWriting}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Was möchtest du mit der Crew teilen?</DialogTitle>
+            <DialogTitle>Was möchtest du mit den anderen teilen?</DialogTitle>
             <DialogDescription>
               {demo
                 ? "Fiktive Vorschau – dein Beitrag wird nicht öffentlich veröffentlicht."
-                : "Sichtbar für angemeldete Community-Mitglieder. Bitte keine vertraulichen Kundeninformationen teilen."}
+                : "Sichtbar für alle angemeldeten Nutzer. Bitte keine vertraulichen Kundeninformationen teilen."}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -182,7 +182,7 @@ export default function ExchangeBoard({
                 toast.success(
                   demo
                     ? "Beispielbeitrag ergänzt."
-                    : "Dein Beitrag ist in der Community sichtbar.",
+                    : "Dein Beitrag ist jetzt für alle Angemeldeten sichtbar.",
                 );
               }
             }}
@@ -204,7 +204,7 @@ export default function ExchangeBoard({
                 maxLength={120}
                 value={draft.title}
                 onChange={(e) => setDraft({ ...draft, title: e.target.value })}
-                placeholder="Was hilft der Crew, dein Thema zu verstehen?"
+                placeholder="Was hilft anderen, dein Thema zu verstehen?"
               />
             </label>
             <label>
@@ -221,7 +221,7 @@ export default function ExchangeBoard({
             </label>
             <button className="btn primary" disabled={saving}>
               <Send size={17} />
-              Mit der Crew teilen
+              Beitrag teilen
             </button>
           </form>
         </DialogContent>
@@ -232,7 +232,7 @@ export default function ExchangeBoard({
             <DialogTitle>{post?.title}</DialogTitle>
             <DialogDescription>
               {post?.name} · {post?.category} ·{" "}
-              {demo ? "Beispielbeitrag" : "Community-Beitrag"}
+              {demo ? "Beispielbeitrag" : "Beitrag im Austausch"}
             </DialogDescription>
           </DialogHeader>
           {post && (
@@ -323,7 +323,7 @@ export default function ExchangeBoard({
         open={!!archive}
         onClose={() => setArchive(null)}
         title="Beitrag zurückziehen?"
-        text="Der Beitrag wird aus der Community-Ansicht genommen. Er bleibt im Datenbestand erhalten."
+        text="Der Beitrag wird aus dem Austausch genommen. Er bleibt im Datenbestand erhalten."
         busy={saving}
         onConfirm={async () => {
           if (

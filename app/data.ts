@@ -4,22 +4,22 @@ export const views = [
   "heute",
   "zahlen",
   "reflexion",
-  "crew",
+  "partner",
   "sessions",
   "wissen",
   "profil",
-  "community",
+  "so-funktionierts",
 ] as const;
 export type View = (typeof views)[number];
 export const labels: Record<View, string> = {
   heute: "Übersicht",
   zahlen: "Meine Zahlen",
   reflexion: "Tägliche Reflexion",
-  crew: "Crew & Buddys",
+  partner: "Call-Partner",
   sessions: "Sessions & Roleplay",
   wissen: "Wissen & Feedback",
   profil: "Mein Profil",
-  community: "Die Community",
+  "so-funktionierts": "So funktioniert’s",
 };
 export function dateKey(d = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {
@@ -259,7 +259,7 @@ export function demoData(): AppData {
       },
       {
         id: "demo-s4",
-        title: "Wochenrückblick mit der Crew",
+        title: "Gemeinsamer Wochenrückblick",
         kind: "Reflexion",
         date: offset(3),
         time: "17:30",

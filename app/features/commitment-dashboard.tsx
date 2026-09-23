@@ -145,7 +145,7 @@ export function StreakStrip() {
           {todayClosed ? "Tagesabschluss ansehen" : "Tagesabschluss"}
         </Link>
         <Link className="cm-link" href="/reflexionen">
-          <MessageCircle size={15} aria-hidden="true" /> Reflexionen der Crew
+          <MessageCircle size={15} aria-hidden="true" /> Reflexionen der anderen
         </Link>
       </div>
     </section>
@@ -394,7 +394,7 @@ export default function CommitmentDashboard({
           <Users size={18} aria-hidden="true" />
           <p>
             Dir fehlen {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team meldet
-            sich persönlich bei dir und fragt, ob alles passt. Das ist kein Ausschluss. Du kannst
+            sich persönlich bei dir und fragt, ob alles passt. Das ist nur eine Nachfrage. Du kannst
             fehlende Tage jederzeit nachtragen oder eine Pause beantragen.
           </p>
         </div>

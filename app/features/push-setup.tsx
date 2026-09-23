@@ -381,7 +381,7 @@ export default function PushSetup({
           <h2 id={`${uid}-title`}>Push auf deinem Gerät</h2>
         </div>
         <p className="cm-muted">
-          Freiwillig. Du kannst ganz ohne Push mitmachen. Mit Push erinnert dich Deal Operator auch
+          Freiwillig. Deal Operator funktioniert auch ganz ohne Push. Mit Push erinnert dich Deal Operator auch
           bei geschlossener Website.
         </p>
       </header>

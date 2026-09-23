@@ -193,12 +193,12 @@ export default function DiscordLink({
           <div>
             <strong>Noch nicht eingerichtet</strong>
             <p>
-              Die Verknüpfung mit Discord ist auf der Website noch nicht eingerichtet. Dem Server
-              kannst du trotzdem schon über den{" "}
+              Die Verknüpfung mit Discord ist auf der Website noch nicht eingerichtet. Den Server
+              erreichst du trotzdem schon über den{" "}
               <a className="cm-link" href={DISCORD_INVITE} target="_blank" rel="noopener noreferrer">
                 Einladungslink
-              </a>{" "}
-              beitreten.
+              </a>
+              .
             </p>
           </div>
         </div>

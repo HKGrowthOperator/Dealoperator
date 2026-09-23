@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Deal Operator",
     short_name: "Deal Operator",
     description:
-      "Zusammen callen. Gemeinsam dranbleiben. Tagesabschluss, Fortschritt und Erinnerungen.",
+      "Werkzeug fürs gemeinsame Callen: Tagesabschluss, Fortschritt und Erinnerungen.",
     start_url: "/tagesabschluss",
     scope: "/",
     display: "standalone",

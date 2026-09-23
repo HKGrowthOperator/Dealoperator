@@ -59,8 +59,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
           <Link className="text-link" href="/profil-uebernehmen">
             dein bestehendes Profil übernehmen
           </Link>{" "}
-          oder nach dem Ausfüllen deines Crew-Profils den ersten Check-in
-          speichern.
+          oder nach dem Ausfüllen deines Profils den ersten Check-in speichern.
         </p>
       ) : (
         <form
@@ -139,9 +138,9 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
               }
             />
             <span>
-              Mein Profil und meine gemeldeten Zahlen im öffentlichen
-              Community-Ranking anzeigen. Sichtbar: Anzeigename, Firma, Rolle
-              und Kennzahlen. Ich kann das jederzeit hier zurücknehmen.
+              Mein Profil und meine gemeldeten Zahlen im öffentlichen Ranking
+              anzeigen. Sichtbar: Anzeigename, Firma, Rolle und Kennzahlen.
+              Ich kann das jederzeit hier zurücknehmen.
             </span>
           </label>
           <div className="notice">

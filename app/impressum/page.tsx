@@ -70,7 +70,8 @@ export default function Page() {
         <section>
           <h2>Angebot</h2>
           <p>
-            Deal Operator ist eine kostenfreie Community für aktive Caller.
+            Deal Operator ist ein kostenfreies Werkzeug, das beim gemeinsamen
+            Callen unterstützt.
             Angaben auf dieser Website beschreiben gemeldete Aktivität und
             ersetzen keine individuelle Rechts-, Steuer- oder
             Datenschutzberatung.

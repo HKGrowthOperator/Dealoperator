@@ -368,7 +368,7 @@ export function EligibilityChecklist({
     <div className="cm-checklist" role="region" aria-label="Voraussetzungen">
       <p className="cm-checklist-lead">
         {purpose === "feed"
-          ? "Die Reflexionen lesen Mitglieder, die diese Punkte erfüllen:"
+          ? "Die Reflexionen liest, wer diese Punkte erfüllt:"
           : "Für einen eigenen Tagesabschluss fehlt noch:"}
       </p>
       <ol>
@@ -1345,9 +1345,9 @@ export default function ClosingForm({
               Mit dem Einreichen zählt dein Tag für deine Serien. Deine Zahlen gehen
               in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
               zugestimmt hast. Deine Reflexion erscheint im Austausch unter
-              /reflexionen. Lesen können alle angemeldeten Mitglieder mit bestätigter
-              E-Mail, hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer
-              wird nicht per SMS geprüft; neue Mitglieder können sich selbst registrieren.
+              /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,
+              hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer wird
+              nicht per SMS geprüft; wer neu ist, kann sich selbst registrieren.
             </p>
             <p className="cm-muted">
               {eligibility.participant?.publicConsent
@@ -1390,8 +1390,8 @@ export default function ClosingForm({
                 }}
               />
               <span>
-                Zusätzlich im Discord-Channel teilen – dort liest jede Person mit, die dem
-                Server beigetreten ist (Beitritt über öffentlichen Einladungslink).
+                Zusätzlich im Discord-Channel teilen: Dort liest jede Person mit, die auf
+                dem Server ist (Zugang über den öffentlichen Einladungslink).
                 <small>
                   {discordReady === false
                     ? "Die Discord-Übertragung ist noch nicht eingerichtet; deine Zustimmung wird gespeichert und erst genutzt, wenn sie läuft."

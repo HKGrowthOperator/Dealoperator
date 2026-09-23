@@ -13,7 +13,7 @@ export default function DiscordNudge({
       link: "Auf Discord verabreden",
     },
     reflection: {
-      title: "Ein Learning, das der Crew helfen könnte?",
+      title: "Ein Learning, das anderen helfen könnte?",
       text: "Nimm es mit in den Austausch auf Discord. Du entscheidest, was du dort teilst.",
       link: "Im Discord austauschen",
     },

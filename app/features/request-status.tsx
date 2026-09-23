@@ -123,7 +123,7 @@ export default function RequestStatus({
         target="_blank"
         rel="noreferrer"
       >
-        Zur Community auf Discord
+        Austausch auf Discord
       </a>
 
       <div className="auth-note">

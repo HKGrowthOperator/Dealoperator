@@ -175,10 +175,10 @@ export default function OnboardingStart({
       </h1>
       <p>
         {step === "choice"
-          ? "Kostenfrei mitmachen. Wähle, wie du startest."
+          ? "Kostenfrei starten. Wähle deinen Einstieg."
           : mode === "claim"
             ? "Such dein Profil, dann brauchen wir nur noch deine Kontaktdaten."
-            : "Ein kostenfreies Konto für deine Zahlen, Reflexionen und deine Crew."}
+            : "Ein kostenfreies Konto für deine Zahlen, deine Reflexionen und deine Call-Partner."}
       </p>
 
       {!ready && (
@@ -186,7 +186,7 @@ export default function OnboardingStart({
           <strong>Die Anmeldung öffnet in Kürze.</strong>
           <p>
             Wir bereiten die sichere Speicherung vor. Das öffentliche Ranking
-            zeigt schon jetzt den gemeldeten Stand der Community.
+            zeigt schon jetzt den gemeldeten Stand.
           </p>
         </div>
       )}
@@ -241,7 +241,7 @@ export default function OnboardingStart({
         <>
           <div className="form-stack">
             <label>
-              Dein Name in der Community
+              Dein Name im Ranking
               <input
                 autoFocus
                 value={query}
@@ -284,7 +284,7 @@ export default function OnboardingStart({
                   <strong>{p.name}</strong>
                   <small>
                     {[p.company, p.role].filter(Boolean).join(" · ") ||
-                      "Vorbereitetes Community-Profil"}
+                      "Vorbereitetes Profil"}
                   </small>
                 </button>
               ))}

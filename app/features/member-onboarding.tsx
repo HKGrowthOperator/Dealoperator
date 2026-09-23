@@ -47,7 +47,7 @@ export default function MemberOnboarding({
       <span className="icon-tile">
         <UserRound />
       </span>
-      <h1>Willkommen in der Crew.</h1>
+      <h1>Willkommen bei Deal Operator.</h1>
       <p>
         Deine E-Mail ist bestätigt. Richte jetzt dein Profil ein und starte mit
         deinen eigenen Zahlen.
@@ -64,7 +64,8 @@ export default function MemberOnboarding({
             onChange={(e) => setValue({ ...value, name: e.target.value })}
           />
           <small>
-            So erscheinst du in der Community. Dein voller Name bleibt beim Team.
+            So sehen dich die anderen, die mitcallen. Dein voller Name bleibt beim
+            Team.
           </small>
         </label>
         <label>
@@ -112,7 +113,7 @@ export default function MemberOnboarding({
               Profil wird eingerichtet …
             </>
           ) : (
-            "Mit meiner Crew starten"
+            "Mit meinen Zahlen starten"
           )}
         </button>
         <small>

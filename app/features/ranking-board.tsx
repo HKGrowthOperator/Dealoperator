@@ -160,12 +160,12 @@ const steps = [
   {
     icon: TrendingUp,
     title: "Fortschritt sehen",
-    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serien. Die Gruppe steht dabei vor den Einzelplätzen.",
+    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serien. Die gemeinsame Summe steht dabei vor den Einzelplätzen.",
   },
   {
     icon: BellRing,
     title: "Erinnert werden",
-    text: "Wenn du Erinnerungen auf deinem Gerät einschaltest, kommt abends ein Hinweis, falls dein Abschluss noch fehlt. Mitmachen geht auch ohne.",
+    text: "Wenn du Erinnerungen auf deinem Gerät einschaltest, kommt abends ein Hinweis, falls dein Abschluss noch fehlt. Es geht auch ohne.",
   },
   {
     icon: HeartHandshake,
@@ -415,9 +415,9 @@ export default function RankingBoard({
             <span className="rr-eyebrow">
               <span className="rr-live-dot" /> ERGEBNISSE
             </span>
-            <h1>Was wir gemeinsam schaffen.</h1>
+            <h1>Was alle zusammen schaffen.</h1>
             <p>
-              Erst die Gruppe, dann die Einzelplätze. Tag und Monat getrennt,
+              Erst die gemeinsame Summe, dann die Einzelplätze. Tag und Monat getrennt,
               jede Kennzahl mit eigener Rangliste. Fehlende Meldungen zählen
               nicht als null.
             </p>
@@ -432,7 +432,7 @@ export default function RankingBoard({
           <section className="rr-intro rr-hero" aria-labelledby="rr-title">
             <div className="rr-intro-copy">
               <span className="rr-eyebrow">
-                <span className="rr-live-dot" /> KOSTENFREI FÜR AKTIVE CALLER
+                <span className="rr-live-dot" /> KOSTENFREI FÜRS GEMEINSAME CALLEN
               </span>
               <h1 id="rr-title">
                 Zusammen callen.
@@ -440,9 +440,10 @@ export default function RankingBoard({
                 Gemeinsam <em>dranbleiben.</em>
               </h1>
               <p>
-                Deal Operator hilft dir, am Telefon dranzubleiben: regelmäßig
-                zusammen callen, jeden Calling-Tag Zahlen und Learnings
-                festhalten und sehen, wie du und die Gruppe vorankommen.
+                Deal Operator unterstützt dich beim gemeinsamen Callen:
+                regelmäßig dranbleiben, jeden Calling-Tag Zahlen und Learnings
+                festhalten und sehen, wie du und alle, die mitcallen,
+                vorankommen.
               </p>
               <div className="rr-intro-actions">
                 <Link href="/tagesabschluss" className="rr-cta-primary">
@@ -455,7 +456,7 @@ export default function RankingBoard({
                 </a>
               </div>
               <p className="rr-intro-note">
-                Neu hier? <Link href="/beitreten">Kostenfrei mitmachen</Link>
+                Neu hier? <Link href="/beitreten">Kostenfrei starten</Link>
               </p>
             </div>
             <ol
@@ -504,7 +505,7 @@ export default function RankingBoard({
           {!onlyRanking && (
             <div className="rr-section-head">
               <span className="rr-eyebrow">ERGEBNISSE</span>
-              <h2>Erst die Gruppe, dann die Einzelplätze.</h2>
+              <h2>Erst die gemeinsame Summe, dann die Einzelplätze.</h2>
             </div>
           )}
         </div>
@@ -641,7 +642,7 @@ export default function RankingBoard({
         ) : loading ? (
           <div className="rr-skeleton" role="status">
             <RefreshCw size={22} className="spin" />
-            <span>Die Leistung der Gruppe wird geladen …</span>
+            <span>Die gemeinsamen Zahlen werden geladen …</span>
           </div>
         ) : (
           data && (
@@ -854,7 +855,7 @@ export default function RankingBoard({
                         <span className="rr-podium-person">
                           <h3>{row.name}</h3>
                           <span className="rr-podium-role">
-                            {row.company || "Teil der Crew"}
+                            {row.company || "Caller"}
                           </span>
                         </span>
                         <span className="rr-podium-score">
@@ -943,7 +944,7 @@ export default function RankingBoard({
                                 </span>
                                 <span className="rr-rank-name">
                                   <strong>{row.name}</strong>
-                                  <small>{row.company || "Teil der Crew"}</small>
+                                  <small>{row.company || "Caller"}</small>
                                 </span>
                                 <dl className="rr-commit-stats">
                                   <div data-lead="true">
@@ -1043,7 +1044,7 @@ export default function RankingBoard({
                                 <small>
                                   {row.company ||
                                     (row.claimed
-                                      ? "Teil der Crew"
+                                      ? "Caller"
                                       : "Profil vorbereitet")}
                                 </small>
                               </span>
@@ -1210,7 +1211,7 @@ export default function RankingBoard({
                         </span>
                         <h3>Learnings teilen, Buddy finden.</h3>
                         <p>
-                          Angemeldete Mitglieder lesen unter Reflexionen, was
+                          Wer angemeldet ist, liest unter Reflexionen, was
                           bei anderen funktioniert hat. Antworten, Buddy-Suche
                           und gemeinsame Call-Blöcke laufen auf Discord.
                         </p>
@@ -1238,7 +1239,7 @@ export default function RankingBoard({
                   <h2>Das sind deine Zahlen?</h2>
                   <p>
                     Wähle dein vorbereitetes Profil aus. Nach E-Mail-Bestätigung
-                    und Freigabe durch unser Team machst du mit deiner
+                    und Freigabe durch das Team machst du mit deiner
                     bisherigen Historie weiter.
                   </p>
                 </div>
@@ -1263,7 +1264,7 @@ export default function RankingBoard({
             <DialogDescription>
               {selected && isJoint(selected)
                 ? "Gemeinsam gemeldete Leistung mehrerer Personen"
-                : selected?.company || "Teil der Deal Operator Crew"}
+                : selected?.company || "Caller"}
             </DialogDescription>
           </DialogHeader>
           {selected && (

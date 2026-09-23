@@ -51,19 +51,19 @@ export default function AuthForm({
       <h1>
         {sent
           ? "Schau in dein Postfach."
-          : "Dein nächster Call.\nMit deiner Crew."}
+          : "Dein nächster Call.\nDeine Zahlen im Blick."}
       </h1>
       <p>
         {sent
-          ? `Wenn es für ${email} ein Konto gibt, ist der Anmeldelink unterwegs. Öffne ihn in diesem Browser. Noch nicht registriert? Dann starte unten mit „Kostenfrei mitmachen“.`
-          : "Ein kostenfreies Konto für deine Zahlen, Reflexionen und die Menschen, die mit dir dranbleiben."}
+          ? `Wenn es für ${email} ein Konto gibt, ist der Anmeldelink unterwegs. Öffne ihn in diesem Browser. Noch nicht registriert? Dann starte unten mit „Kostenfrei starten“.`
+          : "Ein kostenfreies Konto für deine Zahlen, deine Reflexionen und deine Call-Partner."}
       </p>
       {!ready && (
         <div className="notice">
           <strong>Die Anmeldung öffnet in Kürze.</strong>
           <p>
             Wir bereiten die sichere Speicherung vor. Das öffentliche Ranking
-            zeigt schon jetzt den gemeldeten Stand der Community.
+            zeigt schon jetzt den gemeldeten Stand.
           </p>
         </div>
       )}
@@ -104,7 +104,7 @@ export default function AuthForm({
         <span>
           Noch kein Konto?
           <br />
-          <Link href="/beitreten">Kostenfrei mitmachen.</Link>
+          <Link href="/beitreten">Kostenfrei starten.</Link>
         </span>
       </div>
       <Link className="text-link" href="/ranking">

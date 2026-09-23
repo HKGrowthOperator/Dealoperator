@@ -73,7 +73,7 @@ export default function Page() {
           </p>
           <p>
             Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO für die Nutzung des
-            Mitgliedsbereichs. Soweit Supabase Daten im Auftrag verarbeitet,
+            persönlichen Bereichs. Soweit Supabase Daten im Auftrag verarbeitet,
             geschieht das auf Grundlage eines Auftragsverarbeitungsvertrags.
           </p>
         </section>
@@ -109,7 +109,7 @@ export default function Page() {
         <section>
           <h2>6. Gemeldete Zahlen und öffentliches Ranking</h2>
           <p>
-            Im Mitgliedsbereich lassen sich Tageszahlen, persönliche Ziele und
+            Im persönlichen Bereich lassen sich Tageszahlen, persönliche Ziele und
             Reflexionen festhalten. Reflexionen, Notizen, E-Mail-Adressen und
             Telefonnummern sind privat und erscheinen nie im öffentlichen
             Ranking.

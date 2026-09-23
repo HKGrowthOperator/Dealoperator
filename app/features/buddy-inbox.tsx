@@ -32,7 +32,7 @@ export default function BuddyInbox({
       ? b.name
       : b.peerName ||
         data.members.find((m) => m.id === b.to)?.name ||
-        "Mitglied";
+        "Call-Partner";
   const incoming = data.buddies.filter(
     (b) => b.incoming && b.status === "pending",
   ).length;
@@ -163,7 +163,7 @@ export default function BuddyInbox({
           <Users size={25} />
           <h3>
             {filter === "Buddys"
-              ? "Dein nächster Buddy wartet in der Crew."
+              ? "Deinen nächsten Buddy findest du unter Call-Partner."
               : "Hier bist du auf dem aktuellen Stand."}
           </h3>
           <p>

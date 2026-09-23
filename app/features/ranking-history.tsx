@@ -61,7 +61,7 @@ export default function RankingHistory({
     >
       <div className="rr-panel-heading">
         <span className="rr-eyebrow">
-          <CalendarDays size={15} /> TAGESWERTE DER GRUPPE
+          <CalendarDays size={15} /> GEMEINSAME TAGESWERTE
         </span>
         <h2>{formatMonth(month)}</h2>
         <p>Jeder Balken ist ein einzelner Tageswert, keine laufende Summe.</p>
@@ -70,7 +70,7 @@ export default function RankingHistory({
         <div>
           <span>
             {focusDay
-              ? `Gruppe am ${formatDay(focusDay, true)}`
+              ? `Gesamt am ${formatDay(focusDay, true)}`
               : "Noch kein Tag mit Meldung"}
           </span>
           <strong>{fmt(highlighted?.counts[metric] ?? null)}</strong>

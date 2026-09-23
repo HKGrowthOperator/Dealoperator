@@ -44,7 +44,7 @@ function quiet(m: { quiet_start: number | null; quiet_end: number | null }) {
 const TEXT = {
   evening: {
     title: "Dein Tagesabschluss fehlt noch",
-    body: "Zahlen und kurze Reflexion eintragen — dann zählt dein Tag für dich und die Crew.",
+    body: "Zahlen und kurze Reflexion eintragen, dann zählt dein Tag für dich und die Gruppensumme.",
   },
   streak: (day: string) => ({
     title: "Deine Serie hängt am Tagesabschluss",

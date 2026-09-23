@@ -49,12 +49,12 @@ try {
     "/anmelden",
     "/verwaltung",
     "/heute?modus=demo",
-    "/crew?modus=demo",
+    "/partner?modus=demo",
     "/reflexion?modus=demo",
     "/sessions?modus=demo",
     "/wissen?modus=demo",
     "/profil?modus=demo",
-    "/community?modus=demo",
+    "/so-funktionierts?modus=demo",
     "/fonts/manrope-400.ttf",
     "/operator-mark-source.png",
     "/favicon.svg",
@@ -79,6 +79,19 @@ try {
       response.headers.get("location")?.includes("/anmelden"),
       `${path} -> ${response.headers.get("location")}`,
     );
+  }
+  // Frühere Bereichsadressen leiten auf die neuen Pfade um, mit Modus.
+  for (const [from, to] of [
+    ["/crew?modus=demo", "/partner?modus=demo"],
+    ["/crew", "/partner"],
+    ["/community?modus=eigen", "/so-funktionierts?modus=eigen"],
+    ["/community", "/so-funktionierts"],
+    ["/partnerregister?modus=eigen", "/so-funktionierts?modus=eigen#discord"],
+  ]) {
+    const response = await fetch(base + from, { redirect: "manual" });
+    assert.equal(response.status, 307, from);
+    const location = new URL(response.headers.get("location") || "", base);
+    assert.equal(location.pathname + location.search + location.hash, to, from);
   }
   // Die frühere Direktübernahme führt in den geprüften Ablauf.
   const retired = await fetch(base + "/profil-uebernehmen?profil=abc", {

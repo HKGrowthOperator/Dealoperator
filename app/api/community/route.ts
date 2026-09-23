@@ -133,7 +133,7 @@ export async function GET() {
                 ).name
               : x.owner === user.userId
                 ? "Du"
-                : "Mitglied",
+                : "Caller",
           })),
         attendees: rsvps.results.filter((x: any) => x.session === r.id).length,
         joined: rsvps.results.some(
@@ -272,7 +272,7 @@ export async function POST(request: Request) {
         .object({ target: s.min(1).max(100), message: s.min(5).max(800) })
         .parse(body.value);
       if (value.target === id)
-        return json({ error: "Wähle ein anderes Mitglied." }, 400);
+        return json({ error: "Wähle eine andere Person." }, 400);
       const target = await database
         .prepare(
           "SELECT id FROM profiles WHERE id = ? AND (data::jsonb->>'listed') = 'true'",
@@ -287,7 +287,7 @@ export async function POST(request: Request) {
         return json(
           {
             error:
-              "Beide Mitglieder benötigen ein Profil. Das Zielprofil muss sichtbar sein.",
+              "Beide Personen benötigen ein Profil. Das Zielprofil muss sichtbar sein.",
           },
           400,
         );
@@ -319,7 +319,7 @@ export async function POST(request: Request) {
                 .prepare("SELECT data FROM profiles WHERE id = ?")
                 .bind(value.target)
                 .first<{ data: string }>();
-              return row ? JSON.parse(row.data).name : "Mitglied";
+              return row ? JSON.parse(row.data).name : "Caller";
             })(),
           }),
         )
