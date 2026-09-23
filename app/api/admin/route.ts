@@ -1,0 +1,92 @@
+import { getCurrentUser } from "@/server/auth";
+import { database } from "@/server/database";
+import { body, errorResponse, json } from "@/server/http";
+import { AppError, rateLimit } from "@/server/operator";
+import {
+  addPause,
+  commitmentRules,
+  decidePause,
+  deleteEvent,
+  listEvents,
+  pauseList,
+  resolveInbox,
+  saveCommitmentRules,
+  saveEvent,
+  teamInbox,
+  unconfirmedRegistrations,
+} from "@/server/admin";
+import { ensureAdminPrefs, notificationStatus } from "@/server/notify";
+import {
+  commitWins,
+  previewWins,
+  resolveReviewCase,
+  reviewCases,
+} from "@/server/wins-import";
+import { discordStatus, discordInventory } from "@/server/discord-admin";
+
+export const dynamic = "force-dynamic";
+
+async function admin() {
+  const actor = await getCurrentUser();
+  if (!actor) throw new AppError("Bitte melde dich mit deiner bestätigten E-Mail an.", 401);
+  if (!actor.admin)
+    throw new AppError("Dieser Bereich ist nur für die Verwaltung freigeschaltet.", 403);
+  return actor;
+}
+
+export async function GET() {
+  try {
+    const actor = await admin();
+    const db = database();
+    await ensureAdminPrefs(db, actor);
+    const [inbox, unconfirmed, pauses, events, rules, notifications, cases, discord] = await Promise.all([
+      teamInbox(db, actor),
+      unconfirmedRegistrations(db, actor),
+      pauseList(db, actor),
+      listEvents(db),
+      commitmentRules(db, actor),
+      notificationStatus(db),
+      reviewCases(db, actor),
+      discordStatus(db),
+    ]);
+    return json({ inbox, unconfirmed, pauses, events, rules, notifications, cases, discord });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const actor = await admin();
+    const raw = await body(request, 250_000);
+    const db = database();
+    await rateLimit(db, `admin:${actor.userId}`, 60);
+    const v = raw?.value;
+    switch (raw?.action) {
+      case "resolveInbox":
+        return json(await resolveInbox(db, actor, v));
+      case "decidePause":
+        return json(await decidePause(db, actor, v));
+      case "addPause":
+        return json(await addPause(db, actor, v));
+      case "saveEvent":
+        return json(await saveEvent(db, actor, v));
+      case "deleteEvent":
+        return json(await deleteEvent(db, actor, v));
+      case "saveRules":
+        return json(await saveCommitmentRules(db, actor, v));
+      case "previewWins":
+        return json(await previewWins(db, actor, v));
+      case "commitWins":
+        return json(await commitWins(db, actor, v));
+      case "resolveCase":
+        return json(await resolveReviewCase(db, actor, v));
+      case "discordInventory":
+        return json(await discordInventory());
+      default:
+        throw new AppError("Unbekannte Aktion.");
+    }
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
