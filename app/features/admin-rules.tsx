@@ -107,7 +107,7 @@ export function RulesPanel({
         <div>
           <h2 id="adm-rules-title">Dranbleiben-Regeln</h2>
           <p>
-            Diese Werte steuern Serien, Fristen, Erinnerungen und die
+            Diese Werte steuern die Serie, Fristen, Erinnerungen und die
             Teamprüfung. Sie gelten für alle Mitglieder gleich. Zeitzone:{" "}
             {form.timeZone}.
           </p>
@@ -232,24 +232,6 @@ export function RulesPanel({
           </small>
         </label>
       </div>
-
-      <label className="adm-check">
-        <input
-          type="checkbox"
-          checked={form.zeroCallDayBreaksCallingStreak}
-          onChange={(e) =>
-            update({ zeroCallDayBreaksCallingStreak: e.target.checked })
-          }
-        />
-        <span>
-          Ein fristgerechter Abschluss ohne Anwahlen unterbricht die
-          Calling-Serie
-          <small>
-            Aus (Startwert): Er verlängert die Calling-Serie nicht, hält sie
-            aber an. Die Reflexions-Serie läuft in beiden Fällen weiter.
-          </small>
-        </span>
-      </label>
 
       <div className="adm-explain" aria-live="polite">
         <strong>So wirkt es gerade</strong>

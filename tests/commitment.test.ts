@@ -80,7 +80,7 @@ test("deadlines follow daylight saving time in both directions", () => {
   );
 });
 
-test("a complete closing without calls keeps the reflection streak but does not extend the calling streak", () => {
+test("a complete closing without calls extends the one streak like any other on-time closing", () => {
   const s = summarize({
     closings: [
       closing(MO, 50, at(MO, 19)),
@@ -96,9 +96,8 @@ test("a complete closing without calls keeps the reflection streak but does not 
     s.days.map((d) => d.status),
     ["called", "reflected", "called"],
   );
-  assert.equal(s.reflection.current, 3);
-  // Montag und Mittwoch zählen, der Tag ohne Anwahlen hält die Serie an.
-  assert.equal(s.calling.current, 2);
+  assert.equal(s.streak.current, 3);
+  // Aktive Tage zählen weiter nur Tage mit Anwahlen.
   assert.equal(s.activeDays, 2);
   assert.equal(s.closedDays, 3);
 });
@@ -115,31 +114,36 @@ test("a reflection with 0 calls never breaks the streak, even over weeks", () =>
     to: last,
     now: at(last, 22),
   });
-  assert.equal(s.reflection.current, 15);
-  assert.equal(s.reflection.best, 15);
+  assert.equal(s.streak.current, 15);
+  assert.equal(s.streak.best, 15);
   assert.ok(s.days.filter((d) => d.due).every((d) => d.status === "reflected"));
   assert.equal(s.missingOpen, 0);
-  // Die Calling-Serie ist eine eigene Zusatzzahl und wächst nur mit Anwahlen.
-  assert.equal(s.calling.current, 0);
+  // Ohne Calls gilt man für das Team als inaktiv; die Serie bleibt davon unberührt.
+  assert.equal(s.inactive, true);
+  // Es gibt nur diese eine Serie.
+  assert.deepEqual(Object.keys(s).filter((k) => /calling|reflection/i.test(k)), []);
 });
 
-test("the ranking puts the reflection streak first; calls only break ties", async () => {
+test("the ranking sorts by the streak; active days only break ties", async () => {
   const { byCommitment } = await import("../server/commitment-public");
-  const row = (name: string, reflection: number, calling: number, activeDays = 0) => ({
+  const row = (name: string, streak: number, activeDays: number) => ({
     name,
-    reflection: { current: reflection },
-    calling: { current: calling },
+    streak: { current: streak },
     activeDays,
   });
   const sorted = [
-    row("Viel Calls", 2, 2, 2),
-    row("Immer reflektiert, 0 Calls", 5, 0, 0),
-    row("Gleich, mehr Calls", 2, 1, 5),
+    row("Viele Calltage", 2, 9),
+    row("Immer reflektiert, 0 Calls", 5, 0),
+    row("Gleiche Serie, weniger Calltage", 2, 1),
   ].sort(byCommitment);
-  assert.deepEqual(sorted.map((r) => r.name), ["Immer reflektiert, 0 Calls", "Viel Calls", "Gleich, mehr Calls"]);
+  assert.deepEqual(sorted.map((r) => r.name), [
+    "Immer reflektiert, 0 Calls",
+    "Viele Calltage",
+    "Gleiche Serie, weniger Calltage",
+  ]);
 });
 
-test("a missed due day breaks both streaks; best streaks are kept", () => {
+test("a missed due day breaks the streak; the best streak is kept", () => {
   const s = summarize({
     closings: [
       closing(MO, 50, at(MO, 19)),
@@ -153,9 +157,8 @@ test("a missed due day breaks both streaks; best streaks are kept", () => {
     now: at(DO, 22),
   });
   assert.equal(s.days[2].status, "missed");
-  assert.equal(s.calling.current, 1);
-  assert.equal(s.calling.best, 2);
-  assert.equal(s.reflection.current, 1);
+  assert.equal(s.streak.current, 1);
+  assert.equal(s.streak.best, 2);
   assert.equal(s.missingOpen, 1);
 });
 
@@ -175,7 +178,7 @@ test("the weekend neither breaks nor extends a streak; a weekend closing is a bo
     s.days.map((d) => d.status),
     ["called", "bonus", "free", "called"],
   );
-  assert.equal(s.calling.current, 2);
+  assert.equal(s.streak.current, 2);
   assert.equal(s.activeDays, 3);
 });
 
@@ -199,7 +202,7 @@ test("approved pauses take days out of duty and move the deadline", () => {
     s.days.map((d) => d.status),
     ["called", "paused", "paused", "called"],
   );
-  assert.equal(s.calling.current, 2);
+  assert.equal(s.streak.current, 2);
   assert.equal(s.missingOpen, 0);
 });
 
@@ -321,11 +324,11 @@ test("calls added only after the deadline never turn a day into a calling day", 
     now: at(MI, 16),
   });
   assert.equal(s.days[0].status, "reflected");
-  assert.equal(s.calling.current, 0);
-  assert.equal(s.reflection.current, 1);
+  assert.equal(s.activeDays, 1);
+  assert.equal(s.streak.current, 1);
 });
 
-test("days without calls hold the calling streak only until the member counts as inactive", () => {
+test("days without calls make a member inactive for the team, but never cost the streak", () => {
   const zero = (d: string) => closing(d, 0, at(d, 19));
   const s = summarize({
     closings: [
@@ -341,9 +344,8 @@ test("days without calls hold the calling streak only until the member counts as
     now: at(MO2, 11),
   });
   assert.equal(s.inactive, true);
-  assert.equal(s.calling.current, 0);
-  assert.equal(s.calling.best, 1);
-  assert.equal(s.reflection.current, 5);
+  assert.equal(s.streak.current, 5);
+  assert.equal(s.streak.best, 5);
 });
 
 test("a day without calls counts toward inactivity only after its deadline", () => {

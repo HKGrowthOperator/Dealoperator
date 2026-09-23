@@ -118,7 +118,7 @@ export function StreakStrip() {
             : "Zahlen und Reflexion in einem Abschluss. Zählt erst nach dem Einreichen.";
 
   return (
-    <section className="cm-strip" aria-label="Tagesabschluss und Serien">
+    <section className="cm-strip" aria-label="Tagesabschluss und Serie">
       <div className="cm-strip-main">
         <span className="cm-strip-icon" aria-hidden="true">
           {todayClosed ? <CircleCheck size={22} /> : <Flame size={22} />}
@@ -131,12 +131,8 @@ export function StreakStrip() {
       {state?.summary && (
         <dl className="cm-strip-stats">
           <div>
-            <dt>Reflexions-Serie</dt>
-            <dd>{state.summary.reflection.current}</dd>
-          </div>
-          <div>
-            <dt>Calling-Serie</dt>
-            <dd>{state.summary.calling.current}</dd>
+            <dt>Serie</dt>
+            <dd>{state.summary.streak.current}</dd>
           </div>
         </dl>
       )}
@@ -328,7 +324,7 @@ export default function CommitmentDashboard({
       <header className="cm-section-head">
         <div>
           <p className="cm-kicker">DRANBLEIBEN</p>
-          <h2 id={`${uid}-title`}>Deine Serien</h2>
+          <h2 id={`${uid}-title`}>Deine Serie</h2>
         </div>
         <p className="cm-muted">
           Calling-Tage sind {workdays}. Rechtzeitig ist ein Abschluss bis{" "}
@@ -339,23 +335,15 @@ export default function CommitmentDashboard({
 
       <dl className="cm-stats">
         <div className="accent">
-          <dt>Reflexions-Serie</dt>
+          <dt>Serie</dt>
           <dd>
-            <strong>{summary.reflection.current}</strong>
-            <span>Bestwert {summary.reflection.best}</span>
+            <strong>{summary.streak.current}</strong>
+            <span>Bestwert {summary.streak.best}</span>
           </dd>
           <p>
             Rechtzeitige Tagesabschlüsse mit Reflexion in Folge. Auch ein Tag
             mit 0 Anwahlen hält sie am Laufen.
           </p>
-        </div>
-        <div>
-          <dt>Calling-Serie</dt>
-          <dd>
-            <strong>{summary.calling.current}</strong>
-            <span>Bestwert {summary.calling.best}</span>
-          </dd>
-          <p>Zusätzlich: rechtzeitige Calling-Tage mit Anwahlen in Folge.</p>
         </div>
         <div>
           <dt>Aktive Tage</dt>

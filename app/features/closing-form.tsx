@@ -98,8 +98,7 @@ export type PauseEntry = {
   status: "requested" | "approved" | "rejected";
 };
 export type CommitmentSummaryDTO = {
-  calling: { current: number; best: number };
-  reflection: { current: number; best: number };
+  streak: { current: number; best: number };
   activeDays: number;
   closedDays: number;
   inactive: boolean;
@@ -207,7 +206,7 @@ export function fetchClosingState(month?: string, signal?: AbortSignal) {
   );
 }
 
-/** Andere Bausteine (Serien, Kalender) aktualisieren sich nach dem Einreichen. */
+/** Andere Bausteine (Serie, Kalender) aktualisieren sich nach dem Einreichen. */
 export const CLOSING_CHANGED = "deal-operator:closing-changed";
 export function announceClosingChange() {
   window.dispatchEvent(new Event(CLOSING_CHANGED));
@@ -544,14 +543,14 @@ function clampDay(state: ClosingState, requested: string | undefined) {
 
 const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
   called:
-    "Rechtzeitig mit Anwahlen: Der Tag zählt für deine Reflexions-Serie und deine Calling-Serie.",
+    "Rechtzeitig eingereicht: Der Tag zählt für deine Serie.",
   reflected:
-    "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen: Deine Reflexions-Serie läuft weiter. Die Calling-Serie wächst nur an Tagen mit Anwahlen.",
-  late: "Später eingereicht: Deine Zahlen zählen, die Serien setzt dieser Tag nicht fort.",
+    "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen: Deine Serie läuft weiter.",
+  late: "Später eingereicht: Deine Zahlen zählen, deine Serie setzt dieser Tag nicht fort.",
   bonus:
-    "Freiwilliger Abschluss an einem freien Tag: Deine Zahlen zählen, deine Serien bleiben davon unberührt.",
+    "Freiwilliger Abschluss an einem freien Tag: Deine Zahlen zählen, deine Serie bleibt davon unberührt.",
   "before-start":
-    "Dieser Tag liegt vor deinem Start im Tagesabschluss: Er zählt nicht für Serien.",
+    "Dieser Tag liegt vor deinem Start im Tagesabschluss: Er zählt nicht für die Serie.",
 };
 
 // ---------------------------------------------------------------------------
@@ -960,15 +959,15 @@ export default function ClosingForm({
   const dayNote = (() => {
     if (imported) return null;
     if (state.trackingStart && form.day < state.trackingStart && !submitted)
-      return `Dieser Tag liegt vor deinem Start im Tagesabschluss (${formatShortDay(state.trackingStart)}). Er zählt nicht für Serien.`;
+      return `Dieser Tag liegt vor deinem Start im Tagesabschluss (${formatShortDay(state.trackingStart)}). Er zählt nicht für die Serie.`;
     if (paused) return "Dieser Tag liegt in einer bestätigten Pause. Ein Abschluss ist freiwillig.";
     if (!due)
-      return "Kein Calling-Tag: Ein Abschluss ist freiwillig. Er zählt als Bonus, deine Serien bleiben unberührt.";
+      return "Kein Calling-Tag: Ein Abschluss ist freiwillig. Er zählt als Bonus, deine Serie bleibt unberührt.";
     if (submitted) return null;
     if (deadline && nowMs < deadline.getTime())
       return `Calling-Tag. Rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
     if (deadline)
-      return `Rechtzeitig war bis ${formatMoment(deadline.toISOString(), tz)}. Deine Zahlen zählen trotzdem, nur für die Serien zählt der Tag nicht mehr.`;
+      return `Rechtzeitig war bis ${formatMoment(deadline.toISOString(), tz)}. Deine Zahlen zählen trotzdem, nur für die Serie zählt der Tag nicht mehr.`;
     return null;
   })();
 
@@ -1175,7 +1174,7 @@ export default function ClosingForm({
               <li>
                 {confirmation.publicConsent
                   ? "Deine Zahlen zählen im Ranking und in der Gruppensumme und sind öffentlich sichtbar, weil du der öffentlichen Anzeige zugestimmt hast."
-                  : "Deine Zahlen zählen für deine Serien und stehen in deinem Bereich. Im Ranking und in der Gruppensumme erscheinen sie erst, wenn du der öffentlichen Anzeige zustimmst. Das kannst du in deinem Profil ändern."}
+                  : "Deine Zahlen zählen für deine Serie und stehen in deinem Bereich. Im Ranking und in der Gruppensumme erscheinen sie erst, wenn du der öffentlichen Anzeige zustimmst. Das kannst du in deinem Profil ändern."}
               </li>
               {CONFIRM_STATUS[confirmation.status] && (
                 <li>{CONFIRM_STATUS[confirmation.status]}</li>
@@ -1341,7 +1340,7 @@ export default function ClosingForm({
           <fieldset className="cm-group cm-visibility">
             <legend>Wer sieht deinen Tagesabschluss?</legend>
             <p>
-              Mit dem Einreichen zählt dein Tag für deine Serien. Deine Zahlen gehen
+              Mit dem Einreichen zählt dein Tag für deine Serie. Deine Zahlen gehen
               in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
               zugestimmt hast. Deine Reflexion erscheint im Austausch unter
               /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,

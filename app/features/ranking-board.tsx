@@ -96,8 +96,7 @@ type CommitmentRow = {
   id: string;
   name: string;
   company: string;
-  calling: { current: number; best: number };
-  reflection: { current: number; best: number };
+  streak: { current: number; best: number };
   activeDays: number;
   closedDays: number;
 };
@@ -121,8 +120,7 @@ function validCommitment(value: unknown): CommitmentRow[] {
       !!row &&
       typeof row.id === "string" &&
       typeof row.name === "string" &&
-      typeof row.calling?.current === "number" &&
-      typeof row.reflection?.current === "number" &&
+      typeof row.streak?.current === "number" &&
       typeof row.activeDays === "number",
   );
 }
@@ -133,7 +131,7 @@ function validCommitment(value: unknown): CommitmentRow[] {
  */
 function placeCommitment(rows: CommitmentRow[]) {
   const signature = (row: CommitmentRow) =>
-    `${row.reflection.current}|${row.calling.current}|${row.activeDays}`;
+    `${row.streak.current}|${row.activeDays}`;
   const places: number[] = [];
   rows.forEach((row, index) => {
     places.push(
@@ -159,7 +157,7 @@ const steps = [
   {
     icon: TrendingUp,
     title: "Fortschritt sehen",
-    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serien. Die gemeinsame Summe steht dabei vor den Einzelplätzen.",
+    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serie. Die gemeinsame Summe steht dabei vor den Einzelplätzen.",
   },
   {
     icon: BellRing,
@@ -276,7 +274,7 @@ export default function RankingBoard({
   const runningStreaks = commitmentState?.error
     ? null
     : commitmentState
-      ? commitmentState.rows.filter((row) => row.reflection.current > 0).length
+      ? commitmentState.rows.filter((row) => row.streak.current > 0).length
       : null;
   const latestReported =
     !monthly && data && rows.length === 0
@@ -811,8 +809,8 @@ export default function RankingBoard({
                 <div className="rr-ranking-context">
                   {commitmentView ? (
                     <span>
-                      Sortiert nach aktueller <strong>Reflexions-Serie</strong>,
-                      dann Calling-Serie, dann aktiven Tagen.
+                      Sortiert nach aktueller <strong>Serie</strong>, dann
+                      aktiven Tagen.
                     </span>
                   ) : (
                     <span>
@@ -945,24 +943,13 @@ export default function RankingBoard({
                                 </span>
                                 <dl className="rr-commit-stats">
                                   <div data-lead="true">
-                                    <dt>Reflexions-Serie</dt>
+                                    <dt>Serie</dt>
                                     <dd>
                                       <strong>
-                                        {fmt(row.reflection.current)}
+                                        {fmt(row.streak.current)}
                                       </strong>
                                       <small>
-                                        Bestwert {fmt(row.reflection.best)}
-                                      </small>
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Calling-Serie</dt>
-                                    <dd>
-                                      <strong>
-                                        {fmt(row.calling.current)}
-                                      </strong>
-                                      <small>
-                                        Bestwert {fmt(row.calling.best)}
+                                        Bestwert {fmt(row.streak.best)}
                                       </small>
                                     </dd>
                                   </div>
@@ -1129,14 +1116,13 @@ export default function RankingBoard({
                       {commitmentView ? (
                         <>
                           <span>
-                            Die Reflexions-Serie zählt jeden rechtzeitig
-                            eingereichten Tagesabschluss mit Reflexion an
-                            Calling-Tagen, auch mit 0 Anwahlen. Die
-                            Calling-Serie wächst nur an Tagen mit Anwahlen.
-                            Wochenenden sind keine Calling-Tage.
+                            Die Serie zählt jeden rechtzeitig eingereichten
+                            Tagesabschluss mit Reflexion an Calling-Tagen, auch
+                            mit 0 Anwahlen. Wochenenden sind keine
+                            Calling-Tage.
                           </span>
                           <span>
-                            Serien: Stand heute. Aktive Tage und Abschlüsse:{" "}
+                            Serie: Stand heute. Aktive Tage und Abschlüsse:{" "}
                             {formatMonth(month)}. Nur eigene Tagesabschlüsse
                             mit öffentlicher Anzeige.
                           </span>

@@ -55,32 +55,29 @@ export async function commitmentRanking(
       id: p.id as string,
       name: p.name as string,
       company: (p.company as string) || "",
-      calling: overall.calling,
-      reflection: overall.reflection,
+      streak: overall.streak,
       activeDays: range.activeDays,
       closedDays: range.closedDays,
     });
   }
   return rows
-    .filter((r) => r.closedDays > 0 || r.calling.current > 0 || r.reflection.current > 0)
+    .filter((r) => r.closedDays > 0 || r.streak.current > 0)
     .sort(byCommitment);
 }
 
 type RankedCommitment = {
   name: string;
-  calling: { current: number };
-  reflection: { current: number };
+  streak: { current: number };
   activeDays: number;
 };
 /**
- * Reihenfolge der Dranbleiben-Rangliste. Die Serie ist die Reflexions-Serie:
- * Wer rechtzeitig seine Reflexion einreicht, bleibt dran, auch mit 0
- * Anwahlen. Die Calling-Serie entscheidet erst bei Gleichstand.
+ * Reihenfolge der Dranbleiben-Rangliste: zuerst die Serie (rechtzeitige
+ * Tagesabschlüsse mit Reflexion, auch mit 0 Anwahlen), bei Gleichstand die
+ * aktiven Tage im Monat.
  */
 export function byCommitment(a: RankedCommitment, b: RankedCommitment) {
   return (
-    b.reflection.current - a.reflection.current ||
-    b.calling.current - a.calling.current ||
+    b.streak.current - a.streak.current ||
     b.activeDays - a.activeDays ||
     a.name.localeCompare(b.name, "de")
   );
@@ -109,8 +106,7 @@ export async function discordStreakText(db: Database, owner: string, now = new D
     settings,
   });
   const lines = [
-    `Reflexions-Serie: ${s.reflection.current} (Bestwert ${s.reflection.best}), zählt auch Tage mit 0 Anwahlen`,
-    `Calling-Serie: ${s.calling.current} (Bestwert ${s.calling.best}), nur Tage mit Anwahlen`,
+    `Serie: ${s.streak.current} (Bestwert ${s.streak.best}). Jeder rechtzeitige Tagesabschluss mit Reflexion zählt, auch mit 0 Anwahlen.`,
   ];
   if (s.atRisk)
     lines.push(

@@ -14,6 +14,9 @@
  *   Freitag lässt sich damit bis Montagvormittag abschließen.
  * - Genehmigte Pausen nehmen Tage aus der Pflicht heraus und verschieben die
  *   Frist auf den nächsten fälligen Tag danach.
+ * - Es gibt genau eine Serie: fristgerechte vollständige Tagesabschlüsse mit
+ *   Reflexion an Pflicht-Tagen in Folge. 0 Anwahlen unterbrechen sie nicht;
+ *   Hauptsache, die Reflexion ist rechtzeitig eingereicht.
  */
 
 export type Clock = { hour: number; minute: number };
@@ -29,12 +32,6 @@ export type CommitmentSettings = {
   inactivityAfterDays: number;
   /** Teamprüfung ab so vielen offenen fehlenden Abschlüssen. */
   reviewAfterMissing: number;
-  /**
-   * Ein fristgerechter Abschluss ohne Anwahlen verlängert die Calling-Serie
-   * nicht. Ob er sie auch unterbricht, ist hier einstellbar; Startwert:
-   * nein — er hält sie an, die Reflexionsserie läuft weiter.
-   */
-  zeroCallDayBreaksCallingStreak: boolean;
 };
 
 export const defaultCommitmentSettings: CommitmentSettings = {
@@ -45,7 +42,6 @@ export const defaultCommitmentSettings: CommitmentSettings = {
   streakWarning: { hour: 9, minute: 0 },
   inactivityAfterDays: 3,
   reviewAfterMissing: 3,
-  zeroCallDayBreaksCallingStreak: false,
 };
 
 /** Genehmigte Pause, beide Tage einschließlich. */
@@ -219,9 +215,9 @@ export type DayStatus =
   | "future"
   /** Pflicht-Tag, Frist läuft noch, noch kein Abschluss. */
   | "open"
-  /** Fristgerecht abgeschlossen, mit Anwahlen. */
+  /** Fristgerecht abgeschlossen, mit Anwahlen. Zählt für die Serie. */
   | "called"
-  /** Fristgerecht abgeschlossen, ohne Anwahlen. */
+  /** Fristgerecht abgeschlossen, ohne Anwahlen. Zählt ebenso für die Serie. */
   | "reflected"
   /** Nach der Frist abgeschlossen. Zahlen zählen, die Serie nicht. */
   | "late"
@@ -237,8 +233,8 @@ export type DayState = {
 };
 
 export type CommitmentSummary = {
-  calling: { current: number; best: number };
-  reflection: { current: number; best: number };
+  /** Die eine Serie: fristgerechte Tagesabschlüsse mit Reflexion in Folge. */
+  streak: { current: number; best: number };
   /** Tage mit abgeschlossenen Anwahlen (> 0) im betrachteten Zeitraum. */
   activeDays: number;
   /** Tage mit vollständigem Abschluss im betrachteten Zeitraum. */
@@ -290,10 +286,8 @@ export function summarize({
   const today = localDay(now, settings.timeZone);
   const days: DayState[] = [];
 
-  let callingRun = 0,
-    callingBest = 0,
-    reflectionRun = 0,
-    reflectionBest = 0,
+  let streakRun = 0,
+    streakBest = 0,
     noCallRun = 0,
     inactive = false,
     missingOpen = 0,
@@ -334,44 +328,37 @@ export function summarize({
       if (hasCalls(closing) && day >= from) activeDays++;
     }
 
-    // Serien laufen nur über Pflicht-Tage. Freie Tage, Pausen, offene Tage
-    // und Bonus-Tage verändern sie nicht.
+    // Die Serie läuft nur über Pflicht-Tage. Freie Tage, Pausen, offene Tage
+    // und Bonus-Tage verändern sie nicht. Ob Anwahlen dabei waren, spielt für
+    // die Serie keine Rolle; nur für die Inaktivität.
     if (status === "called") {
-      callingRun++;
-      reflectionRun++;
+      streakRun++;
       noCallRun = 0;
     } else if (status === "reflected") {
-      reflectionRun++;
-      if (settings.zeroCallDayBreaksCallingStreak) callingRun = 0;
+      streakRun++;
       // Für die Inaktivität zählt ein Tag ohne Calls erst, wenn seine Frist
       // vorbei ist — bis dahin kann noch ein Calling-Tag daraus werden.
       if (now >= deadline!) noCallRun++;
     } else if (status === "late") {
       // Verspätet: die Zahlen zählen, die Serie ist trotzdem gerissen. Ein
       // verspäteter Abschluss mit Anwahlen beendet aber die Inaktivität.
-      callingRun = 0;
-      reflectionRun = 0;
+      streakRun = 0;
       noCallRun = hasCalls(closing) ? 0 : noCallRun + 1;
     } else if (status === "missed") {
-      callingRun = 0;
-      reflectionRun = 0;
+      streakRun = 0;
       noCallRun++;
       missingOpen++;
     }
-    // Inaktiv (mehr als die Schwelle an Pflicht-Tagen ohne Calls): die
-    // Calling-Serie endet. Tage ohne Calls halten sie nur kurz an.
-    if (noCallRun > settings.inactivityAfterDays) {
-      inactive = true;
-      callingRun = 0;
-    }
-    callingBest = Math.max(callingBest, callingRun);
-    reflectionBest = Math.max(reflectionBest, reflectionRun);
+    // Inaktiv: mehr als die Schwelle an Pflicht-Tagen ohne Calls. Das ist ein
+    // Hinweis für das Team, die Serie bleibt davon unberührt.
+    if (noCallRun > settings.inactivityAfterDays) inactive = true;
+    streakBest = Math.max(streakBest, streakRun);
     if (status === "called" || (status === "late" && hasCalls(closing)))
       inactive = false;
 
     // Der früheste offene Tag hat die nächste Frist und ist damit der
     // dringendste; spätere offene Tage überschreiben ihn nicht.
-    if (!atRisk && status === "open" && (callingRun > 0 || reflectionRun > 0))
+    if (!atRisk && status === "open" && streakRun > 0)
       atRisk = { day, deadline: deadline!.toISOString() };
 
     if (day >= from)
@@ -385,8 +372,7 @@ export function summarize({
   }
 
   return {
-    calling: { current: callingRun, best: callingBest },
-    reflection: { current: reflectionRun, best: reflectionBest },
+    streak: { current: streakRun, best: streakBest },
     activeDays,
     closedDays,
     inactive,

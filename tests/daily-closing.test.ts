@@ -363,3 +363,20 @@ test("a new account from the sign-in page alerts the team once, never for existi
   await noteConfirmedAccount(db, bob);
   assert.equal((await db.query("SELECT * FROM team_inbox")).length, 1);
 });
+
+test("saved rules with the retired calling-streak switch stay valid; only one streak is left", async () => {
+  const { loadCommitmentSettings, saveCommitmentSettings } = await import("../server/settings");
+  const { defaultCommitmentSettings } = await import("../lib/commitment");
+  await db.query(
+    `INSERT INTO app_settings(key,value) VALUES('commitment',$1::jsonb)
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
+    [JSON.stringify({ ...defaultCommitmentSettings, deadlineHour: 11, zeroCallDayBreaksCallingStreak: true })],
+  );
+  const loaded = await loadCommitmentSettings(db);
+  assert.equal(loaded.deadlineHour, 11);
+  assert.equal("zeroCallDayBreaksCallingStreak" in loaded, false);
+  // Auch ein älteres Formular mit dem Schalter lässt sich noch speichern.
+  const saved = await saveCommitmentSettings(db, "admin", { ...loaded, zeroCallDayBreaksCallingStreak: false });
+  assert.equal("zeroCallDayBreaksCallingStreak" in saved, false);
+  await db.query("DELETE FROM app_settings WHERE key='commitment'");
+});
