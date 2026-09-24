@@ -87,6 +87,23 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 - CTA-Pfeile sind entfernt. Funktionale Steuerungen wie Dropdowns oder Kalender dürfen Richtungssymbole behalten.
 - Ausschließlich „kostenfrei“ verwenden. Website-Marke: Deal Operator. Partnerregister bleibt außerhalb der Website.
 
+## Nutzerwege nach der UX-Überarbeitung (24.09.2026)
+
+Mobil (360/390/430) und Desktop (1280) prüfen:
+
+1. Neuer Besuch: gemeinsame Ergebnisse stehen vor den Erklärungen; „Kostenfrei starten“ und „Meine Zahlen sind schon hier“ sind getrennt.
+2. Eigenen Namen in der Rangliste suchen, Zeile aufklappen, „Das sind meine Zahlen“: Übernahme genau dieses Profils.
+3. Anmeldung ohne Ziel landet auf der Startseite mit dem Abschnitt „Mein Tag“.
+4. Anmeldung mit Ziel (Tagesabschluss, Reflexionen, Verwaltung) landet genau dort.
+5. Zahlen und Reflexion einreichen: Bestätigung nennt Tag und tatsächliche Folgen; Erinnerungen werden einmal angeboten.
+6. Fehlende Telefonnummer: früher Hinweis, Nummer im Profil ergänzen, zurück zum Tagesabschluss, Entwurf ist noch da.
+7. Nach dem Einreichen zeigt die Startseite „Heute abgeschlossen“.
+8. Tag und Monat getrennt; historische Links behalten Tag und Kennzahl; Verlauf zeigt Einzelwerte je Tag.
+9. Gleichstand: alle gleichplatzierten Personen stehen mit derselben Platzzahl und Gestaltung in der Liste.
+10. Reflexionen: ohne Zugang nur Nutzen und Weg hinein, keine Inhalte; mit Zugang direkt die Beiträge.
+11. Discord-Knöpfe sagen vor dem Klick, dass Discord geöffnet wird.
+12. Lange Namen umbrechen, Tastatur funktioniert (Tableiste weicht der Bildschirmtastatur), größere Schrift ohne seitliches Scrollen.
+
 ## Betrieb vor dem öffentlichen Start
 
 Betreiber- und Datenschutzangaben, endgültige Domain, Versanddomain und Zustellbarkeit ergänzen. Sicherungen, Wiederherstellungsweg und tatsächliche Tariflimits festlegen. Fehlerlogs ohne Zugangsdaten und private Formulardaten halten. Der Discord-Bot ist eine eigene noch offene Integration, beschrieben in [DISCORD.md](DISCORD.md).
