@@ -122,19 +122,20 @@ export default function Page() {
             Ein eingereichter Tagesabschluss (Anzeigename, Tag, Energie, was gut
             lief, nächster Schritt) ist unter „Reflexionen“ für angemeldete
             Nutzer sichtbar, die ihre E-Mail bestätigt, ein eigenes Profil
-            angelegt und eine Telefonnummer hinterlegt haben. Die Zahlen des
-            Tages stehen dort nur bei gewählter öffentlicher Anzeige. Darauf weist
-            das Formular vor dem Einreichen hin.
+            angelegt und eine Telefonnummer hinterlegt haben, mit den Zahlen des
+            Tages. Darauf weist das Formular vor dem ersten Einreichen hin.
           </p>
           <p>
-            Öffentlich sichtbar sind nur bei gewählter öffentlicher Anzeige:
-            Anzeigename, Firma und Rolle, die freigegebenen Kennzahlen mit
-            Meldedatum sowie in der Dranbleiben-Übersicht die Serie und die
-            Zahl aktiver und abgeschlossener Tage. Die
-            Veröffentlichung wird beim Anlegen des Profils ausdrücklich gewählt,
-            lässt sich auf der Startseite und im Tagesabschluss jederzeit
-            einschalten und im Profil jederzeit widerrufen. Rechtsgrundlage ist
-            Art. 6 Abs. 1 lit. a DSGVO.
+            Die Teilnahme besteht darin, die eigenen Tageszahlen in die
+            gemeinsame Rangliste einzubringen. Mit dem Anlegen oder Übernehmen
+            eines Profils stehen deshalb Anzeigename, Firma und Rolle, die
+            gemeldeten Kennzahlen mit Meldedatum sowie in der
+            Dranbleiben-Übersicht die Serie und die Zahl aktiver und
+            abgeschlossener Tage in der öffentlichen Rangliste; darauf weist
+            das Profilformular hin. Eine Anzeige nur für dich gibt es nicht.
+            Wer nicht mehr in der Rangliste stehen möchte, wendet sich an das
+            Team; das Profil wird dann entfernt. Rechtsgrundlage ist Art. 6
+            Abs. 1 lit. b DSGVO (Teilnahme an der Rangliste).
           </p>
         </section>
 

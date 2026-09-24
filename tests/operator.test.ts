@@ -265,9 +265,9 @@ test("import preview and import commit keep contact data off public API", async 
   assert.ok(!JSON.stringify(rows).includes(alice.email));
   assert.equal(rows[0].claimed, false);
 });
-test("private imported participant stays out of public ranking", async () => {
+test("an imported participant is in the ranking whatever the CSV publicConsent column says", async () => {
   await imported([row({ publicConsent: false })]);
-  assert.deepEqual(await publicRanking(db, berlinDate(), berlinDate()), []);
+  assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 1);
 });
 test("non-admin cannot import or create claim invitations", async () => {
   await assert.rejects(
@@ -568,7 +568,7 @@ test("stale import preview rolls back whole import including newly introduced pa
   );
   assert.equal((await db.query("SELECT id FROM participants")).length, 1);
 });
-test("withdrawal hides public data and a subsequent owner import cannot override member consent", async () => {
+test("a subsequent owner import keeps the member's own profile data; numbers stay public", async () => {
   const id = await imported();
   await takeOver(id, alice);
   await updateAccount(db, alice, {
@@ -580,7 +580,9 @@ test("withdrawal hides public data and a subsequent owner import cannot override
     contactOptIn: false,
   });
   await imported();
-  assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 0);
+  const rows = await publicRanking(db, berlinDate(), berlinDate());
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, "Alice");
   // Einheitlich gespeichert (E.164), nicht SMS-geprüft.
   assert.equal((await ownState(db, alice)).contact.phone, "+49170000123");
 });
@@ -692,7 +694,7 @@ test("new member creates a private profile and existing legacy records remain re
   await givePhone(bob);
   await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const state = await ownState(db, bob);
-  assert.equal(state.participant.public_consent, false);
+  assert.equal(state.participant.public_consent, true);
   assert.equal((await loadOwnRecords(db, bob.userId)).results.length, 2);
   assert.equal(
     (
@@ -794,7 +796,7 @@ test("session capacity, ownership and cancellation are guarded inside a transact
   await assert.rejects(toggleAttendance(db, bob.userId, "session"), /abgesagt/);
 });
 
-test("onboarding creates a private member who can immediately save and retain own numbers", async () => {
+test("onboarding creates a member who can immediately save; the numbers are public", async () => {
   const { createMember } = await import("../server/operator");
   const result = await createMember(db, bob, {
     name: "Bob Caller",
@@ -809,7 +811,7 @@ test("onboarding creates a private member who can immediately save and retain ow
   assert.equal(state.participant.name, "Bob Caller");
   assert.equal(state.records[0].counts.attempts, 100);
   assert.equal(state.email, bob.email);
-  assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 0);
+  assert.equal((await publicRanking(db, berlinDate(), berlinDate())).length, 1);
   assert.equal((await ownState(db, alice)).records.length, 0);
 });
 test("an open takeover request blocks a second empty profile", async () => {
@@ -980,26 +982,25 @@ test("a new member's released numbers reach the public ranking and replace the d
   assert.equal((await publicRanking(db, "2026-01-01", "2026-01-02")).length, 0);
 });
 
-test("a private profile never becomes public on its own", async () => {
+test("a new profile is in the ranking from the first closing; an old opt-out flag is ignored", async () => {
   const { createMember } = await import("../server/operator");
   await createMember(db, bob, {
-    name: "Bob Privat",
+    name: "Bob Neu",
     company: "",
     role: "",
+    // Ältere Formulare schicken das Feld noch mit; es zählt nicht.
     publicConsent: false,
   });
   await givePhone(bob);
   await submitClosing(db, bob, checkin({ expectedRevision: 0 }));
   const today = berlinDate();
-  assert.equal((await publicRanking(db, today, today)).length, 0);
-  // Die eigenen Zahlen sind trotzdem für das eigene Konto da.
+  assert.equal((await publicRanking(db, today, today)).length, 1);
   assert.equal((await ownState(db, bob)).records[0].counts.attempts, 100);
-  // Erst die ausdrückliche Freigabe veröffentlicht.
   await updateAccount(db, bob, {
-    name: "Bob Privat",
+    name: "Bob Neu",
     company: "",
     role: "",
-    publicConsent: true,
+    publicConsent: false,
     phone: "",
     contactOptIn: false,
   });
@@ -1020,7 +1021,7 @@ test("the selection step exposes the role text but never contact data", async ()
   assert.match(String(profile.role), /^Team/);
 });
 
-test("month history separates daily winners from monthly totals and excludes other months/private profiles", async () => {
+test("month history separates daily winners from monthly totals and excludes other months", async () => {
   const { publicRankingMonth } = await import("../server/ranking-history");
   await imported([
     row({
@@ -1042,13 +1043,6 @@ test("month history separates daily winners from monthly totals and excludes oth
       email: "",
       date: "2026-08-31",
       counts: { ...emptyCounts(), attempts: 80, settingsBooked: 0 },
-    }),
-    row({
-      participantKey: "private-import",
-      name: "Private Person",
-      date: "2026-08-30",
-      publicConsent: false,
-      counts: { ...emptyCounts(), attempts: 9999 },
     }),
   ]);
   const month = await publicRankingMonth(db, "2026-08");
@@ -1078,7 +1072,6 @@ test("month history separates daily winners from monthly totals and excludes oth
     "phone",
     "reflection",
     "import_key",
-    "Private Person",
   ])
     assert.ok(!JSON.stringify(month).includes(field));
   assert.ok(

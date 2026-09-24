@@ -3878,56 +3878,6 @@ li[data-medal="gold"] .rb-bar i {
   }
 }
 
-/* Zahlen nicht in der Rangliste: Hinweis mit Ein-Klick-Schalter. */
-.rb-me-consent {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3) var(--space-4);
-  grid-column: 1 / -1;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid color-mix(in oklab, var(--do-amber) 35%, white);
-  border-radius: var(--radius-m);
-  background: var(--do-amber-soft);
-  color: var(--do-ink);
-}
-.rb-me-consent > svg {
-  color: var(--do-amber);
-}
-.rb-me-consent strong {
-  display: block;
-  font-size: var(--text-body);
-}
-.rb-me-consent p {
-  margin: 2px 0 0;
-  color: var(--do-ink-2);
-  font-size: var(--text-label);
-}
-.rb-me-consent-error {
-  color: var(--do-red, #b3261e);
-  font-weight: 600;
-}
-@media (max-width: 599px) {
-  .rb-me-consent {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .rb-me-consent .do-button {
-    grid-column: 1 / -1;
-  }
-}
-.cm-ranking .cm-ranking-note {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  margin: 0 0 var(--space-3);
-  color: var(--do-ink-2);
-  font-size: var(--text-label);
-}
-.cm-ranking .cm-ranking-note svg {
-  flex: none;
-  color: var(--do-amber);
-}
-
 /* Discord auf der Startseite: was dort passiert, und ein Knopf. */
 .rb-discord {
   display: grid;

@@ -72,7 +72,7 @@ export async function syncDiscord(db: Database, fetcher?: typeof fetch) {
       }
     }
     const rows = await db.query(
-      `SELECT c.day,c.counts,c.reflection,c.revision,c.submitted_at,p.name,p.public_consent,
+      `SELECT c.day,c.counts,c.reflection,c.revision,c.submitted_at,p.name,
               dp.channel_id,dp.message_id,dp.posted_hash
          FROM checkins c JOIN participants p ON p.id=c.participant
          LEFT JOIN discord_posts dp ON dp.participant=c.participant AND dp.day=c.day
@@ -154,14 +154,11 @@ function toPost(r: {
   counts: Counts;
   reflection: { energy: number; win: string; next: string; help?: string };
   name: string;
-  public_consent: boolean;
 }): ReflectionPost {
-  const numbers = r.public_consent
-    ? visibleMetrics
-        .filter((m) => r.counts[m] !== null)
-        .map((m) => `${r.counts[m]} ${metricLabels[m]}`)
-        .join(" · ")
-    : null;
+  const numbers = visibleMetrics
+    .filter((m) => r.counts[m] !== null)
+    .map((m) => `${r.counts[m]} ${metricLabels[m]}`)
+    .join(" · ");
   const base = process.env.APP_URL || "https://dealoperator.hk-growthoperator.de";
   return {
     name: r.name,

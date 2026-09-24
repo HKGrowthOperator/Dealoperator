@@ -190,8 +190,8 @@ export default function ImportConsole({
         <p className="hint">
           Die feste participantKey ordnet spätere Meldungen derselben Person zu.
           Leere Kennzahlen bleiben unbekannt. Allgemeine alte Termine gehören in
-          legacyMeetings. publicConsent bleibt false, bis die Veröffentlichung
-          mit der Person geklärt ist. kind steht auf <code>person</code> für
+          legacyMeetings. Gemeldete Zahlen stehen immer in der Rangliste; die
+          Spalte publicConsent wird nicht mehr ausgewertet. kind steht auf <code>person</code> für
           genau eine Person und auf <code>joint</code> für eine gemeinsam
           gemeldete Leistung mehrerer Personen. Eine gemeinsame Meldung zählt
           einmal zur Gesamtleistung, tritt aber in keiner persönlichen
@@ -299,11 +299,7 @@ export default function ImportConsole({
                     <td>{r.counts.attempts ?? "–"}</td>
                     <td>{r.counts.settingsBooked ?? "–"}</td>
                     <td>
-                      {preview[i]?.claimed
-                        ? "Einstellung des Mitglieds bleibt bestehen"
-                        : r.publicConsent
-                          ? "In der öffentlichen Rangliste"
-                          : "Privat"}
+                      {preview[i]?.claimed ? "Profil übernommen" : "In der Rangliste"}
                     </td>
                     <td>{preview[i]?.change}</td>
                   </tr>
@@ -351,8 +347,7 @@ export default function ImportConsole({
                       ? "Gemeinsame Meldung · kein Einzelrang"
                       : p.company || "Einzelprofil"}{" "}
                     ·{" "}
-                    {p.claimed ? "Profil übernommen" : "Noch nicht übernommen"}{" "}
-                    · {p.public_consent ? "In der Rangliste sichtbar" : "Privat"}
+                    {p.claimed ? "Profil übernommen" : "Noch nicht übernommen"}
                   </small>
                 </div>
                 {!p.claimed && p.kind !== "joint" && (

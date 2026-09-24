@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { Database } from "../server/database";
-import { publicRanking, showInRanking } from "../server/operator";
+import { publicRanking } from "../server/operator";
 import {
   closingState,
   requestPause,
@@ -173,7 +173,7 @@ test("without a phone number there is no counted closing and no access to the ex
   assert.equal((await saveDraft(db, alice, { day: today(), counts: {}, reflection: {} })).ok, true);
 });
 
-test("the exchange shows only submitted closings; numbers only with public consent; help stays with the team", async () => {
+test("the exchange shows only submitted closings, always with numbers; help stays with the team", async () => {
   const a = await member(alice, "Alice", { publicConsent: false });
   await member(bob, "Bob", { publicConsent: true });
   await submitClosing(db, alice, closing({ reflection: { energy: 6, win: "Gut", next: "Besser", help: "Einwandbehandlung" } }));
@@ -181,7 +181,8 @@ test("the exchange shows only submitted closings; numbers only with public conse
   const feed = await reflectionFeed(db, alice, {});
   assert.equal(feed.cards.length, 2);
   const card = feed.cards.find((c) => c.participant === a)!;
-  assert.equal(card.numbers, null);
+  // Zahlen stehen immer dabei, auch wenn die alte Spalte noch auf false steht.
+  assert.equal(card.numbers?.attempts, 40);
   assert.equal(card.help, "");
   assert.equal(card.reply.kind, "invite");
   assert.ok(feed.cards.find((c) => c.name === "Bob")!.numbers);
@@ -517,23 +518,12 @@ test("an own closing replaces a day filled from the group messages; curated impo
   assert.equal(row.counts.legacyMeetings, null);
 });
 
-test("the closing can switch the ranking on, never off; the start page switch does the same", async () => {
-  await member(alice, "Alice");
-  await assert.rejects(showInRanking(db, bob), /Profil/);
-  // Nur „ein“: false nimmt das Schema nicht an.
-  await assert.rejects(submitClosing(db, alice, closing({ publicConsent: false })));
-  await submitClosing(db, alice, closing({ publicConsent: true }));
-  const [p] = await db.query("SELECT public_consent FROM participants WHERE owner='alice'");
-  assert.equal(p.public_consent, true);
+test("every submitted closing counts in the ranking, whatever the old consent column says", async () => {
+  await member(alice, "Alice", { publicConsent: false });
+  await submitClosing(db, alice, closing());
   assert.equal((await publicRanking(db, today(), today())).length, 1);
   const state = await closingState(db, alice, today().slice(0, 7));
-  assert.equal(state.eligibility.participant?.publicConsent, true);
-
-  await member(bob, "Bob");
-  await submitClosing(db, bob, closing());
-  assert.equal((await publicRanking(db, today(), today())).length, 1);
-  assert.deepEqual(await showInRanking(db, bob), { ok: true, publicConsent: true });
-  assert.equal((await publicRanking(db, today(), today())).length, 2);
+  assert.equal(state.eligibility.participant?.name, "Alice");
 });
 
 test("a confirmed registration is only information: the inbox entry starts resolved", async () => {

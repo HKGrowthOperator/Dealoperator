@@ -13,7 +13,6 @@ import {
   CircleDashed,
   Clock3,
   ExternalLink,
-  EyeOff,
   Handshake,
   Headphones,
   Link2,
@@ -864,7 +863,6 @@ function PersonalPanel({ home }: { home: HomeState }) {
       >
         {state.action}
       </Link>
-      {home.participant && !home.participant.publicConsent && <RankingConsent />}
       {home.participant && (
         <p className="rb-me-more">
           <span>Jemanden zum Üben oder für Feedback?</span>
@@ -901,58 +899,6 @@ function DiscordPanel({ url }: { url: string }) {
   );
 }
 
-/**
- * Das Profil steht auf „nicht öffentlich“: eingereichte Zahlen fehlen in
- * Rangliste und Summe, ohne dass die Person es merkt. Ein Klick schaltet die
- * Anzeige ein; ausschalten geht im Profil. Danach lädt die Seite neu, damit
- * Rangliste und Summe den eigenen Tag zeigen.
- */
-function RankingConsent() {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  async function enable() {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch("/api/operator", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: "showInRanking" }),
-      });
-      const data = (await response.json().catch(() => ({}))) as { error?: string };
-      if (!response.ok) throw new Error(data.error || "Das hat gerade nicht geklappt.");
-      window.location.reload();
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="rb-me-consent">
-      <EyeOff size={20} aria-hidden="true" />
-      <div>
-        <strong>Deine Zahlen erscheinen nicht in der Rangliste.</strong>
-        <p>
-          Dein Profil steht auf „nicht öffentlich“. Eingereichte Tage zählen so weder in der
-          Rangliste noch in der gemeinsamen Summe. Ausschalten geht später jederzeit im Profil.
-        </p>
-        {error && (
-          <p className="rb-me-consent-error" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
-      <button
-        type="button"
-        className="do-button do-button-primary"
-        disabled={busy}
-        onClick={() => void enable()}
-      >
-        {busy ? "Wird eingeschaltet …" : "In der Rangliste zeigen"}
-      </button>
-    </div>
-  );
-}
 const WEEKDAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" });
 function formatWeekday(day: string) {
   return WEEKDAY.format(new Date(`${day}T12:00:00Z`));

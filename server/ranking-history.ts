@@ -13,12 +13,12 @@ export async function publicRankingMonth(
 ) {
   const { from, to } = monthRange(month);
   // One bounded query keeps the ranking, group totals and daily history on the
-  // same database snapshot. No contacts, reflections or unapproved profiles.
+  // same database snapshot. No contacts or reflections; every reported day counts.
   const rows = await db.query(
     `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,
       c.day,c.counts,c.updated_at
      FROM participants p JOIN checkins c ON c.participant=p.id
-     WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2
+     WHERE c.day >= $1 AND c.day <= $2
      ORDER BY c.day,c.updated_at DESC`,
     [from, to],
   );
@@ -49,7 +49,7 @@ export async function publicRankingMonth(
 export async function latestPublicDay(db: Database, today: string) {
   const [row] = await db.query(
     `SELECT max(c.day) AS day FROM checkins c JOIN participants p ON p.id=c.participant
-      WHERE p.public_consent=true AND c.day <= $1`,
+      WHERE c.day <= $1`,
     [today],
   );
   return (row?.day as string | null | undefined) ?? null;

@@ -35,7 +35,6 @@ export default function AccountSettings({
     name: demo ? "Alex · Beispiel" : "",
     company: "",
     role: demo ? "Sales" : "",
-    publicConsent: false,
     phone: "",
     phoneCountry: "DE",
     contactOptIn: false,
@@ -58,7 +57,6 @@ export default function AccountSettings({
             name: d.participant.name,
             company: d.participant.company,
             role: d.participant.role,
-            publicConsent: d.participant.public_consent,
             // Gespeichert ist +49170…; im Feld stehen Land und nationale Ziffern.
             phone: splitPhone(d.contact.phone || "").national,
             phoneCountry: splitPhone(d.contact.phone || "").country,
@@ -188,29 +186,14 @@ export default function AccountSettings({
               </span>
             </div>
           </div>
-          <label className="checkbox-line">
-            <input
-              type="checkbox"
-              checked={value.publicConsent}
-              onChange={(e) =>
-                setValue({ ...value, publicConsent: e.target.checked })
-              }
-            />
-            <span>
-              Mein Profil und meine gemeldeten Zahlen in der öffentlichen Rangliste
-              anzeigen. Sichtbar: Anzeigename, Firma, Rolle und Kennzahlen.
-              Ich kann das jederzeit hier zurücknehmen.
-            </span>
-          </label>
           <div className="notice">
-            <strong>So erscheinst du:</strong>
+            <strong>So erscheinst du in der Rangliste:</strong>
             <p>
               {value.name || "Dein Anzeigename"} ·{" "}
               {value.company || "Keine Firma"} · {value.role || "Keine Rolle"}
               <br />
-              {value.publicConsent
-                ? "Profil und gemeldete Zahlen sind im offenen Internet sichtbar."
-                : "Dein Profil und deine Zahlen erscheinen nicht in der öffentlichen Rangliste."}
+              Anzeigename, Firma, Rolle und gemeldete Zahlen stehen in der öffentlichen
+              Rangliste. E-Mail und Nummer bleiben privat.
             </p>
           </div>
           {extra && (

@@ -58,7 +58,7 @@ export async function reflectionFeed(
   const cursor = q.before ? q.before.split("|") : null;
   const rows = await db.query(
     `SELECT c.participant,c.day,c.counts,c.reflection,c.submitted_at,
-            p.name,p.public_consent,
+            p.name,
             dp.channel_id,dp.message_id
        FROM checkins c
        JOIN participants p ON p.id=c.participant
@@ -92,13 +92,12 @@ export async function reflectionFeed(
       next: string;
       help?: string;
     };
-    const numbers = r.public_consent
-      ? (Object.fromEntries(
-          visibleMetrics
-            .map((m) => [m, (r.counts as Counts)[m]])
-            .filter(([, v]) => v !== null),
-        ) as Partial<Counts>)
-      : null;
+    // Gemeldete Zahlen stehen immer dabei, wie in der Rangliste.
+    const numbers = Object.fromEntries(
+      visibleMetrics
+        .map((m) => [m, (r.counts as Counts)[m]])
+        .filter(([, v]) => v !== null),
+    ) as Partial<Counts>;
     return {
       participant: r.participant,
       name: r.name,

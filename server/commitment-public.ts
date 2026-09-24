@@ -21,7 +21,7 @@ export async function commitmentRanking(
   const settings = await loadCommitmentSettings(db);
   const people = await db.query(
     `SELECT p.id,p.name,p.company,p.eligible_since FROM participants p
-      WHERE p.public_consent AND p.kind='person' AND p.owner IS NOT NULL AND p.eligible_since IS NOT NULL
+      WHERE p.kind='person' AND p.owner IS NOT NULL AND p.eligible_since IS NOT NULL
         AND EXISTS (SELECT 1 FROM checkins c WHERE c.participant=p.id AND c.origin='closing')`,
   );
   const today = berlinDate(now);

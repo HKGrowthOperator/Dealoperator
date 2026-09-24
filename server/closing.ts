@@ -42,7 +42,6 @@ export type Eligibility = {
   participant: {
     id: string;
     name: string;
-    publicConsent: boolean;
     claimedAt: string | null;
     /** Seit wann alle Voraussetzungen erfüllt sind; Beginn der Erfassung. */
     eligibleSince: string | null;
@@ -59,7 +58,7 @@ export async function eligibility(
   // bestätigte Konten.
   if (!actor) return { eligible: false, participant: null, missing: ["profile"] };
   const [p] = await db.query(
-    "SELECT id,name,kind,public_consent,claimed_at,eligible_since FROM participants WHERE owner=$1",
+    "SELECT id,name,kind,claimed_at,eligible_since FROM participants WHERE owner=$1",
     [actor.userId],
   );
   const [contact] = await db.query(
@@ -93,7 +92,6 @@ export async function eligibility(
         ? {
             id: p.id,
             name: p.name,
-            publicConsent: !!p.public_consent,
             claimedAt: p.claimed_at ? new Date(p.claimed_at).toISOString() : null,
             eligibleSince: eligibleSince ? eligibleSince.toISOString() : null,
           }
@@ -192,10 +190,6 @@ export const submitSchema = z
     // die Bestätigung einmal vorliegt (visibilityConfirmed); geprüft wird in
     // submitClosing, weil es dafür das Profil braucht.
     acknowledged: z.boolean().optional(),
-    // „Meine Zahlen in der Rangliste zeigen“ direkt im Tagesabschluss. Nur
-    // einschalten; ausschalten bleibt bewusst im Profil, wo steht, was damit
-    // verschwindet.
-    publicConsent: z.literal(true).optional(),
   })
   .strict();
 
@@ -313,8 +307,6 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
     // Wer sieht was: einmal bestätigen reicht, auch über die API.
     if (!v.acknowledged && !(await visibilityConfirmed(tx, participant)))
       throw new AppError(ACK_MISSING, 400, undefined, "acknowledged");
-    if (v.publicConsent && !e.participant!.publicConsent)
-      await tx.query("UPDATE participants SET public_consent=true WHERE id=$1", [participant]);
     const settings = await loadCommitmentSettings(tx);
     const first = firstClosableDay(e.participant!.eligibleSince, settings);
     if (first && v.day < first)

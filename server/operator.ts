@@ -123,7 +123,7 @@ export async function once<T>(
 }
 export async function publicRanking(db: Database, from: string, to: string) {
   const rows = await db.query(
-    `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.origin,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE p.public_consent=true AND c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
+    `SELECT p.id,p.import_key,p.name,p.company,p.role,p.kind,p.owner IS NOT NULL AS claimed,c.counts,c.origin,c.updated_at FROM participants p JOIN checkins c ON c.participant=p.id WHERE c.day >= $1 AND c.day <= $2 ORDER BY c.updated_at DESC`,
     [from, to],
   );
   const grouped = new Map<string, RankingRow>();
@@ -197,7 +197,9 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       name: z.string().trim().min(2).max(60),
       company: z.string().trim().max(120),
       role: z.string().trim().max(80),
-      publicConsent: z.boolean(),
+      // Gemeldete Zahlen stehen immer in der Rangliste; ältere Formulare
+      // schicken das Feld noch mit, es wird nicht beachtet.
+      publicConsent: z.boolean().optional(),
       // Nur, wenn noch keine Nummer vorliegt (z. B. über „Anmelden“ gekommen).
       phone: z.string().trim().max(40).optional(),
       phoneCountry: z.string().trim().max(4).optional(),
@@ -230,7 +232,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         value.role,
         actor.email,
         actor.userId,
-        value.publicConsent,
+        true,
       ],
     );
     const [old] = await tx.query("SELECT data FROM profiles WHERE id=$1", [
@@ -397,7 +399,8 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
             r.company,
             r.role,
             r.email.toLowerCase() || null,
-            r.publicConsent,
+            // Die CSV-Spalte publicConsent wird nicht mehr ausgewertet.
+            true,
             r.kind,
             r.kind === "person",
           ],
@@ -411,7 +414,7 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
             r.company,
             r.role,
             r.email.toLowerCase() || null,
-            r.publicConsent,
+            true,
             r.kind,
             r.kind === "person",
           ],
@@ -491,25 +494,14 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
 // entfallen. Ein vorbereitetes Profil wird ausschließlich über eine Anfrage in
 // server/onboarding.ts und die anschließende Freigabe durch das
 // Deal-Operator-Team mit einem Konto verbunden.
-/**
- * Ein-Klick-Schalter „In der Rangliste zeigen“ (Startseite). Schaltet nur
- * ein; ausschalten bleibt im Profil, wo steht, was damit verschwindet.
- */
-export async function showInRanking(db: Database, actor: Actor) {
-  const [p] = await db.query(
-    "UPDATE participants SET public_consent=true WHERE owner=$1 AND kind='person' RETURNING id",
-    [actor.userId],
-  );
-  if (!p) throw new AppError("Lege zuerst dein Profil an oder übernimm es.");
-  return { ok: true, publicConsent: true };
-}
 export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   const v = z
     .object({
       name: z.string().trim().min(2).max(60),
       company: z.string().trim().max(120),
       role: z.string().trim().max(80),
-      publicConsent: z.boolean(),
+      // Wird nicht mehr beachtet: Zahlen stehen immer in der Rangliste.
+      publicConsent: z.boolean().optional(),
       phone: z.string().trim().max(40),
       phoneCountry: z.string().trim().max(4).optional(),
       contactOptIn: z.boolean(),
@@ -525,8 +517,8 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   }
   return db.transaction(async (tx) => {
     const [p] = await tx.query(
-      "UPDATE participants SET name=$2,company=$3,role=$4,public_consent=$5 WHERE owner=$1 RETURNING id",
-      [actor.userId, v.name, v.company, v.role, v.publicConsent],
+      "UPDATE participants SET name=$2,company=$3,role=$4 WHERE owner=$1 RETURNING id",
+      [actor.userId, v.name, v.company, v.role],
     );
     if (!p)
       throw new AppError(

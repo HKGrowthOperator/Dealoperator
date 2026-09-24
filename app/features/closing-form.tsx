@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Check,
   CircleAlert,
-  EyeOff,
   CircleCheck,
   Clock3,
   LoaderCircle,
@@ -131,7 +130,6 @@ export type ClosingState = {
     participant: {
       id: string;
       name: string;
-      publicConsent: boolean;
       claimedAt: string | null;
       eligibleSince?: string | null;
     } | null;
@@ -482,7 +480,6 @@ type Confirmation = {
   day: string;
   unchanged: boolean;
   status: DayStatus;
-  publicConsent: boolean;
   /** Aktuelle Abschluss-Serie nach dem Einreichen, falls bekannt. */
   streak: number | null;
   /** Neu erreichte Leistungslevel, z. B. „Anwahlen auf Level 2“. Nur echte Sprünge. */
@@ -655,9 +652,6 @@ export default function ClosingForm({
   const [conflict, setConflict] = useState(false);
   const [draftStatus, setDraftStatus] = useState<DraftStatus>({ kind: "idle" });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
-  // „Meine Zahlen in der Rangliste zeigen“, wenn das Profil noch auf
-  // „nicht öffentlich“ steht. Geht mit dem Einreichen an den Server.
-  const [shareRanking, setShareRanking] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [showOptional, setShowOptional] = useState(false);
   // Die Tagesauswahl erscheint erst auf Wunsch: meistens geht es um heute.
@@ -952,7 +946,6 @@ export default function ClosingForm({
       },
       // Nur beim ersten Mal nötig; danach kennt der Server die Bestätigung.
       ...(needsAcknowledgement ? { acknowledged: true } : {}),
-      ...(shareRanking ? { publicConsent: true } : {}),
     };
     const hash = JSON.stringify(value);
     const key =
@@ -972,7 +965,6 @@ export default function ClosingForm({
       } catch {
         fresh = null;
       }
-      const base = fresh ?? state;
       // Mit dem ersten Abschluss ist die Bestätigung erteilt, auch wenn das
       // Neuladen gerade nicht geklappt hat.
       if (!fresh) setState((s) => (s ? { ...s, visibilityConfirmed: true } : s));
@@ -985,13 +977,11 @@ export default function ClosingForm({
         day: form.day,
         unchanged: !!result.unchanged,
         status: fresh ? statusOf(fresh, form.day) : "free",
-        publicConsent: !!base.eligibility.participant?.publicConsent,
         streak: fresh?.summary?.streak.current ?? null,
         levelUps: fresh ? levelUps(state, fresh) : [],
       });
       setAttempted(false);
       setTouched(new Set());
-      setShareRanking(false);
       setDraftStatus({ kind: "idle" });
       announceClosingChange();
       onSubmitted?.(form.day);
@@ -1295,19 +1285,10 @@ export default function ClosingForm({
                 </li>
               )}
               <li>
-                {confirmed.publicConsent ? (
-                  "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe."
-                ) : (
-                  <>
-                    Deine Zahlen erscheinen noch nicht in der Rangliste. Einschalten kannst du das
-                    auf der Startseite oder unter{" "}
-                    <Link href="/profil?modus=eigen">Profil und Einstellungen</Link>.
-                  </>
-                )}
+                Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe.
               </li>
               <li>
-                Deine Reflexion steht unter Reflexionen
-                {confirmed.publicConsent ? ", mit deinen Zahlen." : ", ohne deine Zahlen."}
+                Deine Reflexion steht unter Reflexionen, mit deinen Zahlen.
               </li>
             </ul>
           )}
@@ -1462,35 +1443,6 @@ export default function ClosingForm({
             )}
           </fieldset>
 
-          {eligibility.participant && !eligibility.participant.publicConsent && (
-            <fieldset className="cm-group cm-ranking">
-              <legend>Deine Zahlen in der Rangliste</legend>
-              <p className="cm-ranking-note">
-                <EyeOff size={18} aria-hidden="true" />
-                <span>
-                  Dein Profil steht auf „nicht öffentlich“. Deine eingereichten Zahlen fehlen
-                  deshalb in der Rangliste und in der gemeinsamen Summe.
-                </span>
-              </p>
-              <label className="cm-check">
-                <input
-                  id={`${uid}-share-ranking`}
-                  type="checkbox"
-                  checked={shareRanking}
-                  disabled={busy}
-                  onChange={(e) => setShareRanking(e.target.checked)}
-                />
-                <span>
-                  Meine Zahlen mit Anzeigenamen in der Rangliste zeigen
-                  <small>
-                    Gilt mit dem Einreichen für alle deine Tage. Ausschalten geht jederzeit im
-                    Profil.
-                  </small>
-                </span>
-              </label>
-            </fieldset>
-          )}
-
           {needsAcknowledgement && (
             <fieldset className="cm-group cm-visibility">
               <legend>Wer sieht deinen Tagesabschluss?</legend>
@@ -1500,9 +1452,8 @@ export default function ClosingForm({
                   Reflexionen.
                 </li>
                 <li>
-                  {eligibility.participant?.publicConsent || shareRanking
-                    ? "Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, mit deinem Anzeigenamen."
-                    : "Deine Zahlen erscheinen nur in der Rangliste, wenn du das oben einschaltest."}
+                  Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, mit deinem
+                  Anzeigenamen.
                 </li>
                 <li>Deinen Wunsch nach Unterstützung sieht nur das Team.</li>
               </ul>

@@ -91,15 +91,7 @@ test("accounts without a profile see their takeover state, never someone else's 
   assert.deepEqual(s.request, { kind: "claim", status: "pending" });
 });
 
-test("latest public day: today if reported, else the last reported day, never a private one", async () => {
-  assert.equal(await latestPublicDay(db, "2026-09-24"), null);
-  await db.query(
-    `INSERT INTO participants(id,name,public_consent,kind) VALUES('p-hidden','Privat',false,'person')`,
-  );
-  await db.query(
-    `INSERT INTO checkins(participant,day,counts,source,origin) VALUES('p-hidden','2026-09-24',$1,'import','import')`,
-    [counts],
-  );
+test("latest public day: today if reported, else the last reported day", async () => {
   assert.equal(await latestPublicDay(db, "2026-09-24"), null);
   await db.query(
     `INSERT INTO checkins(participant,day,counts,source,origin) VALUES('p-alice','2026-09-22',$1,'import','import')`,

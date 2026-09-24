@@ -30,20 +30,17 @@ export default function MemberOnboarding({
     name: presetName,
     company: "",
     role: "",
-    // Bewusste Wahl, keine Vorbelegung: ohne Antwort geht das Formular nicht ab.
-    publicConsent: null as boolean | null,
     phone: "",
     phoneCountry: DEFAULT_PHONE_COUNTRY as string,
   });
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  const [errors, setErrors] = useState<{ name?: string; phone?: string; consent?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
-  const consentRef = useRef<HTMLInputElement>(null);
   const heading = useStepHeading(done ? "done" : "form");
   const later = next.startsWith("/tagesabschluss") ? "/" : next;
 
@@ -56,12 +53,9 @@ export default function MemberOnboarding({
       const phone = normalisePhone(value.phone, value.phoneCountry);
       if (!phone.ok) found.phone = phone.reason;
     }
-    if (value.publicConsent === null)
-      found.consent = "Bitte wähle, ob deine Zahlen in der Rangliste stehen sollen.";
     setErrors(found);
     if (found.name) return nameRef.current?.focus();
     if (found.phone) return phoneRef.current?.focus();
-    if (found.consent) return consentRef.current?.focus();
     inFlight.current = true;
     setBusy(true);
     setMessage("");
@@ -72,7 +66,6 @@ export default function MemberOnboarding({
           name: value.name.trim(),
           company: value.company.trim(),
           role: value.role.trim(),
-          publicConsent: value.publicConsent === true,
           ...(needsPhone ? { phone: value.phone.trim(), phoneCountry: value.phoneCountry } : {}),
         },
       });
@@ -241,45 +234,10 @@ export default function MemberOnboarding({
             </button>
           )}
 
-          <fieldset
-            className="flow-field flow-radios"
-            data-invalid={errors.consent ? "" : undefined}
-            aria-describedby={`${id}-consent-note`}
-          >
-            <legend>Deine Zahlen in der Rangliste</legend>
-            <label className="flow-radio">
-              <input
-                ref={consentRef}
-                type="radio"
-                name={`${id}-consent`}
-                checked={value.publicConsent === true}
-                onChange={() => setValue({ ...value, publicConsent: true })}
-              />
-              <span>
-                <strong>Ja, mit Anzeigenamen zeigen</strong>
-                <small>So sehen alle, was du schaffst. E-Mail und Nummer bleiben privat.</small>
-              </span>
-            </label>
-            <label className="flow-radio">
-              <input
-                type="radio"
-                name={`${id}-consent`}
-                checked={value.publicConsent === false}
-                onChange={() => setValue({ ...value, publicConsent: false })}
-              />
-              <span>
-                <strong>Nein, nur für mich</strong>
-                <small>Deine Zahlen zählen dann nicht in Rangliste und gemeinsamer Summe.</small>
-              </span>
-            </label>
-            <p
-              id={`${id}-consent-note`}
-              className={errors.consent ? "flow-field-error" : "flow-note"}
-              role={errors.consent ? "alert" : undefined}
-            >
-              {errors.consent || "Du kannst das jederzeit im Profil ändern."}
-            </p>
-          </fieldset>
+          <p className="flow-note flow-ranking-note">
+            Deine gemeldeten Zahlen stehen mit deinem Anzeigenamen in der Rangliste. E-Mail und
+            Nummer bleiben privat.
+          </p>
 
           <button className="btn primary full" disabled={busy}>
             {busy && <LoaderCircle className="spin" size={18} />}
