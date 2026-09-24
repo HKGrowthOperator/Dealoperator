@@ -920,7 +920,8 @@ function Podium({
     if (place) place.rows.push(row);
     else places.push({ rank: row.rank, rows: [row] });
   }
-  if (!places.length) return null;
+  // Mit nur einer Person wiederholte das Podium bloß die einzige Zeile der Liste.
+  if (places.reduce((sum, place) => sum + place.rows.length, 0) < 2) return null;
   return (
     <ol className="rb-podium" data-count={places.length} aria-label="Spitzenplätze">
       {places.map((place) => {
