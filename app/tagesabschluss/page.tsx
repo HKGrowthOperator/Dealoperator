@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, isTeam } from "@/server/auth";
+import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { closingState } from "@/server/closing";
 import { berlinDate, daySchema } from "@/lib/kpis";
@@ -55,9 +55,7 @@ export default async function Page({
 
   return (
     <div className="operator-site">
-      <OperatorHeader
-        viewer={{ signedIn: true, hasPassword: !!actor.hasPassword, team: isTeam(actor) }}
-      />
+      <OperatorHeader viewer={viewerOf(actor)} />
       <main id="inhalt" className="do-page do-page-narrow md">
         <AreaNav area="mine" />
         <h1 className="do-sr">Mein Tag</h1>

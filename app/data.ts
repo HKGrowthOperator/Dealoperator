@@ -112,6 +112,8 @@ export type AppData = WorkflowData & {
   discord?: { invite: string; rooms: boolean };
   /** Admin oder Moderator: darf alle Sessions bearbeiten und absagen. */
   viewerTeam?: boolean;
+  /** Eigene Team-Rolle, damit Admins und Moderatoren sie sehen. */
+  viewerRole?: "admin" | "moderator" | null;
   /** Rang „Aktiver Caller“ (lib/active-caller.ts). */
   activeCaller?: ActiveCaller;
   /** Eigenes Profil in der Rangliste vorhanden: Name und Rolle kommen von dort. */

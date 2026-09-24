@@ -162,7 +162,9 @@ export default function Page() {
             „Moderator“. Zeigst du zusätzlich dein Call-Profil bei den
             Call-Partnern, sehen angemeldete Mitglieder dort einen Link zu
             deinem Discord-Profil und, falls du ihn im Call-Profil einträgst,
-            deinen Discord-Namen, um dich anzuschreiben. Tagesabschlüsse,
+            deinen Discord-Namen, um dich anzuschreiben. Admins und
+            Moderatoren sehen alle Call-Profile, auch nicht gezeigte, um
+            Call-Partner und Sessions zu vermitteln. Tagesabschlüsse,
             Reflexionen, Zahlen und Kontaktdaten werden <strong>nicht</strong>{" "}
             an Discord übertragen.
           </p>

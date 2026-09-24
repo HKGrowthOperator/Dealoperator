@@ -863,7 +863,9 @@ export default function CommunityApp({
             <small>
               Andere Angemeldete sehen Name, Rolle, Zielgruppe, Call-Zeit,
               Wochenziel, Call-Tage, Beschreibung und deinen Discord-Namen.
-              E-Mail und Telefonnummer bleiben privat.
+              Admins und Moderatoren sehen dein Call-Profil auch ohne Häkchen,
+              um Call-Partner und Sessions zu vermitteln. E-Mail und
+              Telefonnummer bleiben privat.
             </small>
           </span>
         </label>
@@ -959,7 +961,13 @@ export default function CommunityApp({
       <article className="card member-card" key={m.id} data-own={own || undefined}>
         <div className="member-top">
           <Avatar name={m.name} color={m.color} />
-          <Tag tone="green">{own ? "Das bist du" : "Sucht Call-Partner"}</Tag>
+          {own ? (
+            <Tag tone="green">Das bist du</Tag>
+          ) : m.listed ? (
+            <Tag tone="green">Sucht Call-Partner</Tag>
+          ) : (
+            <Tag>Nicht gezeigt · nur fürs Team</Tag>
+          )}
         </div>
         <h2>{m.name}</h2>
         <span className="member-role">{m.role}</span>
@@ -1264,6 +1272,13 @@ export default function CommunityApp({
                       </button>
                     )}
                   </PageHeading>
+                  {data.viewerTeam && (
+                    <p className="ca-team-note">
+                      Als {data.viewerRole === "admin" ? "Admin" : "Moderator"} siehst
+                      du alle Call-Profile. Profile mit „Nicht gezeigt“ sehen nur
+                      Admins und Moderatoren.
+                    </p>
+                  )}
                   {data.profile.listed ? (
                     <p className="ca-visible">
                       <CircleCheck size={18} aria-hidden="true" />
@@ -1685,6 +1700,24 @@ export default function CommunityApp({
                     text="Wie du in der Rangliste und bei Call-Partnern erscheinst, und deine Erinnerungen."
                   />
                   <div className="ca-settings">
+                    {data.viewerRole && (
+                      <section className="ca-role" aria-labelledby="ca-role-title">
+                        <div>
+                          <p className="ca-role-kicker">Deine Rolle im Team</p>
+                          <h2 id="ca-role-title">
+                            {data.viewerRole === "admin" ? "Admin" : "Moderator"}
+                          </h2>
+                          <p>
+                            {data.viewerRole === "admin"
+                              ? "Du verwaltest alles: Team-Inbox, Übernahmen, Prüffälle, Pausen, Importe, Regeln, Benachrichtigungen, Discord und Team & Rollen. Bei Call-Partner siehst du alle Call-Profile, auch nicht gezeigte."
+                              : "Du bearbeitest in der Verwaltung Team-Inbox, Übernahmen, Prüffälle, Pausen und den Wins-Import und moderierst Sessions. Bei Call-Partner siehst du alle Call-Profile, auch nicht gezeigte."}
+                          </p>
+                        </div>
+                        <Link className="btn secondary" href="/verwaltung">
+                          Zur Verwaltung
+                        </Link>
+                      </section>
+                    )}
                     <AccountSettings
                       key={demo ? "demo" : "own"}
                       demo={demo}

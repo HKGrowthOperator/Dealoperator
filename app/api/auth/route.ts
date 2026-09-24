@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { authClient, authReady, getCurrentUser, isTeam, safeNext } from "@/server/auth";
+import { authClient, authReady, getCurrentUser, safeNext, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { AppError, clearRateLimit, rateLimit } from "@/server/operator";
 import { body, errorResponse, json } from "@/server/http";
@@ -25,11 +25,7 @@ const email = z
 export async function GET() {
   try {
     const actor = authReady() ? await getCurrentUser() : null;
-    return json({
-      signedIn: !!actor,
-      hasPassword: !!actor?.hasPassword,
-      team: !!actor && isTeam(actor),
-    });
+    return json(viewerOf(actor));
   } catch (e) {
     return errorResponse(e);
   }

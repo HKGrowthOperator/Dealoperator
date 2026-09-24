@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentUser, isTeam } from "@/server/auth";
+import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { reflectionFeed } from "@/server/reflections";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
@@ -26,9 +26,7 @@ export default async function Page() {
       initial = null;
     }
   }
-  const viewer = actor
-    ? { signedIn: true, hasPassword: !!actor.hasPassword, team: isTeam(actor) }
-    : { signedIn: false, hasPassword: false, team: false };
+  const viewer = viewerOf(actor);
 
   return (
     <div className="operator-site">

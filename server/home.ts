@@ -1,6 +1,6 @@
 import type { Database } from "./database";
 import type { Actor } from "./auth";
-import { getCurrentUser, isTeam } from "./auth";
+import { getCurrentUser, isTeam, viewerOf } from "./auth";
 import { database, databaseReady } from "./database";
 import { berlinDate } from "../lib/kpis";
 import { addDays, deadlineFor, isDueDay, previousDueDay } from "../lib/commitment";
@@ -109,11 +109,7 @@ export async function viewerState() {
   } catch {
     actor = null;
   }
-  const viewer = {
-    signedIn: !!actor,
-    hasPassword: !!actor?.hasPassword,
-    team: !!actor && isTeam(actor),
-  };
+  const viewer = viewerOf(actor);
   let home: HomeState | null = null;
   if (actor && databaseReady()) {
     try {

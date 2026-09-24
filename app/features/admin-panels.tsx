@@ -170,7 +170,12 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
     <div className="adm">
       <div className="adm-top">
         <div className="adm-title-row">
-          <h1>Verwaltung</h1>
+          <h1>
+            Verwaltung{" "}
+            <span className="do-role-badge">
+              {role === "admin" ? "Du bist Admin" : "Du bist Moderator"}
+            </span>
+          </h1>
           <button
             className="adm-refresh"
             onClick={() => void reload()}

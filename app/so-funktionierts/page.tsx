@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
-import { getCurrentUser, isTeam } from "@/server/auth";
+import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { loadCommitmentSettings } from "@/server/settings";
 import { discordDestination } from "@/server/discord";
@@ -59,9 +59,7 @@ export default async function Page() {
 
   return (
     <div className="operator-site">
-      <OperatorHeader
-        viewer={{ signedIn, hasPassword: !!actor?.hasPassword, team: !!actor && isTeam(actor) }}
-      />
+      <OperatorHeader viewer={viewerOf(actor)} />
       <main id="inhalt" className="do-page hw">
         <header className="hw-head">
           <h1>So funktioniert’s</h1>

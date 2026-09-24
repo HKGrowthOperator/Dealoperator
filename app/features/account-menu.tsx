@@ -54,7 +54,14 @@ export default function AccountMenu({ viewer }: { viewer: Viewer }) {
       </button>
       {open && (
         <div className="do-account-menu" id={`${id}-menu`}>
-          <p className="do-account-title">Mein Bereich</p>
+          <p className="do-account-title">
+            Mein Bereich
+            {viewer.role && (
+              <span className="do-role-badge">
+                {viewer.role === "admin" ? "Admin" : "Moderator"}
+              </span>
+            )}
+          </p>
           <Link href="/tagesabschluss" onClick={close}>
             Mein Tag
           </Link>

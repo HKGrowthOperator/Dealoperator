@@ -15,7 +15,12 @@ import { keepInstallPrompt } from "./install-app";
 import { DISCORD_INVITE } from "@/lib/discord";
 
 /** Anmeldestand für Kopf und Tableiste. */
-export type Viewer = { signedIn: boolean; hasPassword: boolean; team: boolean };
+export type Viewer = {
+  signedIn: boolean;
+  hasPassword: boolean;
+  team: boolean;
+  role?: "admin" | "moderator" | null;
+};
 
 // Ein Abruf je Seitenaufruf, geteilt von Kopf, Tableiste und Kontomenü.
 let pending: Promise<Viewer | null> | null = null;
@@ -24,7 +29,12 @@ export function loadViewer(): Promise<Viewer | null> {
     .then((r) => (r.ok ? r.json() : null))
     .then((data) =>
       data
-        ? { signedIn: !!data.signedIn, hasPassword: !!data.hasPassword, team: !!data.team }
+        ? {
+            signedIn: !!data.signedIn,
+            hasPassword: !!data.hasPassword,
+            team: !!data.team,
+            role: data.role === "admin" || data.role === "moderator" ? data.role : null,
+          }
         : null,
     )
     .catch(() => null);

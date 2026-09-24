@@ -3499,3 +3499,65 @@ li[data-open] .rb-chevron {
   color: var(--do-ink);
   overflow-wrap: anywhere;
 }
+
+/* Team-Rolle sichtbar: Kontomenü, Verwaltung, Profil. */
+.do-role-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-2);
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--do-blue-soft);
+  color: var(--do-blue);
+  font-size: var(--text-meta);
+  font-weight: 750;
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+.ca-role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--do-blue-line);
+  border-radius: var(--radius-l);
+  background: var(--do-blue-soft);
+}
+.ca-role > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ca-role-kicker {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.ca-role h2 {
+  margin: 2px 0 0;
+  color: var(--do-blue);
+  font-size: var(--text-heading);
+  font-weight: 800;
+}
+.ca-role p:last-child {
+  max-width: 60ch;
+  margin: var(--space-1) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.55;
+}
+.ca-team-note {
+  margin: 0 0 var(--space-3);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+@media (max-width: 599px) {
+  .ca-role {
+    padding: var(--space-4);
+  }
+  .ca-role .btn {
+    flex: 1 1 100%;
+  }
+}

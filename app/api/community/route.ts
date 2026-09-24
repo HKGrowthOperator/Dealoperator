@@ -98,9 +98,13 @@ export async function GET() {
         .bind(user.userId)
         .first<{ data: string }>(),
       loadOwnRecords(database, user.userId),
+      // Das Team (Admins, Moderatoren) sieht alle Call-Profile, um Call-Partner
+      // und Sessions zu vermitteln; alle anderen nur gezeigte.
       database
         .prepare(
-          "SELECT id,data FROM profiles WHERE (data::jsonb->>'listed') = 'true'",
+          isTeam(user)
+            ? "SELECT id,data FROM profiles"
+            : "SELECT id,data FROM profiles WHERE (data::jsonb->>'listed') = 'true'",
         )
         .all(),
       database.prepare("SELECT id,owner,data FROM sessions").all(),
@@ -149,6 +153,7 @@ export async function GET() {
       // Treffpunkt für Sessions und Call-Partner ist Discord.
       discord: { invite: discordDestination().url, rooms: sessionRoomsReady() },
       viewerTeam: isTeam(user),
+      viewerRole: user.admin ? "admin" : user.moderator ? "moderator" : null,
       // Rang „Aktiver Caller“: schaltet Sessions & Roleplay frei.
       activeCaller: active,
       profile: own

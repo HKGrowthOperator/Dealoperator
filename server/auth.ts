@@ -62,6 +62,19 @@ export function isTeam<T extends Pick<Actor, "admin" | "moderator">>(
   return !!actor && (actor.admin || !!actor.moderator);
 }
 
+/**
+ * Anmeldestand für Kopf, Tableiste und Kontomenü. Die Rolle steht dabei,
+ * damit Admins und Moderatoren sie erkennen.
+ */
+export function viewerOf(actor: Actor | null) {
+  return {
+    signedIn: !!actor,
+    hasPassword: !!actor?.hasPassword,
+    team: !!actor && isTeam(actor),
+    role: actor?.admin ? ("admin" as const) : actor?.moderator ? ("moderator" as const) : null,
+  };
+}
+
 /** Fest hinterlegte Grundverwaltung aus der Serverumgebung. */
 export function ownerIds(env = process.env) {
   return (env.OPERATOR_ADMIN_IDS || "")
