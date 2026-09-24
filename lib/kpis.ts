@@ -107,12 +107,13 @@ export type TrackId = (typeof tracks)[number]["id"];
  * Level je KPI-Track. Level 0 heißt „noch kein Level", Level 1 beginnt bei
  * der ersten Schwelle, das höchste Level ist thresholds.length.
  *
- * XP sind die aufsummierte Kennzahl des Tracks: 1 XP = 1 Anwahl, 1 gelegtes
- * Setting, 1 gelegtes Closing bzw. 1 gewonnener Deal. Nicht gemeldet (null)
- * zählt als 0 XP; `value` behält den Unterschied für Aufrufer, die ihn brauchen.
+ * `xp` ist die aufsummierte Kennzahl des Tracks (Anwahlen, Settings,
+ * Closings bzw. Deals). Nicht gemeldet (null) zählt als 0; `value` behält den
+ * Unterschied für Aufrufer, die ihn brauchen. Angezeigt wird der Fortschritt
+ * immer in diesen Einheiten („80 von 100 Anwahlen“), siehe lib/levels.ts.
  *
- * `percent` ist das Verhältnis xp / next — genau das, was „xp / next XP"
- * ausschreibt. Die Leiste und die Zahl darunter sagen dasselbe.
+ * `percent` ist das Verhältnis xp / next. Die Leiste und der Text sagen
+ * dasselbe.
  */
 export function progress(values: Counts) {
   return tracks.map((t) => {
