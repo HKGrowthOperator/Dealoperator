@@ -48,9 +48,10 @@ function useViewer(initial?: Viewer | null) {
  * umfasst Tagesabschluss, Fortschritt und eigene Zahlen; der Austausch hängt
  * an den Reflexionen.
  */
-type Area = "results" | "day" | "exchange" | "profile" | "";
+type Area = "results" | "day" | "exchange" | "profile" | "admin" | "";
 function areaOf(path: string): Area {
   if (path === "/" || path.startsWith("/ranking")) return "results";
+  if (/^\/verwaltung(\/|$)/.test(path)) return "admin";
   if (/^\/(tagesabschluss|heute|zahlen|reflexion)(\/|$)/.test(path)) return "day";
   if (/^\/(reflexionen|partner|sessions|wissen)(\/|$)/.test(path)) return "exchange";
   if (/^\/(profil|passwort)(\/|$)/.test(path)) return "profile";
@@ -107,14 +108,28 @@ export function OperatorHeader({
                 {item.label}
               </Link>
             ))}
+            {viewer?.team && (
+              <Link
+                href="/verwaltung"
+                className="do-nav-link"
+                aria-current={area === "admin" ? "page" : undefined}
+              >
+                Verwaltung
+              </Link>
+            )}
           </nav>
           <div className="do-header-actions">
+            {/* Jeder Einstieg nur einmal: Auf der Startseite steht
+                „Kostenfrei starten“ im Kopfbereich der Seite, am Handy
+                „Anmelden“ in der Tableiste. */}
             {viewer && !signedIn && (
               <>
-                <Link className="do-button do-button-quiet do-hide-mobile" href="/starten">
-                  Kostenfrei starten
-                </Link>
-                <Link className="do-button do-button-secondary" href="/anmelden">
+                {path !== "/" && (
+                  <Link className="do-button do-button-quiet do-hide-mobile" href="/starten">
+                    Kostenfrei starten
+                  </Link>
+                )}
+                <Link className="do-button do-button-secondary do-hide-mobile" href="/anmelden">
                   Anmelden
                 </Link>
               </>

@@ -20,6 +20,11 @@ const fmt = (value: number | null) =>
  * sein Tagesranking. Kalender, Diagramm und Gewinner stehen nicht mehr als
  * gleichwertige Blöcke nebeneinander.
  */
+/** „A“, „A und B“, „A, B und C“. */
+function joinNames(names: string[]) {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names.at(-1)}`;
+}
+
 export default function RankingHistory({
   month,
   days,
@@ -74,9 +79,11 @@ export default function RankingHistory({
               onClick={() => onDay(day)}
             >
               <span
-                style={{
-                  height: value === null ? "2px" : `${Math.max(3, (value / max) * 100)}%`,
-                }}
+                style={
+                  value === null
+                    ? { height: "2px" }
+                    : { transform: `scaleY(${Math.max(0.03, value / max)})` }
+                }
               />
             </button>
           );
@@ -106,12 +113,12 @@ export default function RankingHistory({
                     </span>
                     <span className="rb-day-leader">
                       {leader
-                        ? `Platz 1: ${leader.people.map((p) => p.name).join(" und ")}`
+                        ? `Platz 1: ${joinNames(leader.people.map((p) => p.name))}`
                         : "Kein Platz 1"}
                     </span>
                     <strong>
                       {fmt(day.counts[metric])}
-                      <small>{unit}</small>
+                      <small>{unit} gesamt</small>
                     </strong>
                   </button>
                 </li>

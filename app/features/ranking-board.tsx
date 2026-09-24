@@ -6,12 +6,13 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleCheck,
   CircleDashed,
   Clock3,
   Link2,
   NotebookPen,
-  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
@@ -119,24 +120,32 @@ function placeCommitment(rows: CommitmentRow[]) {
 const medal = (place: number, value: number | null | undefined) =>
   value && value > 0 && place <= 3 ? (["gold", "silver", "bronze"] as const)[place - 1] : undefined;
 
+/** Dieselben drei Schritte wie auf /so-funktionierts. */
 const steps = [
   {
-    title: "Callen und festhalten",
-    text: "Nach jedem Calling-Tag trägst du Anwahlen, Settings und Closings ein, dazu zwei kurze Fragen: Was lief gut, was machst du beim nächsten Mal besser?",
+    title: "Callen",
+    text: "Du callst wie gewohnt, an Calling-Tagen von Montag bis Freitag.",
   },
   {
-    title: "Gemeinsam sehen, was entsteht",
-    text: "Mit deiner Zustimmung zählen deine Zahlen in der gemeinsamen Summe und in der Rangliste. Tag und Monat stehen getrennt.",
+    title: "Tag abschließen",
+    text: "Anwahlen, Settings und Closings eintragen, dazu zwei kurze Fragen: Was lief gut, was machst du beim nächsten Mal besser?",
   },
   {
-    title: "Dranbleiben",
-    text: "Jeder rechtzeitige Tagesabschluss an einem Calling-Tag verlängert deine Abschluss-Serie. Wochenenden und bestätigte Pausen unterbrechen sie nicht.",
-  },
-  {
-    title: "Voneinander lernen",
-    text: "Unter Reflexionen liest du, was bei anderen funktioniert hat. Sessions, Roleplay und Call-Partner findest du im Discord.",
+    title: "Sehen, was entsteht",
+    text: "Mit deiner Zustimmung zählen deine Zahlen in der gemeinsamen Summe und in der Rangliste. Unter Reflexionen liest du, was bei anderen funktioniert hat.",
   },
 ];
+
+/** Tag bzw. Monat um n verschieben (Kalenderrechnung ohne Zeitzone). */
+function shiftDay(day: string, n: number) {
+  const d = new Date(`${day}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function shiftMonth(month: string, n: number) {
+  const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1));
+  return d.toISOString().slice(0, 7);
+}
 
 export default function RankingBoard({
   discordUrl,
@@ -414,28 +423,53 @@ export default function RankingBoard({
                   Monat
                 </button>
               </div>
-              <label className="rb-date">
-                <CalendarDays size={18} aria-hidden="true" />
-                <span className="do-sr">{monthly ? "Monat wählen" : "Tag wählen"}</span>
-                <input
-                  type={monthly ? "month" : "date"}
-                  min={monthly ? "2000-01" : "2000-01-01"}
-                  max={monthly ? today.slice(0, 7) : today}
-                  value={monthly ? month : day}
-                  onChange={(e) => {
-                    const parsed = (monthly ? monthSchema : daySchema).safeParse(e.target.value);
-                    if (parsed.success)
-                      navigate(monthly ? { month: parsed.data } : { day: parsed.data });
-                  }}
-                />
-              </label>
+              {/* Das Datum steht schon links; hier nur blättern und wählen. */}
+              <div className="rb-stepper" role="group" aria-label={monthly ? "Monat wechseln" : "Tag wechseln"}>
+                <button
+                  type="button"
+                  aria-label={monthly ? "Vorheriger Monat" : "Vorheriger Tag"}
+                  onClick={() =>
+                    navigate(monthly ? { month: shiftMonth(month, -1) } : { day: shiftDay(day, -1) })
+                  }
+                >
+                  <ChevronLeft size={18} aria-hidden="true" />
+                </button>
+                {!monthly && (
+                  <label className="rb-date-pick">
+                    <CalendarDays size={18} aria-hidden="true" />
+                    <span className="do-sr">Tag wählen</span>
+                    <input
+                      type="date"
+                      min="2000-01-01"
+                      max={today}
+                      value={day}
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker?.();
+                        } catch {
+                          /* ältere Browser öffnen den Kalender selbst */
+                        }
+                      }}
+                      onChange={(e) => {
+                        const parsed = daySchema.safeParse(e.target.value);
+                        if (parsed.success) navigate({ day: parsed.data });
+                      }}
+                    />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  aria-label={monthly ? "Nächster Monat" : "Nächster Tag"}
+                  disabled={monthly ? month >= today.slice(0, 7) : day >= today}
+                  onClick={() =>
+                    navigate(monthly ? { month: shiftMonth(month, 1) } : { day: shiftDay(day, 1) })
+                  }
+                >
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           </div>
-          {fallback && (
-            <p className="rb-note">
-              Für heute ist noch nichts gemeldet. Du siehst den letzten Tag mit Meldungen.
-            </p>
-          )}
           {event && (event.thanks || event.url) && (
             <p className="rb-note rb-note-event">
               {event.thanks}{" "}
@@ -458,34 +492,15 @@ export default function RankingBoard({
             </div>
           ) : (
             <div className="rb-kpis" data-loading={loading || undefined} aria-busy={loading}>
-              {kpis.map((kpi) => {
-                const selectable = kpi.key !== "people";
-                const body = (
-                  <>
-                    <span className="rb-kpi-label">{kpi.label}</span>
-                    <strong key={`${requestKey}-${kpi.key}`} className="rb-kpi-value">
-                      {loading ? " " : fmt(kpi.value)}
-                    </strong>
-                    <span className="rb-kpi-note">{loading ? "Wird geladen" : kpi.note}</span>
-                  </>
-                );
-                return selectable ? (
-                  <button
-                    key={kpi.key}
-                    type="button"
-                    className="rb-kpi"
-                    aria-pressed={!commitmentView && choice === kpi.key}
-                    aria-label={`${kpi.label}: ${loading ? "wird geladen" : fmt(kpi.value)}. Rangliste nach ${kpi.label} zeigen`}
-                    onClick={() => choose(kpi.key as VisibleMetric)}
-                  >
-                    {body}
-                  </button>
-                ) : (
-                  <div key={kpi.key} className="rb-kpi">
-                    {body}
-                  </div>
-                );
-              })}
+              {kpis.map((kpi) => (
+                <div key={kpi.key} className="rb-kpi">
+                  <span className="rb-kpi-label">{kpi.label}</span>
+                  <strong key={`${requestKey}-${kpi.key}`} className="rb-kpi-value">
+                    {loading ? " " : fmt(kpi.value)}
+                  </strong>
+                  <span className="rb-kpi-note">{loading ? "Wird geladen" : kpi.note}</span>
+                </div>
+              ))}
             </div>
           )}
           {!error && !loading && (
@@ -501,9 +516,6 @@ export default function RankingBoard({
                 </span>
               )}
               {data?.label && <span>{data.label}</span>}
-              <span className="rb-updated">
-                <RefreshCw size={13} aria-hidden="true" /> Aktualisiert {current?.updated}
-              </span>
             </p>
           )}
           {!error && !loading && upcoming && (
@@ -566,6 +578,11 @@ export default function RankingBoard({
               )}
             </label>
           </div>
+          {!signedIn && !commitmentView && !loading && !error && filtered.length > 0 && (
+            <p className="rb-claim-hint">
+              Dein Name steht hier? Antippen und „Das sind meine Zahlen“ wählen.
+            </p>
+          )}
           {!commitmentView && ownId && !loading && !error && (
             <p className="rb-own">
               {own ? (
@@ -663,7 +680,7 @@ export default function RankingBoard({
               <div>
                 {newest && !commitmentView && (
                   <span>
-                    Letzte Meldung{" "}
+                    Stand{" "}
                     {new Date(newest).toLocaleString("de-DE", {
                       timeZone: "Europe/Berlin",
                       day: "2-digit",
@@ -698,34 +715,6 @@ export default function RankingBoard({
           />
         )}
 
-        {!signedIn && (
-          <section className="rb-claim" aria-labelledby="rb-claim-title">
-            <ShieldCheck size={24} aria-hidden="true" />
-            <div>
-              <h2 id="rb-claim-title">Stehst du schon in der Rangliste?</h2>
-              <p>
-                Such deinen Namen, tipp ihn an und wähle „Das sind meine Zahlen“. Nach der Prüfung
-                durch das Team gehört dein Profil mit allen bisherigen Tagen dir.
-              </p>
-            </div>
-            <div className="rb-claim-actions">
-              <button
-                type="button"
-                className="do-button do-button-secondary"
-                onClick={() => {
-                  searchRef.current?.focus();
-                  searchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-                }}
-              >
-                <Search size={17} aria-hidden="true" /> Namen suchen
-              </button>
-              <Link className="do-link" href="/starten?weg=neu">
-                Ich starte neu
-              </Link>
-            </div>
-          </section>
-        )}
-
         <section className="rb-exchange" aria-label="Austausch">
           <Link href="/reflexionen">
             <strong>Reflexionen lesen</strong>
@@ -737,7 +726,7 @@ export default function RankingBoard({
           </a>
         </section>
 
-        {!onlyRanking && (
+        {!onlyRanking && !signedIn && (
           <section className="rb-how" id="so-funktionierts" aria-labelledby="rb-how-title">
             <h2 id="rb-how-title">So funktioniert’s</h2>
             <ol>
@@ -750,7 +739,9 @@ export default function RankingBoard({
             </ol>
             <p className="rb-how-foot">
               Kostenfrei. Mehr zu Serie, Level und wer was sieht:{" "}
-              <Link href="/so-funktionierts">So funktioniert’s im Detail</Link>.
+              <Link className="do-link" href="/so-funktionierts">
+                So funktioniert’s im Detail
+              </Link>
             </p>
           </section>
         )}
@@ -918,7 +909,11 @@ function RankRow({
           </strong>
           {row.company && <small>{row.company}</small>}
           <span className="rb-bar" aria-hidden="true">
-            <i style={{ width: best > 0 && value !== null ? `${(value / best) * 100}%` : "0%" }} />
+            <i
+              style={{
+                transform: `scaleX(${best > 0 && value !== null ? value / best : 0})`,
+              }}
+            />
           </span>
         </span>
         <span className="rb-value">

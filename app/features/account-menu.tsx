@@ -51,7 +51,6 @@ export default function AccountMenu({ viewer }: { viewer: Viewer }) {
         onClick={() => setOpen((v) => !v)}
       >
         <CircleUserRound size={24} aria-hidden="true" />
-        <span className="do-account-dot" aria-hidden="true" />
       </button>
       {open && (
         <div className="do-account-menu" id={`${id}-menu`}>
