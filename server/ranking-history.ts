@@ -40,3 +40,17 @@ export async function publicRankingMonth(
   }));
   return summarizeRankingMonth(records, month, day);
 }
+
+/**
+ * Letzter Tag mit öffentlichen Meldungen bis einschließlich `today`. Die
+ * öffentliche Startansicht zeigt ihn, wenn für heute noch nichts gemeldet
+ * ist, klar als „Letzter gemeldeter Tag“ gekennzeichnet.
+ */
+export async function latestPublicDay(db: Database, today: string) {
+  const [row] = await db.query(
+    `SELECT max(c.day) AS day FROM checkins c JOIN participants p ON p.id=c.participant
+      WHERE p.public_consent=true AND c.day <= $1`,
+    [today],
+  );
+  return (row?.day as string | null | undefined) ?? null;
+}

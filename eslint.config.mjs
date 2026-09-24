@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
       "tests/team-roles.test.ts",
       "tests/claim.test.ts",
       "tests/sessions.test.ts",
+      "tests/home.test.ts",
       "tests/role-designations.test.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },

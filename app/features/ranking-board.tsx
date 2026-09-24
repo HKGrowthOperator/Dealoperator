@@ -1,28 +1,21 @@
 "use client";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  BellRing,
-  CalendarCheck,
-  ChartColumn,
+  CalendarDays,
   Check,
-  ClipboardCheck,
-  Copy,
-  Flame,
-  Handshake,
-  Headphones,
-  HeartHandshake,
-  Medal,
-  MessagesSquare,
-  Phone,
+  ChevronDown,
+  CircleCheck,
+  CircleDashed,
+  Clock3,
+  Link2,
+  NotebookPen,
   RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
-  TrendingUp,
-  Trophy,
-  Users,
+  X,
 } from "lucide-react";
 import {
   aggregate,
@@ -33,6 +26,7 @@ import {
   visibleMetrics,
   ranked,
   soloRows,
+  type RankingRow,
   type VisibleMetric,
 } from "@/lib/kpis";
 import {
@@ -48,50 +42,34 @@ import {
 } from "@/lib/ranking-history";
 import { DISCORD_INVITE } from "@/lib/discord";
 import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { OperatorHeader, OperatorFooter } from "./operator-shell";
+import type { HomeState } from "@/server/home";
+import { OperatorHeader, OperatorFooter, type Viewer } from "./operator-shell";
 import RankingHistory from "./ranking-history";
 
-const fmt = (v: number | null) =>
-  v === null ? "—" : v.toLocaleString("de-DE");
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter((part) => part !== "&" && part !== "und")
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
+const fmt = (v: number | null | undefined) =>
+  v === null || v === undefined ? "–" : v.toLocaleString("de-DE");
 
 /**
- * Getrennte Ranglisten. Dranbleiben ist eine eigene Wertung aus den Serien,
- * kein Mischwert aus Kennzahlen.
+ * Getrennte Ranglisten je Kennzahl. Die Abschluss-Serie ist eine eigene
+ * Wertung aus den Tagesabschlüssen, kein Mischwert aus Kennzahlen.
  */
 const COMMITMENT = "dranbleiben";
 type Choice = VisibleMetric | typeof COMMITMENT;
-const primaryMetrics: VisibleMetric[] = [
-  "attempts",
-  "settingsBooked",
-  "closingsBooked",
-];
-const secondaryMetrics: VisibleMetric[] = [
-  "dealsWon",
-  "settingsHeld",
-  "closingsHeld",
+const primaryMetrics: VisibleMetric[] = ["attempts", "settingsBooked", "closingsBooked"];
+const secondaryChoices: { value: Choice; label: string }[] = [
+  { value: "dealsWon", label: metricLabels.dealsWon },
+  { value: "settingsHeld", label: metricLabels.settingsHeld },
+  { value: "closingsHeld", label: metricLabels.closingsHeld },
+  { value: COMMITMENT, label: "Abschluss-Serie" },
 ];
 
-type LoadedRanking = {
+type Loaded = {
   key: string;
-  data: RankingMonth | null;
+  data: (RankingMonth & { day?: string; latest?: { day: string; fallback: boolean } }) | null;
   error: string;
   updated: string;
 };
-/** Öffentliche Dranbleiben-Zeile. Nie ein privater Status. */
+/** Öffentliche Serien-Zeile. Nie ein privater Status. */
 type CommitmentRow = {
   id: string;
   name: string;
@@ -126,72 +104,62 @@ function validCommitment(value: unknown): CommitmentRow[] {
       typeof row.activeDays === "number",
   );
 }
-
-/**
- * Plätze für die bereits sortierte Serverliste. Gleiche Serien und gleiche
- * aktive Tage teilen sich einen Platz.
- */
+/** Gleiche Serien und gleiche aktive Tage teilen sich einen Platz. */
 function placeCommitment(rows: CommitmentRow[]) {
-  const signature = (row: CommitmentRow) =>
-    `${row.streak.current}|${row.activeDays}`;
+  const signature = (row: CommitmentRow) => `${row.streak.current}|${row.activeDays}`;
   const places: number[] = [];
   rows.forEach((row, index) => {
     places.push(
-      index > 0 && signature(rows[index - 1]) === signature(row)
-        ? places[index - 1]
-        : index + 1,
+      index > 0 && signature(rows[index - 1]) === signature(row) ? places[index - 1] : index + 1,
     );
   });
   return rows.map((row, index) => ({ ...row, rank: places[index] }));
 }
+/** Spitzenplatz für die Gestaltung: 1 bis 3, nur mit positivem Wert. */
+const medal = (place: number, value: number | null | undefined) =>
+  value && value > 0 && place <= 3 ? (["gold", "silver", "bronze"] as const)[place - 1] : undefined;
 
 const steps = [
   {
-    icon: Headphones,
-    title: "Beim Callen dranbleiben",
-    text: "Du callst mit den anderen? Hier hältst du fest, was dabei rauskommt, und siehst, wie du vorankommst.",
+    title: "Callen und festhalten",
+    text: "Nach jedem Calling-Tag trägst du Anwahlen, Settings und Closings ein, dazu zwei kurze Fragen: Was lief gut, was machst du beim nächsten Mal besser?",
   },
   {
-    icon: ClipboardCheck,
-    title: "Täglich festhalten",
-    text: "Anwahlen, Settings und Closings plus eine kurze Reflexion: Was lief gut, was machst du beim nächsten Calling-Tag besser?",
+    title: "Gemeinsam sehen, was entsteht",
+    text: "Mit deiner Zustimmung zählen deine Zahlen in der gemeinsamen Summe und in der Rangliste. Tag und Monat stehen getrennt.",
   },
   {
-    icon: TrendingUp,
-    title: "Fortschritt sehen",
-    text: "Tageswerte im Verlauf, der Monat im Überblick und deine Serie. Die gemeinsame Summe steht dabei vor den Einzelplätzen.",
+    title: "Dranbleiben",
+    text: "Jeder rechtzeitige Tagesabschluss an einem Calling-Tag verlängert deine Abschluss-Serie. Wochenenden und bestätigte Pausen unterbrechen sie nicht.",
   },
   {
-    icon: BellRing,
-    title: "Erinnert werden",
-    text: "Wenn du Erinnerungen auf deinem Gerät einschaltest, kommt abends ein Hinweis, falls dein Abschluss noch fehlt. Es geht auch ohne.",
+    title: "Voneinander lernen",
+    text: "Unter Reflexionen liest du, was bei anderen funktioniert hat. Sessions, Roleplay und Call-Partner findest du im Discord.",
   },
-  {
-    icon: HeartHandshake,
-    title: "Sich gegenseitig stützen",
-    text: "Lies die Learnings der anderen. Im Discord trefft ihr euch zu Sessions und Roleplay und pusht euch gegenseitig.",
-    reflections: true,
-    discord: "Discord öffnen",
-  },
-] as const;
+];
 
 export default function RankingBoard({
   discordUrl,
   onlyRanking = false,
+  viewer = null,
+  home = null,
 }: {
   discordUrl?: string;
-  /** /ranking: nur Ergebnisse, ohne Einstiegserklärung. */
+  /** /ranking: nur Ergebnisse, ohne Einstieg und Erklärung. */
   onlyRanking?: boolean;
+  /** Anmeldestand vom Server. */
+  viewer?: Viewer | null;
+  /** Persönlicher Stand für den Abschnitt „Mein Tag“. */
+  home?: HomeState | null;
 }) {
   const params = useSearchParams();
   const discord = discordUrl || DISCORD_INVITE;
   const today = berlinDate();
   const parsedDay = daySchema.safeParse(params.get("day"));
   const parsedMonth = monthSchema.safeParse(params.get("month"));
-  const monthly =
-    params.has("month") && parsedMonth.success && !params.has("day");
-  const day = parsedDay.success ? parsedDay.data : today;
-  const month = monthly ? parsedMonth.data : day.slice(0, 7);
+  const monthly = params.has("month") && parsedMonth.success && !params.has("day");
+  // Ohne gewählten Zeitraum: heute bzw. der letzte gemeldete Tag.
+  const latestMode = !parsedDay.success && !monthly;
   const requested = params.get("metric");
   const choice: Choice =
     requested === COMMITMENT
@@ -200,124 +168,89 @@ export default function RankingBoard({
         ? (requested as VisibleMetric)
         : "attempts";
   const commitmentView = choice === COMMITMENT;
-  // Verlauf und Profil brauchen eine Kennzahl; bei Dranbleiben die Anwahlen.
   const metric: VisibleMetric = commitmentView ? "attempts" : choice;
-  const [search, setSearch] = useState("");
-  const [loaded, setLoaded] = useState<LoadedRanking | null>(null);
+
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [retry, setRetry] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState("");
-  const [archiveOpen, setArchiveOpen] = useState(false);
   const [eventList, setEventList] = useState<RankingEvent[] | null>(null);
   const [commitment, setCommitment] = useState<LoadedCommitment | null>(null);
-  const requestKey = `${month}/${monthly ? "month" : day}`;
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const requestKey = latestMode
+    ? "latest"
+    : monthly
+      ? `month/${parsedMonth.data}`
+      : `day/${parsedDay.data}`;
   const current = loaded?.key === requestKey ? loaded : null;
-  const data = current?.data;
+  const data = current?.data ?? null;
   const loading = !current;
   const error = current?.error || "";
+  const day = parsedDay.success ? parsedDay.data : (data?.latest?.day ?? today);
+  const month = monthly ? parsedMonth.data! : day.slice(0, 7);
+  const fallback = latestMode && !!data?.latest?.fallback;
+
   const rows = useMemo(() => data?.rows || [], [data]);
-  // ranked() lässt gemeinsame Meldungen nicht antreten. Die Gesamtleistung
-  // rechnet weiter mit allen Zeilen, damit jede Meldung genau einmal zählt.
+  // ranked() lässt gemeinsame Meldungen nicht antreten. Die Summe rechnet mit
+  // allen Zeilen, damit jede Meldung genau einmal zählt.
   const all = useMemo(() => ranked(rows, metric), [rows, metric]);
-  const totals = useMemo(
-    () => aggregate(rows.map((row) => row.counts)),
-    [rows],
-  );
+  const totals = useMemo(() => aggregate(rows.map((row) => row.counts)), [rows]);
   const joint = useMemo(() => rows.filter(isJoint), [rows]);
   const people = useMemo(() => soloRows(rows), [rows]);
-  const selected = rows.find((row) => row.id === selectedId) ?? null;
-  const needle = search.toLocaleLowerCase("de");
-  const filtered = all.filter((row) =>
-    `${row.name} ${row.company} ${row.role}`
-      .toLocaleLowerCase("de")
-      .includes(needle),
-  );
-  const podium = all.filter((row) => (row.counts[metric] ?? 0) > 0).slice(0, 3);
+  const needle = search.trim().toLocaleLowerCase("de");
+  const matches = (row: { name: string; company: string }) =>
+    `${row.name} ${row.company}`.toLocaleLowerCase("de").includes(needle);
+  const filtered = all.filter(matches);
   const best = all[0]?.counts[metric] ?? 0;
+  const ownId = home?.participant?.id ?? null;
+  const own = ownId ? all.find((row) => row.id === ownId) : undefined;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
-  const newest = rows.reduce(
-    (latest, row) => (row.updatedAt > latest ? row.updatedAt : latest),
-    "",
-  );
+  const newest = rows.reduce((latest, row) => (row.updatedAt > latest ? row.updatedAt : latest), "");
 
-  // Gekennzeichnete Tage kommen vom Server. Ohne Antwort bleibt der
-  // Akquise Day vom 22.09.2026 trotzdem gekennzeichnet.
   const events = useMemo(() => withPermanentEvents(eventList), [eventList]);
-  const eventByDay = useMemo(
-    () => new Map(events.map((event) => [event.day, event])),
-    [events],
-  );
+  const eventByDay = useMemo(() => new Map(events.map((e) => [e.day, e])), [events]);
   const event = monthly ? undefined : eventByDay.get(day);
-  const otherEvents = events
-    .filter(
-      (item) =>
-        item.day.startsWith(`${month}-`) &&
-        item.day <= today &&
-        (monthly || item.day !== day),
-    )
-    .toSorted((a, b) => a.day.localeCompare(b.day));
-  // Geplante Event-Tage: nur als Hinweis, ein Ranking gibt es erst am Tag.
   const upcoming = events
     .filter((item) => item.day > today)
     .toSorted((a, b) => a.day.localeCompare(b.day))[0];
 
-  // Dranbleiben: Serien mit Stand heute, aktive Tage im gewählten Monat.
+  // Abschluss-Serie: Stand heute, aktive Tage im gewählten Monat.
   const range = monthRange(month, today);
   const commitmentKey = `${range.from}/${range.to}`;
-  const commitmentState =
-    commitment?.key === commitmentKey ? commitment : null;
+  const commitmentState = commitment?.key === commitmentKey ? commitment : null;
   const commitmentRows = useMemo(
     () => placeCommitment(commitmentState?.rows || []),
     [commitmentState],
   );
-  const commitmentFiltered = commitmentRows.filter((row) =>
-    `${row.name} ${row.company}`.toLocaleLowerCase("de").includes(needle),
-  );
-  const runningStreaks = commitmentState?.error
-    ? null
-    : commitmentState
-      ? commitmentState.rows.filter((row) => row.streak.current > 0).length
-      : null;
-  const latestReported =
-    !monthly && data && rows.length === 0
-      ? data.days.filter((entry) => entry.day !== day).at(-1)
-      : undefined;
+  const commitmentFiltered = commitmentRows.filter(matches);
 
   useEffect(() => {
     const controller = new AbortController();
     let busy = false;
+    const url = latestMode
+      ? "/api/ranking/month?latest=1"
+      : monthly
+        ? `/api/ranking/month?month=${parsedMonth.data}`
+        : `/api/ranking/month?month=${parsedDay.data!.slice(0, 7)}&day=${parsedDay.data}`;
     async function load() {
       if (busy) return;
       busy = true;
       try {
-        const response = await fetch(
-          `/api/ranking/month?month=${month}${monthly ? "" : `&day=${day}`}`,
-          { cache: "no-store", signal: controller.signal },
-        );
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
         const payload = await response.json();
-        if (!response.ok)
-          throw Error(
-            payload.error || "Die Zahlen sind gerade nicht abrufbar.",
-          );
+        if (!response.ok) throw Error(payload.error || "Die Zahlen sind gerade nicht abrufbar.");
         if (!controller.signal.aborted)
           setLoaded({
             key: requestKey,
             data: payload,
             error: "",
-            updated: new Date().toLocaleTimeString("de-DE", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
+            updated: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
           });
-      } catch (error) {
-        // A failed refresh hides both the old totals and the old history.
+      } catch (e) {
         if (!controller.signal.aborted)
-          setLoaded({
-            key: requestKey,
-            data: null,
-            error: (error as Error).message,
-            updated: "",
-          });
+          setLoaded({ key: requestKey, data: null, error: (e as Error).message, updated: "" });
       } finally {
         busy = false;
       }
@@ -335,7 +268,9 @@ export default function RankingBoard({
       clearInterval(interval);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [requestKey, month, day, monthly, retry]);
+    // Die URL-Teile stecken vollständig in requestKey.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestKey, retry]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -343,8 +278,7 @@ export default function RankingBoard({
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw Error(payload.error);
-        if (!controller.signal.aborted)
-          setEventList(validEvents(payload.events));
+        if (!controller.signal.aborted) setEventList(validEvents(payload.events));
       })
       .catch(() => {
         // Nicht erreichbar: der feste Akquise Day bleibt als Rückfall.
@@ -354,6 +288,7 @@ export default function RankingBoard({
   }, []);
 
   useEffect(() => {
+    if (!commitmentView) return;
     const controller = new AbortController();
     const [from, to] = commitmentKey.split("/");
     fetch(`/api/ranking/dranbleiben?from=${from}&to=${to}`, {
@@ -362,39 +297,27 @@ export default function RankingBoard({
     })
       .then(async (response) => {
         const payload = await response.json();
-        if (!response.ok)
-          throw Error(
-            payload.error || "Die Serien sind gerade nicht abrufbar.",
-          );
+        if (!response.ok) throw Error(payload.error || "Die Serien sind gerade nicht abrufbar.");
         if (!controller.signal.aborted)
-          setCommitment({
-            key: commitmentKey,
-            rows: validCommitment(payload.rows),
-            error: "",
-          });
+          setCommitment({ key: commitmentKey, rows: validCommitment(payload.rows), error: "" });
       })
       .catch((e) => {
         if (!controller.signal.aborted)
-          setCommitment({
-            key: commitmentKey,
-            rows: [],
-            error: (e as Error).message,
-          });
+          setCommitment({ key: commitmentKey, rows: [], error: (e as Error).message });
       });
     return () => controller.abort();
-  }, [commitmentKey, retry]);
+  }, [commitmentKey, commitmentView, retry]);
 
-  function navigate(
-    period: { day: string } | { month: string },
-    nextChoice: Choice = choice,
-  ) {
-    const next = new URLSearchParams({ ...period, metric: nextChoice });
-    window.history.pushState(null, "", `${window.location.pathname}?${next}`);
-    setSelectedId(null);
+  function navigate(period: { day: string } | { month: string } | null, nextChoice: Choice = choice) {
+    const next = new URLSearchParams(period ?? {});
+    if (nextChoice !== "attempts" || period) next.set("metric", nextChoice);
+    const query = next.toString();
+    window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    setOpenId(null);
     setShareMessage("");
   }
   function choose(value: Choice) {
-    navigate(monthly ? { month } : { day }, value);
+    navigate(latestMode ? null : monthly ? { month } : { day }, value);
   }
   async function share() {
     const url = `${window.location.origin}/ranking?${new URLSearchParams({ ...(monthly ? { month } : { day }), metric: choice })}`;
@@ -405,942 +328,723 @@ export default function RankingBoard({
       setShareMessage("Kopiere den Link aus der Adressleiste.");
     }
   }
+  function showOwn() {
+    if (!own) return;
+    setSearch("");
+    setOpenId(own.id);
+    window.setTimeout(() => {
+      document.getElementById(`rb-row-${own.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 0);
+  }
+
+  const signedIn = viewer?.signedIn ?? !!home;
+  const kpis: { key: VisibleMetric | "people"; label: string; value: number | null; note: string }[] = [
+    { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
+    { key: "settingsBooked", label: "Settings", value: totals.settingsBooked, note: totals.settingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
+    { key: "closingsBooked", label: "Closings", value: totals.closingsBooked, note: totals.closingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
+    { key: "people", label: "Am Start", value: people.length, note: people.length === 1 ? "Person mit Meldung" : "Personen mit Meldung" },
+  ];
+
   return (
-    <div className="operator-site rr-site">
-      <OperatorHeader discordUrl={discord} />
-      <main className="rr-main">
-        {onlyRanking ? (
-          <section className="rr-intro rr-intro-compact">
-            <span className="rr-eyebrow">
-              <span className="rr-live-dot" /> ERGEBNISSE
-            </span>
-            <h1>Was alle zusammen schaffen.</h1>
+    <div className="operator-site">
+      <OperatorHeader discordUrl={discord} viewer={viewer} />
+      <main id="inhalt" className="do-page rb">
+        {!onlyRanking && !signedIn && (
+          <section className="rb-intro" aria-labelledby="rb-title">
+            <h1 id="rb-title">Zusammen callen. Gemeinsam dranbleiben.</h1>
             <p>
-              Erst die gemeinsame Summe, dann die Einzelplätze. Tag und Monat getrennt,
-              jede Kennzahl mit eigener Rangliste. Fehlende Meldungen zählen
-              nicht als null.
+              Hier siehst du, was alle zusammen schaffen, und hältst deinen eigenen Calling-Tag fest,
+              kostenfrei.
             </p>
-            <div className="rr-intro-actions">
-              <Link href="/tagesabschluss" className="rr-cta-primary">
-                <ClipboardCheck size={18} />
-                Tagesabschluss machen
+            <div className="rb-intro-actions">
+              <Link className="do-button do-button-primary" href="/starten?weg=neu">
+                Kostenfrei starten
+              </Link>
+              <Link className="do-button do-button-secondary" href="/starten?weg=profil">
+                Meine Zahlen sind schon hier
               </Link>
             </div>
           </section>
-        ) : (
-          <section className="rr-intro rr-hero" aria-labelledby="rr-title">
-            <div className="rr-intro-copy">
-              <span className="rr-eyebrow">
-                <span className="rr-live-dot" /> FÜRS GEMEINSAME CALLEN
-              </span>
-              <h1 id="rr-title">
-                Zusammen callen.
-                <br />
-                Gemeinsam <em>dranbleiben.</em>
-              </h1>
-              <p>
-                Deal Operator unterstützt dich beim gemeinsamen Callen:
-                regelmäßig dranbleiben, jeden Calling-Tag Zahlen und Learnings
-                festhalten und sehen, wie du und alle, die mitcallen,
-                vorankommen.
-              </p>
-              <div className="rr-intro-actions">
-                <Link href="/tagesabschluss" className="rr-cta-primary">
-                  <ClipboardCheck size={18} />
-                  Tagesabschluss machen
-                </Link>
-                <a href="#ergebnisse" className="rr-intro-secondary">
-                  <ChartColumn size={17} />
-                  Ergebnisse ansehen
-                </a>
-              </div>
-              <p className="rr-intro-note">
-                Neu hier? <Link href="/starten">Kostenfrei starten</Link>
-              </p>
-            </div>
-            <ol
-              className="rr-steps"
-              id="so-funktionierts"
-              aria-label="So hilft dir Deal Operator dranzubleiben"
-            >
-              {steps.map((step, index) => {
-                const Icon = step.icon;
-                return (
-                  <li
-                    key={step.title}
-                    style={{ "--step": index } as CSSProperties}
-                  >
-                    <span className="rr-step-icon" aria-hidden="true">
-                      <Icon size={18} />
-                    </span>
-                    <div>
-                      <strong className="rr-step-title">{step.title}</strong>
-                      <p>{step.text}</p>
-                      {("reflections" in step || "discord" in step) && (
-                        <span className="rr-step-links">
-                          {"reflections" in step && (
-                            <Link href="/reflexionen">Reflexionen lesen</Link>
-                          )}
-                          {"discord" in step && typeof step.discord === "string" && (
-                            <a
-                              href={discord}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {step.discord}
-                            </a>
-                          )}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
         )}
+        {(onlyRanking || signedIn) && <h1 className="do-sr">Ergebnisse</h1>}
+        {signedIn && home && <PersonalPanel home={home} />}
 
-        <div className="rr-results-anchor" id="ergebnisse">
-          {!onlyRanking && (
-            <div className="rr-section-head">
-              <span className="rr-eyebrow">ERGEBNISSE</span>
-              <h2>Erst die gemeinsame Summe, dann die Einzelplätze.</h2>
+        <section className="rb-results" aria-labelledby="rb-results-title">
+          <div className="rb-results-head">
+            <div>
+              <h2 id="rb-results-title">Gemeinsam erreicht</h2>
+              <p className="rb-period">
+                <span className="rb-period-date">{periodLabel}</span>
+                {fallback && <span className="rb-tag">Letzter gemeldeter Tag</span>}
+                {event && (
+                  <span className="rb-tag rb-tag-event">
+                    <Sparkles size={14} aria-hidden="true" /> {event.title}
+                  </span>
+                )}
+                {(monthly || day !== today) && (
+                  <button type="button" className="rb-today" onClick={() => navigate({ day: today })}>
+                    Zu heute
+                  </button>
+                )}
+              </p>
             </div>
-          )}
-        </div>
-
-        <section className="rr-toolbar" aria-label="Ranking-Zeitraum">
-          <div className="rr-segment" role="group" aria-label="Ansicht">
-            <button
-              aria-pressed={!monthly}
-              onClick={() =>
-                navigate({
-                  day: month === today.slice(0, 7) ? today : `${month}-01`,
-                })
-              }
-            >
-              Tag
-            </button>
-            <button aria-pressed={monthly} onClick={() => navigate({ month })}>
-              Monat
-            </button>
+            <div className="rb-period-tools">
+              <div className="rb-segment" role="group" aria-label="Zeitraum">
+                <button
+                  type="button"
+                  aria-pressed={!monthly}
+                  onClick={() =>
+                    navigate(
+                      month === today.slice(0, 7)
+                        ? null
+                        : { day: data?.days.at(-1)?.day ?? `${month}-01` },
+                    )
+                  }
+                >
+                  Tag
+                </button>
+                <button type="button" aria-pressed={monthly} onClick={() => navigate({ month })}>
+                  Monat
+                </button>
+              </div>
+              <label className="rb-date">
+                <CalendarDays size={18} aria-hidden="true" />
+                <span className="do-sr">{monthly ? "Monat wählen" : "Tag wählen"}</span>
+                <input
+                  type={monthly ? "month" : "date"}
+                  min={monthly ? "2000-01" : "2000-01-01"}
+                  max={monthly ? today.slice(0, 7) : today}
+                  value={monthly ? month : day}
+                  onChange={(e) => {
+                    const parsed = (monthly ? monthSchema : daySchema).safeParse(e.target.value);
+                    if (parsed.success)
+                      navigate(monthly ? { month: parsed.data } : { day: parsed.data });
+                  }}
+                />
+              </label>
+            </div>
           </div>
-          <label className="rr-period-input">
-            <CalendarCheck size={17} />
-            <span className="sr-only">
-              {monthly ? "Ranking-Monat" : "Ranking-Tag"}
-            </span>
-            <input
-              aria-label={monthly ? "Ranking-Monat" : "Ranking-Tag"}
-              type={monthly ? "month" : "date"}
-              min={monthly ? "2000-01" : "2000-01-01"}
-              max={monthly ? today.slice(0, 7) : today}
-              value={monthly ? month : day}
-              onChange={(e) => {
-                const parsed = (monthly ? monthSchema : daySchema).safeParse(
-                  e.target.value,
-                );
-                if (parsed.success)
-                  navigate(
-                    monthly ? { month: parsed.data } : { day: parsed.data },
-                  );
-              }}
-            />
-          </label>
-          <button
-            className="rr-plain-button"
-            onClick={() => navigate({ day: today })}
-          >
-            Heute
-          </button>
-          <span className="rr-toolbar-spacer" />
-          <span className="rr-refresh-label">
-            {error
-              ? "Abruf fehlgeschlagen"
-              : loading
-                ? "Lädt …"
-                : `Aktualisiert ${current?.updated}`}
-          </span>
-          <button
-            className="rr-icon-button"
-            onClick={() => setRetry((value) => value + 1)}
-            aria-label="Ranking aktualisieren"
-          >
-            <RefreshCw size={17} className={loading ? "spin" : ""} />
-          </button>
-          <button className="rr-share-button" onClick={share}>
-            <Copy size={16} />
-            <span>Ranking teilen</span>
-          </button>
-          {shareMessage && (
-            <span className="rr-share-feedback" role="status">
-              {shareMessage}
-            </span>
+          {fallback && (
+            <p className="rb-note">
+              Für heute ist noch nichts gemeldet. Du siehst den letzten Tag mit Meldungen.
+            </p>
           )}
-        </section>
-
-        {event && (
-          <div className="rr-event-banner">
-            <span className="rr-event-tag">
-              <Sparkles size={15} /> {event.title.toLocaleUpperCase("de")}
-            </span>
-            <p>
-              <strong>
-                {eventLabel(event)} · {formatDay(event.day)}
-              </strong>
-              {event.thanks && <span>{event.thanks}</span>}
+          {event && (event.thanks || event.url) && (
+            <p className="rb-note rb-note-event">
+              {event.thanks}{" "}
               {event.url && (
                 <a href={event.url} target="_blank" rel="noopener noreferrer">
                   {event.partner || event.url.replace(/^https:\/\//, "")}
                 </a>
               )}
-              <small>
-                Unten siehst du das Tagesranking dieses Tages. Die Leistung
-                steckt genau einmal in Tages- und Monatswerten, ohne
-                Zusatzwertung.
-              </small>
             </p>
-          </div>
-        )}
-        {(otherEvents.length > 0 || upcoming) && (
-          <div className="rr-event-strip" aria-label="Gekennzeichnete Tage">
-            {upcoming && (
-              <p className="rr-event-upcoming">
-                <CalendarCheck size={14} />
-                <span>
-                  Geplant: {eventLabel(upcoming)} am {formatDay(upcoming.day)}
-                </span>
+          )}
+
+          {error ? (
+            <div className="rb-state" role="alert">
+              <p>
+                <strong>Die Zahlen sind gerade nicht abrufbar.</strong> {error}
               </p>
-            )}
-            {otherEvents.map((item) => (
-              <button
-                key={item.day}
-                onClick={() => navigate({ day: item.day })}
-              >
-                <Sparkles size={14} />
-                <span>
-                  {formatDay(item.day, true)} · {eventLabel(item)}
-                </span>
-                <small>Tagesranking ansehen</small>
+              <button type="button" className="do-button do-button-secondary" onClick={() => setRetry((v) => v + 1)}>
+                Erneut laden
               </button>
-            ))}
+            </div>
+          ) : (
+            <div className="rb-kpis" data-loading={loading || undefined} aria-busy={loading}>
+              {kpis.map((kpi) => {
+                const selectable = kpi.key !== "people";
+                const body = (
+                  <>
+                    <span className="rb-kpi-label">{kpi.label}</span>
+                    <strong key={`${requestKey}-${kpi.key}`} className="rb-kpi-value">
+                      {loading ? " " : fmt(kpi.value)}
+                    </strong>
+                    <span className="rb-kpi-note">{loading ? "Wird geladen" : kpi.note}</span>
+                  </>
+                );
+                return selectable ? (
+                  <button
+                    key={kpi.key}
+                    type="button"
+                    className="rb-kpi"
+                    aria-pressed={!commitmentView && choice === kpi.key}
+                    aria-label={`${kpi.label}: ${loading ? "wird geladen" : fmt(kpi.value)}. Rangliste nach ${kpi.label} zeigen`}
+                    onClick={() => choose(kpi.key as VisibleMetric)}
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  <div key={kpi.key} className="rb-kpi">
+                    {body}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {!error && !loading && (
+            <p className="rb-kpi-foot">
+              {totals.dealsWon !== null && (
+                <span>
+                  {fmt(totals.dealsWon)} {totals.dealsWon === 1 ? "Deal gewonnen" : "Deals gewonnen"}
+                </span>
+              )}
+              {joint.length > 0 && (
+                <span>
+                  {joint.length} gemeinsame {joint.length === 1 ? "Meldung" : "Meldungen"}
+                </span>
+              )}
+              {data?.label && <span>{data.label}</span>}
+              <span className="rb-updated">
+                <RefreshCw size={13} aria-hidden="true" /> Aktualisiert {current?.updated}
+              </span>
+            </p>
+          )}
+          {!error && !loading && upcoming && (
+            <p className="rb-upcoming">
+              <CalendarDays size={16} aria-hidden="true" /> Geplant: {eventLabel(upcoming)} am{" "}
+              {formatDay(upcoming.day)}
+            </p>
+          )}
+        </section>
+
+        <section className="rb-ranking" aria-labelledby="rb-ranking-title">
+          <div className="rb-section-head">
+            <h2 id="rb-ranking-title">Rangliste</h2>
+            <span>
+              {commitmentView
+                ? "Abschluss-Serie, Stand heute"
+                : `${metricLabels[metric]} · ${monthly ? formatMonth(month) : formatDay(day, true)}`}
+            </span>
           </div>
+          <div className="rb-filters">
+            <div className="rb-tabs" role="group" aria-label="Rangliste nach">
+              {primaryMetrics.map((key) => (
+                <button key={key} type="button" aria-pressed={choice === key} onClick={() => choose(key)}>
+                  {metricShortLabels[key]}
+                </button>
+              ))}
+              <label className="rb-more-select" data-active={secondaryChoices.some((c) => c.value === choice) || undefined}>
+                <span className="do-sr">Weitere Ranglisten</span>
+                <select
+                  value={secondaryChoices.some((c) => c.value === choice) ? choice : ""}
+                  onChange={(e) => e.target.value && choose(e.target.value as Choice)}
+                >
+                  <option value="" disabled>
+                    Weitere Ranglisten
+                  </option>
+                  {secondaryChoices.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={16} aria-hidden="true" />
+              </label>
+            </div>
+            <label className="rb-search">
+              <Search size={18} aria-hidden="true" />
+              <span className="do-sr">Namen suchen</span>
+              <input
+                ref={searchRef}
+                type="search"
+                placeholder="Namen suchen"
+                autoComplete="off"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch("")} aria-label="Suche leeren">
+                  <X size={16} aria-hidden="true" />
+                </button>
+              )}
+            </label>
+          </div>
+          {!commitmentView && ownId && !loading && !error && (
+            <p className="rb-own">
+              {own ? (
+                <button type="button" onClick={showOwn}>
+                  <span className="rb-own-place">{own.rank}.</span>
+                  <span>
+                    Dein Platz mit {fmt(own.counts[metric])} {metricShortLabels[metric]}
+                  </span>
+                </button>
+              ) : (
+                <span className="rb-own-empty">
+                  {monthly ? "In diesem Monat" : "An diesem Tag"} bist du in dieser Rangliste nicht dabei.
+                </span>
+              )}
+            </p>
+          )}
+
+          {commitmentView ? (
+            <CommitmentList state={commitmentState} rows={commitmentFiltered} total={commitmentRows.length} search={search} ownId={ownId} month={month} onRetry={() => setRetry((v) => v + 1)} />
+          ) : loading ? (
+            <ol className="rb-list" aria-busy="true" aria-label="Rangliste wird geladen">
+              {Array.from({ length: 5 }, (_, i) => (
+                <li key={i} className="rb-skeleton" />
+              ))}
+            </ol>
+          ) : error ? null : filtered.length ? (
+            <ol className="rb-list" key={`${requestKey}-${metric}`} aria-label={`Rangliste nach ${metricLabels[metric]}`}>
+              {filtered.map((row, index) => (
+                <RankRow
+                  key={row.id}
+                  row={row}
+                  metric={metric}
+                  best={best}
+                  index={index}
+                  own={row.id === ownId}
+                  open={openId === row.id}
+                  periodLabel={periodLabel}
+                  monthly={monthly}
+                  signedIn={signedIn}
+                  onToggle={() => setOpenId((id) => (id === row.id ? null : row.id))}
+                />
+              ))}
+            </ol>
+          ) : (
+            <div className="rb-empty">
+              <p>
+                <strong>
+                  {search
+                    ? "Kein Name gefunden."
+                    : people.length > 0
+                      ? `Noch keine Meldung für ${metricShortLabels[metric]}.`
+                      : `Für ${monthly ? "diesen Monat" : "diesen Tag"} ist noch nichts gemeldet.`}
+                </strong>{" "}
+                {search
+                  ? "Prüfe die Schreibweise oder such nach dem Nachnamen."
+                  : people.length > 0
+                    ? "Für andere Kennzahlen gibt es Meldungen."
+                    : "Wähle einen anderen Tag im Verlauf."}
+              </p>
+            </div>
+          )}
+
+          {!commitmentView && !loading && joint.length > 0 && (
+            <details className="rb-joint">
+              <summary>
+                Gemeinsame Meldungen ({joint.length})<span>kein eigener Platz</span>
+              </summary>
+              <ul>
+                {joint.map((row) => {
+                  const origin = jointReport(row.key);
+                  return (
+                    <li key={row.id}>
+                      <span>
+                        {row.name}
+                        {origin && <small>{origin.reportedAt} Uhr · je zur Hälfte aufgeteilt</small>}
+                      </span>
+                      <strong>{fmt(origin?.report[metric] ?? row.counts[metric] ?? null)}</strong>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p>
+                Gemeinsam erbrachte Leistung tritt nicht gegen einzelne Personen an. Die Werte stecken
+                bereits in den Einzelzahlen und zählen nicht doppelt.
+              </p>
+            </details>
+          )}
+          {!loading && !error && (
+            <div className="rb-list-foot">
+              <p>
+                {commitmentView
+                  ? "Die Serie zählt jeden rechtzeitig eingereichten Tagesabschluss an Calling-Tagen, auch mit 0 Anwahlen."
+                  : "Gleiche Werte teilen sich einen Platz. 0 ist eine Meldung, keine Meldung ist keine 0."}
+              </p>
+              <div>
+                {newest && !commitmentView && (
+                  <span>
+                    Letzte Meldung{" "}
+                    {new Date(newest).toLocaleString("de-DE", {
+                      timeZone: "Europe/Berlin",
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    Uhr
+                  </span>
+                )}
+                <button type="button" className="rb-share" onClick={share}>
+                  <Link2 size={16} aria-hidden="true" />
+                  {shareMessage || "Link zu dieser Ansicht kopieren"}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {data && !error && (
+          <RankingHistory
+            month={month}
+            days={data.days}
+            metric={metric}
+            selectedDay={monthly ? undefined : day}
+            today={today}
+            events={events}
+            onDay={(value) => {
+              navigate({ day: value });
+              document.getElementById("rb-results-title")?.scrollIntoView({ block: "start", behavior: "smooth" });
+            }}
+          />
         )}
 
-        {error ? (
-          <div className="rr-state rr-glass" role="alert">
-            <h2>Die Zahlen sind gerade nicht abrufbar.</h2>
-            <p>{error}</p>
-            <button
-              className="btn primary"
-              onClick={() => setRetry((value) => value + 1)}
-            >
-              Erneut laden
-            </button>
-          </div>
-        ) : loading ? (
-          <div className="rr-skeleton" role="status">
-            <RefreshCw size={22} className="spin" />
-            <span>Die gemeinsamen Zahlen werden geladen …</span>
-          </div>
-        ) : (
-          data && (
-            <>
-              <section
-                className="rr-scoreboard"
-                aria-label={`Gruppenleistung: ${periodLabel}`}
+        {!signedIn && (
+          <section className="rb-claim" aria-labelledby="rb-claim-title">
+            <ShieldCheck size={24} aria-hidden="true" />
+            <div>
+              <h2 id="rb-claim-title">Stehst du schon in der Rangliste?</h2>
+              <p>
+                Such deinen Namen, tipp ihn an und wähle „Das sind meine Zahlen“. Nach kurzer Prüfung
+                durch das Team gehört dein Profil mit allen bisherigen Tagen dir.
+              </p>
+            </div>
+            <div className="rb-claim-actions">
+              <button
+                type="button"
+                className="do-button do-button-secondary"
+                onClick={() => {
+                  searchRef.current?.focus();
+                  searchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+                }}
               >
-                <div className="rr-scoreboard-top">
-                  <span className="rr-eyebrow">
-                    {monthly
-                      ? "GRUPPENLEISTUNG · MONAT"
-                      : event
-                        ? `GRUPPENLEISTUNG · ${event.title.toLocaleUpperCase("de")}`
-                        : "GRUPPENLEISTUNG · TAG"}
-                  </span>
-                  <span className="rr-period-label">{periodLabel}</span>
-                </div>
-                <div className="rr-score-grid">
-                  <div className="rr-main-score">
-                    <span>
-                      <Phone size={18} /> Anwahlen
-                    </span>
-                    <strong key={`${requestKey}-calls`}>
-                      {fmt(totals.attempts)}
-                    </strong>
-                    <small>
-                      {totals.attempts === null
-                        ? "Noch nicht gemeldet"
-                        : monthly
-                          ? "Summe dieses Monats"
-                          : "Tageswert"}
-                    </small>
-                  </div>
-                  <div>
-                    <span>
-                      <CalendarCheck size={18} /> Settings
-                    </span>
-                    <strong>{fmt(totals.settingsBooked)}</strong>
-                    <small>
-                      {totals.settingsBooked === null
-                        ? "Noch nicht gemeldet"
-                        : "vereinbart"}
-                    </small>
-                  </div>
-                  <div>
-                    <span>
-                      <Handshake size={18} /> Closings
-                    </span>
-                    <strong>{fmt(totals.closingsBooked)}</strong>
-                    <small>
-                      {totals.closingsBooked === null
-                        ? "Noch nicht gemeldet"
-                        : "vereinbart"}
-                    </small>
-                  </div>
-                  <div>
-                    <span>
-                      <Users size={18} /> Am Start
-                    </span>
-                    <strong>{fmt(people.length)}</strong>
-                    <small>
-                      {people.length === 1 ? "Person" : "Personen"} mit Meldung
-                      {joint.length > 0
-                        ? ` · ${joint.length} gemeinsame ${joint.length === 1 ? "Meldung" : "Meldungen"}`
-                        : ""}
-                    </small>
-                  </div>
-                </div>
-                <div className="rr-score-detail">
-                  <button onClick={() => choose("dealsWon")}>
-                    <strong>{fmt(totals.dealsWon)}</strong>{" "}
-                    {totals.dealsWon === 1 ? "Deal gewonnen" : "Deals gewonnen"}
-                  </button>
-                  {runningStreaks !== null && (
-                    <button onClick={() => choose(COMMITMENT)}>
-                      <Flame size={13} />
-                      <strong>{fmt(runningStreaks)}</strong>
-                      {runningStreaks === 1 ? "laufende Serie" : "laufende Serien"}
-                    </button>
-                  )}
-                </div>
-                {latestReported && (
-                  <p className="rr-score-hint">
-                    Für diesen Tag ist noch nichts gemeldet.{" "}
-                    <button
-                      onClick={() => navigate({ day: latestReported.day })}
-                    >
-                      Letzten Tag mit Meldungen ansehen (
-                      {formatDay(latestReported.day, true)})
-                    </button>
-                  </p>
-                )}
-                {data.label && (
-                  <p className="rr-snapshot-label">{data.label}</p>
-                )}
-              </section>
+                <Search size={17} aria-hidden="true" /> Namen suchen
+              </button>
+              <Link className="do-link" href="/starten?weg=neu">
+                Ich starte neu
+              </Link>
+            </div>
+          </section>
+        )}
 
-              <section
-                className="rr-competition"
-                id="ranking"
-                aria-label="Einzelplätze"
-              >
-                <div className="rr-ranking-heading">
-                  <div>
-                    <span className="rr-eyebrow">
-                      EINZELPLÄTZE · {monthly ? "MONAT" : "TAG"}
-                    </span>
-                    <h2>
-                      {commitmentView
-                        ? "Serien"
-                        : monthly
-                          ? "Monatsranking"
-                          : event
-                            ? `Tagesranking ${event.title}`
-                            : "Tagesranking"}
-                    </h2>
-                  </div>
-                  <span>{periodLabel}</span>
-                </div>
-                <div
-                  className="rr-metric-bar"
-                  role="group"
-                  aria-label="Rangliste wählen"
-                >
-                  {primaryMetrics.map((key) => (
-                    <button
-                      key={key}
-                      aria-pressed={choice === key}
-                      onClick={() => choose(key)}
-                    >
-                      {metricShortLabels[key]}
-                    </button>
-                  ))}
-                  <button
-                    aria-pressed={commitmentView}
-                    onClick={() => choose(COMMITMENT)}
-                    className="rr-commit-tab"
-                  >
-                    <Flame size={14} /> Dranbleiben
-                  </button>
-                  <label className="rr-more-metrics">
-                    <span className="sr-only">Weitere Kennzahlen</span>
-                    <select
-                      aria-label="Weitere Kennzahlen"
-                      value={
-                        secondaryMetrics.includes(choice as VisibleMetric)
-                          ? choice
-                          : ""
-                      }
-                      onChange={(e) => {
-                        if (e.target.value)
-                          choose(e.target.value as VisibleMetric);
-                      }}
-                    >
-                      <option value="" disabled>
-                        Weitere Kennzahlen
-                      </option>
-                      {secondaryMetrics.map((key) => (
-                        <option value={key} key={key}>
-                          {metricLabels[key]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="rr-ranking-context">
-                  {commitmentView ? (
-                    <span>
-                      Sortiert nach aktueller <strong>Serie</strong>, dann
-                      aktiven Tagen.
-                    </span>
-                  ) : (
-                    <span>
-                      Sortiert nach <strong>{metricLabels[metric]}</strong>
-                      {monthly ? " im Monat" : " an diesem Tag"}. Jede
-                      Kennzahl hat ihre eigene Rangliste.
-                    </span>
-                  )}
-                </div>
-                {!commitmentView && podium.length > 0 && (
-                  <div
-                    className="rr-podium"
-                    key={`${requestKey}-${metric}`}
-                    aria-label={`Spitzenplätze nach ${metricLabels[metric]}`}
-                  >
-                    {podium.map((row, index) => (
-                      <button
-                        className="rr-podium-card"
-                        key={row.id}
-                        data-place={row.rank}
-                        data-position={index}
-                        onClick={() => setSelectedId(row.id)}
-                      >
-                        <div className="rr-podium-top">
-                          <span>
-                            {row.rank === 1 ? (
-                              <Trophy size={16} />
-                            ) : (
-                              <Medal size={16} />
-                            )}{" "}
-                            PLATZ {row.rank}
-                          </span>
-                        </div>
-                        <span className="rr-podium-avatar">
-                          {initials(row.name)}
-                        </span>
-                        <span className="rr-podium-person">
-                          <h3>{row.name}</h3>
-                          <span className="rr-podium-role">
-                            {row.company || "Caller"}
-                          </span>
-                        </span>
-                        <span className="rr-podium-score">
-                          <strong className="rr-podium-value">
-                            {fmt(row.counts[metric])}
-                          </strong>
-                          <span className="rr-podium-metric">
-                            {metricShortLabels[metric]}
-                          </span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className="rr-board-layout">
-                  <div className="rr-leaderboard rr-glass">
-                    <div className="rr-list-top">
-                      <h3>
-                        {commitmentView
-                          ? "Dranbleiben"
-                          : `Gemeldet: ${metricShortLabels[metric]}`}{" "}
-                        <span>
-                          {commitmentView
-                            ? search
-                              ? `${commitmentFiltered.length} von ${commitmentRows.length}`
-                              : commitmentRows.length
-                            : search
-                              ? `${filtered.length} von ${all.length}`
-                              : all.length}
-                        </span>
-                      </h3>
-                      <label className="rr-search">
-                        <Search size={17} />
-                        <input
-                          aria-label="Person suchen"
-                          placeholder="Name suchen"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                        {search && (
-                          <button
-                            onClick={() => setSearch("")}
-                            aria-label="Suche zurücksetzen"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </label>
-                    </div>
-                    {commitmentView ? (
-                      !commitmentState ? (
-                        <div className="rr-empty" role="status">
-                          <RefreshCw size={24} className="spin" />
-                          <p>Die Serien werden geladen …</p>
-                        </div>
-                      ) : commitmentState.error ? (
-                        <div className="rr-empty" role="alert">
-                          <h3>Die Serien sind gerade nicht abrufbar.</h3>
-                          <p>{commitmentState.error}</p>
-                          <button
-                            className="btn primary"
-                            onClick={() => setRetry((value) => value + 1)}
-                          >
-                            Erneut laden
-                          </button>
-                        </div>
-                      ) : commitmentFiltered.length ? (
-                        <ol
-                          className="rr-rank-list rr-commit-list"
-                          aria-label="Rangliste Dranbleiben"
-                        >
-                          {commitmentFiltered.map((row, index) => (
-                            <li
-                              key={row.id}
-                              data-place={row.rank}
-                              style={
-                                {
-                                  "--row-delay": `${Math.min(index, 12) * 22}ms`,
-                                } as CSSProperties
-                              }
-                            >
-                              <div className="rr-commit-row">
-                                <span className="rr-place">
-                                  <span className="sr-only">Platz </span>
-                                  {row.rank}
-                                </span>
-                                <span className="rr-rank-name">
-                                  <strong>{row.name}</strong>
-                                  <small>{row.company || "Caller"}</small>
-                                  {row.active && (
-                                    <span className="rr-active-caller">
-                                      <Flame size={13} aria-hidden="true" />
-                                      Aktiver Caller
-                                    </span>
-                                  )}
-                                </span>
-                                <dl className="rr-commit-stats">
-                                  <div data-lead="true">
-                                    <dt>Serie</dt>
-                                    <dd>
-                                      <strong>
-                                        {fmt(row.streak.current)}
-                                      </strong>
-                                      <small>
-                                        Bestwert {fmt(row.streak.best)}
-                                      </small>
-                                    </dd>
-                                  </div>
-                                  <div>
-                                    <dt>Aktive Tage</dt>
-                                    <dd>
-                                      <strong>{fmt(row.activeDays)}</strong>
-                                      <small>
-                                        {fmt(row.closedDays)}{" "}
-                                        {row.closedDays === 1
-                                          ? "Abschluss"
-                                          : "Abschlüsse"}
-                                      </small>
-                                    </dd>
-                                  </div>
-                                </dl>
-                              </div>
-                            </li>
-                          ))}
-                        </ol>
-                      ) : (
-                        <div className="rr-empty">
-                          <Flame size={27} />
-                          <h3>
-                            {search
-                              ? "Kein Profil gefunden."
-                              : "Noch keine öffentlichen Serien."}
-                          </h3>
-                          <p>
-                            {search
-                              ? "Versuche einen anderen Namen."
-                              : "Hier erscheinen Personen, die ihren Tagesabschluss selbst einreichen und der öffentlichen Anzeige zugestimmt haben."}
-                          </p>
-                          {!search && (
-                            <Link
-                              href="/tagesabschluss"
-                              className="btn primary"
-                            >
-                              Tagesabschluss machen
-                            </Link>
-                          )}
-                        </div>
-                      )
-                    ) : filtered.length ? (
-                      <ol
-                        className="rr-rank-list"
-                        key={`${requestKey}-${metric}`}
-                        aria-label={`Rangliste nach ${metricLabels[metric]}`}
-                      >
-                        {filtered.map((row, index) => (
-                          <li
-                            key={row.id}
-                            data-place={row.rank ?? undefined}
-                            style={
-                              {
-                                "--row-delay": `${Math.min(index, 12) * 22}ms`,
-                              } as CSSProperties
-                            }
-                          >
-                            <button
-                              className="rr-rank-row"
-                              onClick={() => setSelectedId(row.id)}
-                              aria-label={`${row.name}, Platz ${row.rank}, ${fmt(row.counts[metric])} ${metricShortLabels[metric]}`}
-                            >
-                              <span className="rr-place">{row.rank}</span>
-                              <span className="rr-rank-name">
-                                <strong>
-                                  {row.name}
-                                  {row.claimed && (
-                                    <ShieldCheck
-                                      size={13}
-                                      aria-label="Profil übernommen"
-                                    />
-                                  )}
-                                </strong>
-                                <small>
-                                  {row.company || "Caller"}
-                                </small>
-                              </span>
-                              <span className="rr-rank-value">
-                                <strong>{fmt(row.counts[metric])}</strong>
-                                <small>{metricShortLabels[metric]}</small>
-                              </span>
-                              <span className="rr-progress" aria-hidden="true">
-                                <i
-                                  style={{
-                                    width:
-                                      best > 0 && row.counts[metric] !== null
-                                        ? `${(row.counts[metric]! / best) * 100}%`
-                                        : "0%",
-                                  }}
-                                />
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ol>
-                    ) : (
-                      <div className="rr-empty">
-                        <Phone size={27} />
-                        <h3>
-                          {search
-                            ? "Kein Profil gefunden."
-                            : people.length > 0
-                              ? `Noch keine Meldung für ${metricShortLabels[metric]}.`
-                              : "Für diesen Zeitraum ist noch nichts gemeldet."}
-                        </h3>
-                        <p>
-                          {search
-                            ? "Versuche einen anderen Namen."
-                            : people.length > 0
-                              ? "Für andere Kennzahlen gibt es Meldungen. Wechsle oben die Auswahl."
-                              : `Für ${monthly ? "diesen Monat" : "diesen Tag"} sind noch keine öffentlichen Zahlen gemeldet. Wähle einen Tag im Archiv oder halte deinen Calling-Tag im Tagesabschluss fest.`}
-                        </p>
-                        {!search && (
-                          <Link href="/tagesabschluss" className="btn primary">
-                            Tagesabschluss machen
-                          </Link>
-                        )}
-                      </div>
-                    )}
-                    {!commitmentView && joint.length > 0 && (
-                      <div className="rr-joint">
-                        <div className="rr-joint-head">
-                          <h4>Gemeinsame Meldungen</h4>
-                          <span>Quelle, kein eigener Rang</span>
-                        </div>
-                        <ul>
-                          {joint.map((row) => {
-                            const origin = jointReport(row.key);
-                            const reported = origin?.report[metric];
-                            return (
-                              <li key={row.id}>
-                                <button onClick={() => setSelectedId(row.id)}>
-                                  <Users size={15} />
-                                  <span>
-                                    {row.name}
-                                    {origin && (
-                                      <small>
-                                        {origin.reportedAt} Uhr · 50/50
-                                        aufgeteilt
-                                      </small>
-                                    )}
-                                  </span>
-                                  <strong>
-                                    {fmt(
-                                      reported ?? row.counts[metric] ?? null,
-                                    )}
-                                  </strong>
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                        <p>
-                          Eine gemeinsam erbrachte Leistung tritt nicht gegen
-                          einzelne Personen an. Die gezeigten Werte sind die
-                          Originalmeldung; sie stecken bereits in den
-                          Einzelzahlen und werden nicht zusätzlich gezählt.
-                        </p>
-                      </div>
-                    )}
-                    <div className="rr-table-caption">
-                      {commitmentView ? (
-                        <>
-                          <span>
-                            Die Serie zählt jeden rechtzeitig eingereichten
-                            Tagesabschluss mit Reflexion an Calling-Tagen, auch
-                            mit 0 Anwahlen. Wochenenden sind keine
-                            Calling-Tage.
-                          </span>
-                          <span>
-                            Serie: Stand heute. Aktive Tage und Abschlüsse:{" "}
-                            {formatMonth(month)}. Nur eigene Tagesabschlüsse
-                            mit öffentlicher Anzeige.
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span>
-                            Nur Personen mit einer Meldung für diese Kennzahl.
-                            0 ist eine Meldung, keine Meldung ist keine 0.
-                          </span>
-                          <span>Gleiche Werte teilen sich einen Rang.</span>
-                        </>
-                      )}
-                    </div>
-                    {!commitmentView && newest && (
-                      <p className="rr-data-updated">
-                        Letzte Meldung aktualisiert am{" "}
-                        {new Date(newest).toLocaleString("de-DE", {
-                          timeZone: "Europe/Berlin",
-                          day: "2-digit",
-                          month: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}{" "}
-                        Uhr
-                      </p>
-                    )}
-                  </div>
-                  <aside className="rr-aside">
-                    <div className="rr-mobile-tools">
-                      <button
-                        aria-expanded={archiveOpen}
-                        aria-controls="ranking-archive"
-                        onClick={() => setArchiveOpen((open) => !open)}
-                      >
-                        <CalendarCheck size={16} />
-                        {archiveOpen
-                          ? "Verlauf schließen"
-                          : "Tagesverlauf & Archiv"}
-                      </button>
-                      <Link href="/reflexionen">
-                        <MessagesSquare size={16} />
-                        Reflexionen
-                      </Link>
-                    </div>
-                    <div
-                      className="rr-aside-content"
-                      id="ranking-archive"
-                      data-expanded={archiveOpen}
-                    >
-                      <RankingHistory
-                        month={month}
-                        days={data.days}
-                        metric={metric}
-                        selectedDay={monthly ? undefined : day}
-                        today={today}
-                        events={events}
-                        onDay={(value) => {
-                          navigate({ day: value });
-                          setArchiveOpen(false);
-                        }}
-                      />
-                      <div className="rr-exchange rr-glass">
-                        <span className="rr-eyebrow">
-                          <MessagesSquare size={14} /> AUSTAUSCH
-                        </span>
-                        <h3>Learnings teilen, Call-Partner finden.</h3>
-                        <p>
-                          Angemeldet mit eigenem Profil und hinterlegter
-                          Telefonnummer liest du unter Reflexionen, was bei
-                          anderen funktioniert hat. Im Discord findest du
-                          Call-Partner, Sessions und Roleplay, und du siehst,
-                          wer durchzieht.
-                        </p>
-                        <div className="rr-exchange-links">
-                          <Link href="/reflexionen">Reflexionen lesen</Link>
-                          <a
-                            href={discord}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Headphones size={15} />
-                            Discord öffnen
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </aside>
-                </div>
-              </section>
-              <section className="rr-next-step rr-glass">
-                <div className="rr-next-icon">
-                  <ShieldCheck size={27} />
-                </div>
-                <div>
-                  <h2>Deine Zahlen stehen schon im Ranking?</h2>
-                  <p>
-                    Wenn du deine Zahlen künftig selbst eintragen möchtest,
-                    kannst du dein Profil übernehmen, nach E-Mail-Bestätigung
-                    und kurzer Prüfung durch das Team.
-                  </p>
-                </div>
-                <Link className="btn primary" href="/starten">
-                  Zahlen übernehmen
-                </Link>
-              </section>
-            </>
-          )
+        <section className="rb-exchange" aria-label="Austausch">
+          <Link href="/reflexionen">
+            <strong>Reflexionen lesen</strong>
+            <span>Was bei anderen heute funktioniert hat.</span>
+          </Link>
+          <a href={discord} target="_blank" rel="noopener noreferrer">
+            <strong>Call-Partner im Discord finden</strong>
+            <span>Sessions, Roleplay und gemeinsames Callen. Öffnet Discord.</span>
+          </a>
+        </section>
+
+        {!onlyRanking && (
+          <section className="rb-how" id="so-funktionierts" aria-labelledby="rb-how-title">
+            <h2 id="rb-how-title">So funktioniert’s</h2>
+            <ol>
+              {steps.map((step) => (
+                <li key={step.title}>
+                  <strong>{step.title}</strong>
+                  <p>{step.text}</p>
+                </li>
+              ))}
+            </ol>
+            <p className="rb-how-foot">
+              Kostenfrei. Erinnerungen am Abend gibt es, wenn du sie auf deinem Gerät einschaltest.
+            </p>
+          </section>
         )}
       </main>
-      <OperatorFooter discordUrl={discord} />
-      <Dialog
-        open={!!selected}
-        onOpenChange={(open) => {
-          if (!open) setSelectedId(null);
-        }}
-      >
-        <DialogContent className="operator-dialog rr-profile-dialog">
-          <DialogHeader>
-            <DialogTitle>{selected?.name}</DialogTitle>
-            <DialogDescription>
-              {selected && isJoint(selected)
-                ? "Gemeinsam gemeldete Leistung mehrerer Personen"
-                : selected?.company || "Caller"}
-            </DialogDescription>
-          </DialogHeader>
-          {selected && (
-            <>
-              <div className="rr-profile-period">
-                <CalendarCheck size={16} />
-                {periodLabel}
-                {event && <span>{event.title}</span>}
-              </div>
-              <div className="profile-kpis">
-                {visibleMetrics.map((key) => (
-                  <div key={key}>
-                    <span>{metricLabels[key]}</span>
-                    <strong>{fmt(selected.counts[key])}</strong>
-                  </div>
-                ))}
-              </div>
-              {(() => {
-                const origin = splitOrigin(selected.key);
-                const own = jointReport(selected.key);
-                if (origin)
-                  return (
-                    <p className="rr-split-note">
-                      <strong>{SPLIT_NOTE}</strong>
-                      Die gemeinsame Meldung von {origin.name} um{" "}
-                      {origin.reportedAt} Uhr wurde je zur Hälfte auf die
-                      beteiligten Personen gerechnet. Es sind zugeteilte, keine
-                      einzeln gemeldeten Werte.
-                      {origin.kept.map((k) => (
-                        <span key={k.metric}>{k.why}</span>
-                      ))}
-                    </p>
-                  );
-                if (own)
-                  return (
-                    <p className="rr-split-note">
-                      <strong>
-                        Gemeinsame Meldung um {own.reportedAt} Uhr
-                      </strong>
-                      Ursprünglich gemeldet:{" "}
-                      {visibleMetrics
-                        .filter((m) => own.report[m] != null)
-                        .map((m) => `${own.report[m]} ${metricLabels[m]}`)
-                        .join(", ") || "keine öffentliche Kennzahl"}
-                      {own.report.legacyMeetings != null
-                        ? `, ${own.report.legacyMeetings} Termine ohne Typangabe`
-                        : ""}
-                      . Diese Werte sind 50/50 auf{" "}
-                      {own.parts.map((p) => p.name).join(" und ")} verteilt und
-                      stecken dort in den Einzelzahlen. Sie werden hier nicht
-                      noch einmal mitgezählt.
-                      {own.kept.map((k) => (
-                        <span key={k.metric}>{k.why}</span>
-                      ))}
-                    </p>
-                  );
-                return (
-                  <p className="hint">
-                    Die Werte gelten für{" "}
-                    {monthly ? "den ausgewählten Monat" : "diesen Tag"}. Gleiche
-                    Werte teilen sich einen Rang. Nicht gemeldete Kennzahlen
-                    bleiben offen.
-                  </p>
-                );
-              })()}
-              {isJoint(selected) ? (
-                <p className="hint">
-                  Diese Meldung gehört mehreren Personen und lässt sich nicht
-                  als persönliches Profil übernehmen. Melde dich mit deinen
-                  eigenen Zahlen an.
-                </p>
-              ) : (
-                !selected.claimed && (
-                  <Link
-                    className="btn primary"
-                    href={`/starten?profil=${encodeURIComponent(selected.id)}`}
-                  >
-                    <Check size={17} />
-                    Das sind meine Zahlen
-                  </Link>
-                )
-              )}
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      <OperatorFooter discordUrl={discord} showAdmin={!!viewer?.team || !!home?.team} />
     </div>
+  );
+}
+
+/** Kompakter Abschnitt „Mein Tag“ auf der Startseite, je nach Stand. */
+function PersonalPanel({ home }: { home: HomeState }) {
+  const state = (() => {
+    if (!home.participant) {
+      if (home.request && ["pending", "info_needed"].includes(home.request.status))
+        return {
+          icon: Clock3,
+          tone: "wait",
+          title:
+            home.request.status === "info_needed"
+              ? "Das Team hat eine Rückfrage zu deiner Profilübernahme."
+              : "Deine Profilübernahme wird geprüft.",
+          text: "Sobald das Team freigibt, trägst du hier deinen Tag ein.",
+          href: "/status",
+          action: home.request.status === "info_needed" ? "Rückfrage beantworten" : "Stand ansehen",
+        };
+      return {
+        icon: CircleDashed,
+        tone: "open",
+        title: "Dein Konto hat noch kein Profil.",
+        text: "Leg ein Profil an oder übernimm deine Zahlen, wenn du schon in der Rangliste stehst.",
+        href: "/start",
+        action: "Profil einrichten",
+      };
+    }
+    const t = home.today!;
+    if (home.earlier && t.status !== "done")
+      return {
+        icon: Clock3,
+        tone: "open",
+        title: `Dein Abschluss für ${formatWeekday(home.earlier.day)} ist noch offen.`,
+        text: `Bis ${formatDeadline(home.earlier.deadline)} zählt er noch für deine Serie.`,
+        href: `/tagesabschluss?tag=${home.earlier.day}`,
+        action: `${formatWeekday(home.earlier.day)} abschließen`,
+      };
+    if (t.status === "done")
+      return {
+        icon: CircleCheck,
+        tone: "done",
+        title: "Heute abgeschlossen.",
+        text: "Deine Zahlen und deine Reflexion sind eingereicht.",
+        href: "/tagesabschluss",
+        action: "Meinen Tag ansehen",
+      };
+    if (t.status === "imported")
+      return {
+        icon: Check,
+        tone: "done",
+        title: "Deine Zahlen für heute sind eingetragen.",
+        text: "Das Team hat sie übernommen.",
+        href: "/tagesabschluss",
+        action: "Meinen Tag ansehen",
+      };
+    if (t.status === "draft")
+      return {
+        icon: NotebookPen,
+        tone: "draft",
+        title: "Dein Entwurf für heute ist gespeichert.",
+        text: "Er zählt, sobald du ihn einreichst.",
+        href: "/tagesabschluss",
+        action: "Fortsetzen",
+      };
+    return {
+      icon: CircleDashed,
+      tone: "open",
+      title: t.due ? "Dein Abschluss für heute ist noch offen." : "Heute ist kein Calling-Tag.",
+      text: t.due
+        ? "Zahlen und zwei kurze Fragen, dann zählt dein Tag."
+        : "Ein Abschluss ist freiwillig und zählt als Bonus.",
+      href: "/tagesabschluss",
+      action: "Tag abschließen",
+    };
+  })();
+  const Icon = state.icon;
+  return (
+    <section className="rb-me" data-tone={state.tone} aria-labelledby="rb-me-title">
+      <span className="rb-me-icon" aria-hidden="true">
+        <Icon size={22} />
+      </span>
+      <div className="rb-me-text">
+        <p className="rb-me-kicker">Mein Tag</p>
+        <h2 id="rb-me-title">{state.title}</h2>
+        <p>{state.text}</p>
+      </div>
+      <Link
+        className={`do-button ${state.tone === "done" ? "do-button-secondary" : "do-button-primary"}`}
+        href={state.href}
+      >
+        {state.action}
+      </Link>
+    </section>
+  );
+}
+const WEEKDAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" });
+function formatWeekday(day: string) {
+  return WEEKDAY.format(new Date(`${day}T12:00:00Z`));
+}
+function formatDeadline(iso: string) {
+  return `${new Intl.DateTimeFormat("de-DE", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Berlin",
+  }).format(new Date(iso))} Uhr`;
+}
+
+function RankRow({
+  row,
+  metric,
+  best,
+  index,
+  own,
+  open,
+  periodLabel,
+  monthly,
+  signedIn,
+  onToggle,
+}: {
+  row: RankingRow & { rank: number };
+  metric: VisibleMetric;
+  best: number;
+  index: number;
+  own: boolean;
+  open: boolean;
+  periodLabel: string;
+  monthly: boolean;
+  signedIn: boolean;
+  onToggle: () => void;
+}) {
+  const value = row.counts[metric];
+  const tier = medal(row.rank, value);
+  const origin = splitOrigin(row.key);
+  return (
+    <li
+      id={`rb-row-${row.id}`}
+      data-medal={tier}
+      data-own={own || undefined}
+      data-open={open || undefined}
+      style={{ "--i": Math.min(index, 10) } as CSSProperties}
+    >
+      <button
+        type="button"
+        className="rb-row"
+        aria-expanded={open}
+        aria-controls={`rb-detail-${row.id}`}
+        onClick={onToggle}
+      >
+        <span className="rb-place">
+          <span className="do-sr">Platz </span>
+          {row.rank}
+        </span>
+        <span className="rb-name">
+          <strong>
+            {row.name}
+            {own && <em className="rb-you">Du</em>}
+          </strong>
+          {row.company && <small>{row.company}</small>}
+          <span className="rb-bar" aria-hidden="true">
+            <i style={{ width: best > 0 && value !== null ? `${(value / best) * 100}%` : "0%" }} />
+          </span>
+        </span>
+        <span className="rb-value">
+          <strong>{fmt(value)}</strong>
+          <small>{metricShortLabels[metric]}</small>
+        </span>
+        <ChevronDown className="rb-chevron" size={18} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="rb-detail" id={`rb-detail-${row.id}`}>
+          <p className="rb-detail-period">{periodLabel}</p>
+          <dl>
+            {visibleMetrics.map((key) => (
+              <div key={key}>
+                <dt>{metricLabels[key]}</dt>
+                <dd>{fmt(row.counts[key])}</dd>
+              </div>
+            ))}
+          </dl>
+          {origin ? (
+            <p className="rb-detail-note">
+              <strong>{SPLIT_NOTE}</strong> Die gemeinsame Meldung von {origin.name} um{" "}
+              {origin.reportedAt} Uhr ist je zur Hälfte auf die Beteiligten gerechnet. Es sind
+              zugeteilte, keine einzeln gemeldeten Werte.
+              {origin.kept.map((k) => (
+                <span key={k.metric}> {k.why}</span>
+              ))}
+            </p>
+          ) : (
+            <p className="rb-detail-note">
+              Werte für {monthly ? "den Monat" : "diesen Tag"}. Nicht gemeldete Kennzahlen bleiben offen.
+            </p>
+          )}
+          {row.claimed ? (
+            <p className="rb-detail-claimed">
+              <ShieldCheck size={16} aria-hidden="true" /> Dieses Profil gehört bereits zu einem Konto.
+            </p>
+          ) : (
+            !own && (
+              <Link
+                className="do-button do-button-secondary"
+                href={`/starten?profil=${encodeURIComponent(row.id)}`}
+              >
+                Das sind meine Zahlen
+              </Link>
+            )
+          )}
+          {!row.claimed && signedIn && (
+            <p className="rb-detail-hint">Du wirst mit deinem Konto zur Übernahme geführt.</p>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function CommitmentList({
+  state,
+  rows,
+  total,
+  search,
+  ownId,
+  month,
+  onRetry,
+}: {
+  state: LoadedCommitment | null;
+  rows: (CommitmentRow & { rank: number })[];
+  total: number;
+  search: string;
+  ownId: string | null;
+  month: string;
+  onRetry: () => void;
+}) {
+  if (!state)
+    return (
+      <ol className="rb-list" aria-busy="true" aria-label="Serien werden geladen">
+        {Array.from({ length: 4 }, (_, i) => (
+          <li key={i} className="rb-skeleton" />
+        ))}
+      </ol>
+    );
+  if (state.error)
+    return (
+      <div className="rb-state" role="alert">
+        <p>
+          <strong>Die Serien sind gerade nicht abrufbar.</strong> {state.error}
+        </p>
+        <button type="button" className="do-button do-button-secondary" onClick={onRetry}>
+          Erneut laden
+        </button>
+      </div>
+    );
+  if (!rows.length)
+    return (
+      <div className="rb-empty">
+        <p>
+          <strong>{search ? "Kein Name gefunden." : "Noch keine öffentlichen Serien."}</strong>{" "}
+          {search
+            ? "Prüfe die Schreibweise."
+            : "Hier erscheinen Personen, die ihren Tagesabschluss selbst einreichen und der öffentlichen Anzeige zugestimmt haben."}
+        </p>
+      </div>
+    );
+  return (
+    <ol className="rb-list" aria-label={`Rangliste Abschluss-Serie, ${search ? `${rows.length} von ${total}` : total} Personen`}>
+      {rows.map((row, index) => (
+        <li
+          key={row.id}
+          data-medal={medal(row.rank, row.streak.current)}
+          data-own={row.id === ownId || undefined}
+          style={{ "--i": Math.min(index, 10) } as CSSProperties}
+        >
+          <div className="rb-row rb-row-static">
+            <span className="rb-place">
+              <span className="do-sr">Platz </span>
+              {row.rank}
+            </span>
+            <span className="rb-name">
+              <strong>
+                {row.name}
+                {row.id === ownId && <em className="rb-you">Du</em>}
+              </strong>
+              <small>
+                {row.activeDays} aktive {row.activeDays === 1 ? "Tag" : "Tage"} im {formatMonth(month)}
+                {row.active ? " · Aktiver Caller" : ""}
+              </small>
+            </span>
+            <span className="rb-value">
+              <strong>{fmt(row.streak.current)}</strong>
+              <small>{row.streak.current === 1 ? "Tag Serie" : "Tage Serie"}</small>
+            </span>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
