@@ -157,6 +157,55 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
 }
+/* Ältere Knöpfe (.btn) sehen genauso aus wie .do-button. */
+.operator-site .btn {
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: var(--radius-m);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: none;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+.operator-site .btn:active:not(:disabled) {
+  transform: none;
+}
+.operator-site .btn.primary,
+.operator-site .btn.lime {
+  border-color: var(--do-blue);
+  background: var(--do-blue);
+  box-shadow: none;
+  color: var(--do-surface);
+}
+.operator-site .btn.primary:hover,
+.operator-site .btn.lime:hover {
+  border-color: var(--do-blue-strong);
+  background: var(--do-blue-strong);
+  box-shadow: none;
+}
+.operator-site .btn.secondary {
+  border-color: var(--do-line-strong);
+  background: var(--do-surface);
+  color: var(--do-ink);
+}
+.operator-site .btn.secondary:hover {
+  border-color: var(--do-blue-line);
+  color: var(--do-blue);
+}
+.operator-site .btn.chosen {
+  border-color: var(--do-blue-line);
+  background: var(--do-blue-soft);
+  color: var(--do-blue);
+}
+.operator-site .btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 .do-link {
   display: inline-flex;
   align-items: center;
@@ -166,6 +215,14 @@ body {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
+}
+button.do-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
 }
 .do-sr {
   position: absolute;
@@ -283,16 +340,6 @@ body {
   border-color: var(--do-blue-line);
   color: var(--do-blue);
 }
-.do-account-dot {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 10px;
-  height: 10px;
-  border: 2px solid var(--do-surface);
-  border-radius: 50%;
-  background: var(--do-green);
-}
 .do-account-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -386,7 +433,7 @@ body {
     padding: 4px 2px;
     border-radius: var(--radius-s);
     color: var(--do-ink-3);
-    font-size: var(--text-meta);
+    font-size: var(--text-label);
     font-weight: 650;
     line-height: 1.2;
     text-align: center;
@@ -400,6 +447,11 @@ body {
   }
   .do-tabbar a[aria-current="page"] {
     color: var(--do-blue);
+  }
+  @media (max-width: 374px) {
+    .do-tabbar a {
+      font-size: var(--text-meta);
+    }
   }
   .do-tabbar a[aria-current="page"] svg {
     stroke-width: 2.4;
@@ -512,7 +564,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border-radius: var(--radius-s);
   color: var(--do-ink-2);
@@ -533,11 +585,78 @@ body {
   .do-area-nav {
     display: grid;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
+    grid-auto-columns: auto;
+    justify-content: space-between;
     width: 100%;
   }
   .do-area-nav a {
-    padding: 0 6px;
+    padding: 0 10px;
+  }
+}
+/* Passen die Einträge nicht in eine Zeile, stehen sie zwei mal zwei. */
+@media (max-width: 439px) {
+  .do-area-nav[data-area="exchange"] {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 349px) {
+  .do-area-nav[data-area="mine"] {
+    grid-auto-flow: row;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/*
+ * Umschalter innerhalb einer Seite (Tabs aus components/ui) sehen aus wie
+ * die Bereichsnavigation: gleiche Fläche, gleiche Schrift, gleiche Ziele.
+ */
+.ca-main [data-slot="tabs-list"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 4px;
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+}
+.ca-main [data-slot="tabs-trigger"] {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  box-shadow: none;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-weight: 700;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.ca-main [data-slot="tabs-trigger"]:hover {
+  color: var(--do-ink);
+}
+.ca-main [data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--do-blue-soft);
+  box-shadow: none;
+  color: var(--do-blue);
+}
+.ca-main [data-slot="tabs-trigger"]:focus-visible {
+  outline: 2px solid var(--do-blue);
+  outline-offset: 2px;
+}
+@media (max-width: 599px) {
+  .ca-main [data-slot="tabs-list"] {
+    width: 100%;
+  }
+  .ca-main [data-slot="tabs-trigger"] {
+    flex: 1 0 auto;
+    padding: 0 10px;
   }
 }
 
@@ -619,6 +738,7 @@ body {
 }
 .ca-settings {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   max-width: 760px;
 }
@@ -781,13 +901,13 @@ body {
 }
 .rb-segment {
   display: inline-flex;
-  padding: 3px;
+  padding: 2px;
   border-radius: var(--radius-m);
   background: oklch(32% 0.07 260);
 }
 .rb-segment button {
   min-width: 64px;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border: 0;
   border-radius: var(--radius-s);
@@ -803,42 +923,67 @@ body {
   background: var(--do-surface);
   color: var(--do-ink);
 }
-.rb-date {
-  position: relative;
+/* Blättern und Kalender: das Datum selbst steht links, nur einmal. */
+.rb-stepper {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  min-height: 46px;
-  padding: 0 12px;
+  padding: 2px;
   border-radius: var(--radius-m);
   background: oklch(32% 0.07 260);
-  color: oklch(90% 0.03 255);
 }
-.rb-date input {
-  min-width: 0;
-  min-height: 44px;
+.rb-stepper > button,
+.rb-date-pick {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border: 0;
+  border-radius: var(--radius-s);
   background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: 600;
+  color: oklch(92% 0.03 255);
+  cursor: pointer;
+  transition: background-color 160ms var(--ease-out);
+}
+.rb-stepper > button:hover:not(:disabled),
+.rb-date-pick:hover {
+  background: oklch(40% 0.08 260);
+}
+.rb-stepper > button:disabled {
+  color: oklch(60% 0.04 255);
+  cursor: default;
+}
+.rb-date-pick input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
   color-scheme: dark;
 }
+.rb-date-pick:focus-within {
+  outline: 2px solid oklch(80% 0.12 255);
+  outline-offset: 1px;
+}
+/* „Zu heute“ ist eine Aktion, kein Etikett: als Link gezeichnet. */
 .rb-today {
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid oklch(50% 0.08 260);
-  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
   background: transparent;
-  color: oklch(94% 0.03 255);
+  color: oklch(90% 0.08 250);
   font: inherit;
   font-size: var(--text-label);
   font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
 .rb-today:hover {
-  background: oklch(32% 0.07 260);
+  color: oklch(97% 0.03 250);
 }
 .rb-note {
   margin: var(--space-3) 0 0;
@@ -868,18 +1013,7 @@ body {
   font: inherit;
   text-align: left;
 }
-button.rb-kpi {
-  cursor: pointer;
-  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
-}
-button.rb-kpi:hover {
-  border-color: oklch(55% 0.12 262);
-}
-.rb-kpi[aria-pressed="true"] {
-  border-color: oklch(70% 0.15 258);
-  background: oklch(33% 0.1 262);
-  box-shadow: inset 0 0 0 1px oklch(70% 0.15 258);
-}
+
 .rb-kpi-label {
   color: oklch(88% 0.03 255);
   font-size: var(--text-label);
@@ -914,13 +1048,7 @@ button.rb-kpi:hover {
   color: oklch(84% 0.03 255);
   font-size: var(--text-label);
 }
-.rb-updated {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  color: oklch(76% 0.03 255);
-}
+
 .rb-upcoming {
   display: flex;
   align-items: center;
@@ -980,14 +1108,11 @@ button.rb-kpi:hover {
   .rb-period-tools {
     width: 100%;
   }
-  .rb-date {
-    flex: 1 1 auto;
+  .rb-period-tools {
+    justify-content: space-between;
   }
   .rb-kpi {
     padding: var(--space-3);
-  }
-  .rb-updated {
-    margin-left: 0;
   }
 }
 
@@ -1062,7 +1187,7 @@ button.rb-kpi:hover {
   min-width: 0;
   text-overflow: ellipsis;
   appearance: none;
-  min-height: 42px;
+  min-height: 44px;
   padding-right: 4px;
   border: 0;
   background: transparent;
@@ -1276,10 +1401,11 @@ li[data-own] {
 }
 .rb-bar i {
   display: block;
+  width: 100%;
   height: 100%;
-  border-radius: inherit;
   background: var(--do-blue-line);
-  transition: width 320ms var(--ease-out);
+  transform-origin: left center;
+  transition: transform 320ms var(--ease-out);
 }
 li[data-medal] .rb-bar i,
 li[data-own] .rb-bar i {
@@ -1517,9 +1643,13 @@ li[data-open] .rb-chevron {
 .rb-chart span {
   display: block;
   width: 100%;
-  border-radius: 3px 3px 1px 1px;
+  height: 100%;
+  border-radius: 2px 2px 1px 1px;
   background: var(--do-blue-line);
-  transition: height 320ms var(--ease-out), background-color 160ms var(--ease-out);
+  transform-origin: center bottom;
+  transition:
+    transform 320ms var(--ease-out),
+    background-color 160ms var(--ease-out);
 }
 .rb-chart button[data-missing] span {
   background: var(--do-line);
@@ -1632,43 +1762,6 @@ li[data-open] .rb-chevron {
 }
 
 /* Übernahme, Austausch, Erklärung */
-.rb-claim {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border: 1px solid var(--do-line);
-  border-radius: var(--radius-l);
-  background: var(--do-surface);
-}
-.rb-claim > svg {
-  color: var(--do-blue);
-}
-.rb-claim h2 {
-  margin: 0;
-  font-size: var(--text-lead);
-  font-weight: 800;
-}
-.rb-claim p {
-  margin: var(--space-1) 0 0;
-  max-width: 60ch;
-  color: var(--do-ink-2);
-}
-.rb-claim-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-4);
-}
-@media (max-width: 799px) {
-  .rb-claim {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .rb-claim > svg {
-    display: none;
-  }
-}
 .rb-exchange {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1747,6 +1840,15 @@ li[data-open] .rb-chevron {
   color: var(--do-ink-3);
   font-size: var(--text-label);
 }
+.rb-how-foot .do-link {
+  min-height: 0;
+  font-size: inherit;
+}
+.rb-claim-hint {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
 @media (max-width: 699px) {
   .rb-how ol {
     grid-template-columns: minmax(0, 1fr);
@@ -1762,6 +1864,7 @@ li[data-open] .rb-chevron {
   margin-bottom: 0;
 }
 .md-closing.cm-card {
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
   padding: var(--space-5);
   border: 1px solid var(--do-line);
@@ -1869,6 +1972,46 @@ li[data-open] .rb-chevron {
 .md .cm-count label {
   font-size: var(--text-body);
 }
+/* Handy: Zahlen als ruhige Zeilen statt drei Kästen, Hinweis sichtbar. */
+@media (max-width: 639px) {
+  .md .md-counts {
+    gap: 0;
+  }
+  .md .md-counts .cm-count {
+    padding: var(--space-3) 0;
+    border: 0;
+    border-bottom: 1px solid var(--do-line);
+    border-radius: 0;
+    background: none;
+  }
+  .md .md-counts .cm-count:first-child {
+    border-top: 1px solid var(--do-line);
+  }
+  .md .md-counts .cm-count.invalid {
+    padding-inline: var(--space-2);
+    background: var(--do-red-soft);
+  }
+  .md .cm-count label small {
+    display: block;
+  }
+}
+.md-day-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-5);
+}
+.md-day-links .do-link {
+  gap: 6px;
+  font-size: var(--text-label);
+}
+.md .cm-check small {
+  display: block;
+  margin-top: 2px;
+  color: var(--do-ink-3);
+  font-size: var(--text-label);
+  font-weight: 500;
+}
 /* Drei Zahlen nebeneinander ab Tablet, gleich hoch. */
 @media (min-width: 640px) {
   .md .md-counts {
@@ -1940,6 +2083,7 @@ li[data-open] .rb-chevron {
 .md-confirm {
   display: grid;
   justify-items: start;
+  min-width: 0;
   gap: var(--space-3);
   padding: var(--space-5);
   border-radius: var(--radius-l);
@@ -2012,9 +2156,42 @@ li[data-open] .rb-chevron {
   font: inherit;
   cursor: pointer;
 }
-.md-confirm .cm-push-prompt {
+/* Einmaliges Erinnerungs-Angebot in der Bestätigung: flach, keine zweite
+   Karte in der Karte, und nichts darf die Box verbreitern. */
+.md-confirm > * {
+  min-width: 0;
+  max-width: 100%;
+}
+.md-confirm .md-push-after-submit {
   width: 100%;
   margin: var(--space-2) 0 0;
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-top: 1px solid color-mix(in oklch, var(--do-green) 22%, transparent);
+  border-radius: 0;
+  background: none;
+  color: var(--do-ink);
+}
+.md-push-after-submit .cm-push-prompt-icon {
+  display: none;
+}
+.md-push-after-submit > div {
+  min-width: 0;
+}
+.md-push-after-submit strong {
+  font-size: var(--text-body);
+}
+.md-push-after-submit p {
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.md-push-after-submit .cm-push-prompt-actions {
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+.md-push-after-submit .do-button {
+  white-space: normal;
+  text-align: center;
 }
 @keyframes md-confirm {
   from {
@@ -2035,6 +2212,9 @@ li[data-open] .rb-chevron {
   }
   .md-head h2 {
     font-size: 1.5rem;
+  }
+  .md-confirm {
+    padding: var(--space-4);
   }
   .md-confirm-actions .do-button {
     flex: 1 1 100%;
@@ -2158,23 +2338,36 @@ li[data-open] .rb-chevron {
 .cm-pauses > summary {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
   min-height: 44px;
+  color: var(--do-blue);
   list-style: none;
   cursor: pointer;
+}
+/* Gleicher Pfeil wie „Regeln“ und „Nachtragen“ darüber. */
+.cm-pauses > summary::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 160ms var(--ease-out);
+}
+.cm-pauses[open] > summary::before {
+  transform: rotate(45deg);
 }
 .cm-pauses > summary::-webkit-details-marker {
   display: none;
 }
 .cm-pauses > summary h3 {
   margin: 0;
-  color: var(--do-blue);
+  color: inherit;
   font-size: var(--text-body);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
-.cm-pauses[open] > summary h3 {
+.cm-pauses[open] > summary {
   color: var(--do-ink);
-  text-decoration: none;
 }
 .ca-main .ac-card {
   margin-bottom: var(--space-5);
@@ -2246,11 +2439,31 @@ li[data-open] .rb-chevron {
 .rf-rules summary {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   min-height: 48px;
   padding: 0 var(--space-4);
   color: var(--do-ink);
   font-weight: 700;
+  list-style: none;
   cursor: pointer;
+}
+.rf-rules summary::-webkit-details-marker {
+  display: none;
+}
+/* Gleicher Pfeil wie bei „So funktioniert's“. */
+.rf-rules summary::after {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--do-ink-3);
+  border-bottom: 2px solid var(--do-ink-3);
+  transform: rotate(45deg);
+  transition: transform 200ms var(--ease-out);
+}
+.rf-rules[open] summary::after {
+  transform: rotate(-135deg);
 }
 .rf-rules ul {
   display: grid;
@@ -2347,9 +2560,55 @@ li[data-open] .rb-chevron {
   font-weight: 600;
 }
 @media (max-width: 599px) {
-  .ca-settings .checkin-fields {
+  .ca-settings .checkin-fields,
+  .ca-settings .form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+/* Ein Profil: Angaben für Call-Partner im selben Formular */
+.ca-settings .account-extra {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: var(--space-5) 0 var(--space-2);
+  padding: var(--space-5) 0 0;
+  border: 0;
+  border-top: 1px solid var(--do-line);
+}
+.ca-settings .account-extra > legend,
+.ca-settings .account-extra > h3 {
+  float: left;
+  width: 100%;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  color: var(--do-ink);
+  font-size: var(--text-heading);
+  font-weight: 800;
+}
+.ca-settings .account-extra .form-stack {
+  clear: both;
+}
+.ca-settings .notice {
+  margin: var(--space-4) 0;
+  border-color: var(--do-line);
+  background: var(--do-surface-2);
+  color: var(--do-ink-2);
+}
+.ca-settings .notice strong {
+  color: var(--do-ink);
+}
+.ca-settings .form-stack small,
+.ca-settings .checkbox-row small {
+  color: var(--do-ink-3);
+  font-size: var(--text-label);
+  line-height: 1.5;
+}
+.account-access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  margin-top: var(--space-2);
 }
 .rf .cm-feed-filters {
   display: grid;
@@ -2809,11 +3068,6 @@ li[data-open] .rb-chevron {
   margin: var(--space-2) 0 0;
   color: var(--do-ink-2);
 }
-.hw-external {
-  color: var(--do-ink-3);
-  font-size: var(--text-label);
-  font-weight: 600;
-}
 .hw-end {
   margin-top: var(--space-8);
   padding: var(--space-6) var(--space-5);
@@ -2925,4 +3179,154 @@ li[data-open] .rb-chevron {
 }
 .do-resend .form-error {
   color: var(--do-red);
+}
+
+/* Mein Fortschritt: Wochendiagramm im Stil des Verlaufs auf der Startseite */
+.ca-chart .bar {
+  background: var(--do-blue-line);
+  transition: background-color 160ms var(--ease-out);
+}
+.ca-chart .chart-col[data-missing] .bar {
+  background: var(--do-line);
+}
+.ca-chart .chart-col[data-today] .bar,
+.ca-chart .chart-col:not(:disabled):hover .bar {
+  background: var(--do-blue);
+}
+.ca-chart .chart-col:disabled {
+  cursor: default;
+}
+.ca-chart .bar-value,
+.ca-chart .chart-col > span {
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+}
+.ca-chart .chart-col[data-today] > span {
+  color: var(--do-blue);
+  font-weight: 700;
+}
+.cm-stats dt {
+  hyphens: none;
+}
+
+/* Suche und Auswahl im Mitgliederbereich: gleiche Höhe wie Knöpfe, 16 px
+   Schrift (sonst zoomt iOS beim Tippen ins Feld). */
+.ca-main .search-input {
+  min-height: 44px;
+  padding: 0 14px;
+  border-color: var(--do-line-strong);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+  color: var(--do-ink-3);
+  cursor: text;
+}
+.ca-main .search-input input {
+  min-height: 42px;
+  color: var(--do-ink);
+  font-size: 16px;
+}
+.ca-main .search-input input::placeholder {
+  color: var(--do-ink-3);
+}
+.ca-main .search-input:focus-within {
+  border-color: var(--do-blue);
+  box-shadow: 0 0 0 3px var(--do-blue-soft);
+}
+.ca-main [data-slot="select-trigger"] {
+  min-height: 44px;
+  border-color: var(--do-line-strong);
+  border-radius: var(--radius-m);
+  color: var(--do-ink);
+  font-size: var(--text-body);
+}
+.ca-main .checkin-card-more summary {
+  min-height: 44px;
+}
+
+/* Lesbare Zeilen: Fließtext am Desktop höchstens etwa 70 Zeichen breit. */
+.hw-section p,
+.hw-section dd,
+.hw-rules li,
+.rf-gate p,
+.rf-rules li,
+.ca-main .cm-muted,
+.ca-main .cm-rules li,
+.ca-main .cm-rules-note p,
+.ca-main .cm-pref small,
+.ca-main .ac-card p,
+.ca-main .checkbox-row small,
+.ca-main .cm-device-state p,
+.adm-card p,
+.adm-card small,
+.adm-explain li,
+.review-queue > header p {
+  /* Manrope ist breit: 60ch ergeben rund 75 bis 80 Zeichen je Zeile. */
+  max-width: 60ch;
+}
+
+/* Schmale Handys: lange Knopftexte brechen um, statt die Seite zu verbreitern. */
+@media (max-width: 479px) {
+  .operator-site .btn,
+  .operator-site .do-button {
+    white-space: normal;
+    text-align: center;
+  }
+  .md .cm-toggle {
+    text-align: left;
+  }
+}
+
+/* Profil: Kontozeile mit Luft zum ersten Feld; Zwischenüberschriften der
+   Erinnerungen einheitlich; leere Knopfzeilen nehmen keinen Platz ein. */
+.operator-account > .hint {
+  margin-bottom: var(--space-4);
+}
+.ca-main .cm-actions:empty {
+  display: none;
+}
+.ca-main .cm-app-head strong,
+.ca-main .cm-devices h3 {
+  color: var(--do-ink);
+  font-size: var(--text-body);
+  font-weight: 750;
+}
+
+/* „Mein Fortschritt“: Kennzahlen der Serie wie die Kacheln von „Diese Woche“;
+   der Kalender bleibt am Desktop flach statt quadratisch. */
+.ca-main .cm-stats {
+  gap: var(--space-3);
+}
+.ca-main .cm-stats > div {
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-m);
+  background: var(--do-surface-2);
+}
+.ca-main .cm-stats dd strong {
+  color: var(--do-ink);
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+.ca-main .cm-stats dd span,
+.ca-main .cm-stats p {
+  color: var(--do-ink-3);
+  font-size: var(--text-label);
+}
+@media (max-width: 599px) {
+  .ca-main .cm-stats {
+    gap: var(--space-2);
+  }
+  .ca-main .cm-stats > div {
+    padding: var(--space-3);
+  }
+  .ca-main .cm-stats dd strong {
+    font-size: 1.5rem;
+  }
+}
+@media (min-width: 760px) {
+  .ca-main .cm-day {
+    min-height: 52px;
+    aspect-ratio: auto;
+  }
 }

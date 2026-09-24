@@ -671,29 +671,6 @@ tbody tr[data-rank="3"] .rank-place {
   }
 }
 
-.rank-bar {
-  display: block;
-  height: 4px;
-  margin-top: 6px;
-  border-radius: 999px;
-  background: #dbe7f7;
-  overflow: hidden;
-  position: relative;
-}
-.rank-bar::after {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--p, 0%);
-  border-radius: inherit;
-  background: linear-gradient(90deg, #0755f5, #46b7f0);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .rank-bar::after {
-    transition: width 0.45s cubic-bezier(0.22, 0.68, 0.36, 1);
-  }
-}
-
 /* Ehrlicher Fehlerzustand statt veralteter Gruppensummen. */
 .crew-stats-error {
   display: grid;
@@ -793,13 +770,7 @@ tbody tr[data-rank="1"] .rank-avatar {
   background: linear-gradient(140deg, #f7d070, #e0a92c);
   color: #4a3407;
 }
-.rank-bar {
-  height: 5px;
-  background: #e3ecf8;
-}
-tbody tr[data-rank="1"] .rank-bar::after {
-  background: linear-gradient(90deg, #e0a92c, #f7d070);
-}
+
 .metric-tabs button {
   font-variant-numeric: tabular-nums;
 }

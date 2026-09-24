@@ -71,6 +71,11 @@
 .flow-progress + h1 {
   margin-top: 4px;
 }
+/* Die Überschrift steht ganz oben im Schritt, ohne Symbol darüber. */
+.flow h1:first-child,
+.flow-step > h1:first-child {
+  margin-top: 0;
+}
 .flow-progress p {
   margin: 0 0 8px;
   color: var(--flow-soft);
@@ -586,10 +591,6 @@
   .flow h1 {
     margin-top: 14px;
     font-size: 25px;
-  }
-  .flow .icon-tile {
-    width: 30px;
-    height: 30px;
   }
   .flow-choices button,
   .flow-option {

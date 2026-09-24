@@ -488,54 +488,7 @@
   color: #d3e3f7;
   font-size: 13px;
 }
-.rr-score-grid {
-  display: grid;
-  grid-template-columns: 1.28fr 1.12fr 0.9fr 0.9fr;
-  margin: 27px 0 28px;
-}
-.rr-score-grid > div {
-  min-width: 0;
-  padding: 0 25px;
-  border-left: 1px solid #9cc6fc22;
-}
-.rr-score-grid > div:first-child {
-  padding-left: 0;
-  border-left: 0;
-}
-.rr-score-grid > div:last-child {
-  padding-right: 0;
-}
-.rr-score-grid > div > span {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #b4c9e4;
-  font-size: 13px;
-  font-weight: 550;
-}
-.rr-score-grid > div > span svg {
-  color: #80b5fd;
-}
-.rr-score-grid strong {
-  display: block;
-  color: #fff;
-  font-size: clamp(38px, 4.5vw, 60px);
-  letter-spacing: -0.045em;
-  line-height: 1.45;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.rr-score-grid .rr-main-score strong {
-  background: linear-gradient(150deg, #fff 10%, #8fccff);
-  background-clip: text;
-  color: transparent;
-}
-.rr-score-grid small {
-  display: block;
-  font-size: 13px;
-  color: #8da9cb;
-  line-height: 1.6;
-}
+
 .rr-score-detail {
   display: flex;
   flex-wrap: wrap;
@@ -936,50 +889,9 @@
   font-size: 13px;
   color: #8a99ad;
 }
-.rr-progress {
-  grid-column: 1 / -1;
-  display: block;
-  width: 100%;
-  height: 4px;
-  background: #eaf0f8;
-  overflow: hidden;
-  border-radius: 6px;
-}
-.rr-progress i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #61bdff, #226dec);
-  transition: width 0.45s cubic-bezier(0.22, 0.8, 0.3, 1);
-}
-.rr-rank-list > li[data-place="1"] .rr-progress i {
-  background: linear-gradient(90deg, #f3c463, #d99516);
-}
 
 /* Herkunftshinweis im Profil: zugeteilte Werte müssen als solche lesbar sein. */
-.rr-split-note {
-  display: grid;
-  gap: 7px;
-  margin: 14px 0 0;
-  padding: 13px 15px;
-  border: 1px solid #d9e4f2;
-  border-left: 3px solid #6f8fd6;
-  border-radius: 12px;
-  background: #f6f9fd;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #4b5c74;
-}
-.rr-split-note strong {
-  color: #2b4a73;
-  font-size: 14px;
-  font-weight: 750;
-}
-.rr-split-note span {
-  color: #6b7c94;
-  font-size: 13px;
-  line-height: 1.55;
-}
+
 .rr-joint li button span small {
   display: block;
   margin-top: 2px;
@@ -1557,12 +1469,8 @@
     grid-template-columns: minmax(0, 1fr) 310px;
     gap: 16px;
   }
-  .rr-score-grid > div {
-    padding: 0 18px;
-  }
-  .rr-score-grid > div > span {
-    font-size: 13px;
-  }
+  
+  
   .rr-more-metrics {
     margin-left: 0;
   }
@@ -1620,31 +1528,12 @@
   }
   /* Ausgewogenes 2x2-Raster. Die Schriftgröße wächst mit der Breite, damit
      auch vierstellige Zahlen mit Tausenderpunkt vollständig sichtbar sind. */
-  .rr-score-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 14px;
-    row-gap: 22px;
-    margin: 22px 0;
-  }
-  .rr-score-grid > div {
-    padding: 0;
-    border-left: 0;
-  }
-  .rr-score-grid > div:nth-child(2n) {
-    padding-left: 14px;
-    border-left: 1px solid #9cc6fc22;
-  }
-  .rr-score-grid strong {
-    font-size: clamp(30px, 10.5vw, 46px);
-    line-height: 1.25;
-  }
-  .rr-score-grid > div > span {
-    font-size: 13px;
-  }
-  .rr-score-grid small {
-    font-size: 13px;
-    line-height: 1.5;
-  }
+  
+  
+  
+  
+  
+  
   .rr-scoreboard-top {
     flex-wrap: wrap;
     gap: 10px;

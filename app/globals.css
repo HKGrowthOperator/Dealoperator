@@ -1,13 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "../vendor/shadcn-tailwind-4.13.0.css";
-@font-face {
-  font-family: Inter;
-  src: url("/fonts/inter-latin.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 100 900;
-  font-display: swap;
-}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -590,20 +583,7 @@ svg {
   font-size: 13px;
   color: #445779;
 }
-.section-caption {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: #9099a6;
-  margin: 0 0 12px;
-}
-.section-caption > span:last-child {
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
-}
+
 .card {
   background: #fff;
   border: 1px solid #e4e8ed;
@@ -898,23 +878,6 @@ svg {
 }
 .routine-card .card-heading {
   margin-bottom: 12px;
-}
-.icon-tile {
-  background: #f4f6f8;
-  border: 1px solid #e9edf2;
-  border-radius: 9px;
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #7c8999;
-  flex-shrink: 0;
-}
-.icon-tile.lime {
-  background: #dce4f3;
-  border-color: #cad7ed;
-  color: #3d5783;
 }
 .routine-row {
   display: flex;
@@ -2062,9 +2025,6 @@ td .tag {
   gap: 22px;
   margin: 25px 0;
 }
-.register-benefits .icon-tile {
-  margin-bottom: 19px;
-}
 .register-benefits h3 {
   font-size: 14px;
   margin-bottom: 11px;
@@ -2679,12 +2639,8 @@ td .tag {
   .page-footer > span > span {
     display: none;
   }
-  .section-caption {
-    font-size: 13px;
-  }
-  .section-caption > span:last-child {
-    font-size: 13px;
-  }
+  
+  
   .topbar-right > .icon-button {
     display: none;
   }
@@ -2875,9 +2831,6 @@ td .tag {
   .register-benefits p {
     font-size: 13px;
   }
-  .register-benefits .icon-tile {
-    margin-bottom: 14px;
-  }
   .card-heading {
     gap: 10px;
     align-items: flex-start;
@@ -3061,12 +3014,8 @@ td .tag {
   .week-banner > .text-button {
     font-size: 13px;
   }
-  .section-caption {
-    font-size: 13px;
-  }
-  .section-caption > span:last-child {
-    font-size: 13px;
-  }
+  
+  
   .stat-top {
     font-size: 14px;
   }
@@ -3305,7 +3254,6 @@ body {
 }
 .card-heading p,
 .stat-note,
-.section-caption > span:last-child,
 .mode-bar,
 .mode-bar button,
 .mode-bar > a {
@@ -4233,12 +4181,8 @@ th {
   .mode-bar button {
     min-height: 27px;
   }
-  .section-caption {
-    font-size: 13px;
-  }
-  .section-caption > span:last-child {
-    font-size: 13px;
-  }
+  
+  
   .routine-row strong {
     font-size: 14px;
   }
@@ -5433,180 +5377,7 @@ th {
   border-radius: 8px;
   font-size: 14px;
 }
-.kpi-levels {
-  container-type: inline-size;
-}
-/* Zwei Spalten, bis vier Karten nebeneinander wirklich Platz haben — auch
-   neben der Seitenleiste auf Tablets, nicht nur nach Fensterbreite. */
-.kpi-track-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 13px;
-  margin: 22px 0;
-}
-@container (min-width: 840px) {
-  .kpi-track-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-/* KPI-Level in „Dein Bereich": Level, Ziel, XP-Leiste. Kein Text unter 13 px. */
-.kpi-levels .section-caption {
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: 14px;
-}
-.kpi-levels .section-caption > span:last-child {
-  font-size: 14px;
-  color: #6a7d99;
-}
-.kpi-track {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid #d0dcf0;
-  background: white;
-  border-radius: 9px;
-  padding: 18px;
-}
-.kpi-track-label {
-  font-size: 14px;
-  font-weight: 600;
-  color: #5b75a1;
-}
-.kpi-track-level {
-  display: block;
-  font-size: 22px;
-  line-height: 1.2;
-  color: #173c70;
-  margin: 6px 0 4px;
-}
-.kpi-track[data-level="0"] .kpi-track-level {
-  font-size: 20px;
-  color: #5d7091;
-}
-.kpi-track-goal {
-  font-size: 14px;
-  line-height: 1.45;
-  color: #526a8a;
-  margin: 0 0 14px;
-  text-wrap: pretty;
-}
-.kpi-track-xp {
-  margin-top: auto;
-}
-.xp-bar {
-  position: relative;
-  height: 10px;
-  border-radius: 999px;
-  background: #dde8f8;
-  box-shadow: inset 0 1px 2px #173c701f;
-}
-/* Die Füllung „lädt sich auf": xp-charge (Breite), xp-glow (Schein),
-   Funke an der Spitze (::after) und ein Glanz, sobald sie geladen ist.
-   Nur ohne „Bewegung reduzieren", siehe unten. */
-.xp-fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--xp, 0) * 1%);
-  min-width: 10px;
-  border-radius: inherit;
-  background:
-    linear-gradient(100deg, transparent 35%, #ffffffa6 50%, transparent 65%)
-      no-repeat,
-    linear-gradient(90deg, #4f8dff, #0755f5);
-  background-size:
-    200% 100%,
-    100% 100%;
-  background-position:
-    150% 0,
-    0 0;
-  box-shadow: 0 0 8px #0755f547;
-}
-.xp-fill[data-empty] {
-  display: none;
-}
-.xp-fill::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  right: -4px;
-  width: 18px;
-  height: 18px;
-  margin-top: -9px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 20%, #8fb6ffd9 42%, #0755f500 70%);
-  opacity: 0;
-  pointer-events: none;
-}
-.kpi-track[data-maxed] .xp-fill {
-  box-shadow: 0 0 12px #0755f566;
-}
-.kpi-track-xp-text {
-  display: block;
-  margin-top: 9px;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: #173c70;
-  font-variant-numeric: tabular-nums;
-}
-@media (prefers-reduced-motion: no-preference) {
-  .xp-fill {
-    --xp-delay: calc(var(--i, 0) * 110ms + 150ms);
-    animation:
-      xp-charge 1.3s cubic-bezier(0.22, 0.8, 0.24, 1) var(--xp-delay) backwards,
-      xp-glow 1.7s ease-out var(--xp-delay) backwards,
-      xp-shine 0.9s ease-in-out calc(var(--xp-delay) + 1.1s) backwards;
-    transition: width 0.6s cubic-bezier(0.22, 0.8, 0.24, 1);
-  }
-  .xp-fill::after {
-    animation: xp-spark 1.3s ease-out var(--xp-delay) backwards;
-  }
-}
-@keyframes xp-charge {
-  from {
-    width: 0;
-    min-width: 0;
-  }
-}
-@keyframes xp-glow {
-  from {
-    box-shadow: 0 0 0 #0755f500;
-  }
-  55% {
-    box-shadow: 0 0 14px 3px #3e82ff99;
-  }
-}
-@keyframes xp-spark {
-  0% {
-    opacity: 0;
-    transform: scale(0.5);
-  }
-  12% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  70% {
-    opacity: 0.9;
-    transform: scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.5);
-  }
-}
-@keyframes xp-shine {
-  from {
-    background-position:
-      150% 0,
-      0 0;
-  }
-  to {
-    background-position:
-      -50% 0,
-      0 0;
-  }
-}
+
 .checkin-form {
   display: flex;
   flex-direction: column;
@@ -6234,18 +6005,10 @@ th {
   .stats-grid .stat:not(.stat-accent) .stat-note {
     display: none;
   }
-  .kpi-track-grid {
-    gap: 10px;
-  }
-  .kpi-track {
-    padding: 14px 13px;
-  }
-  .kpi-track-level {
-    font-size: 19px;
-  }
-  .kpi-track[data-level="0"] .kpi-track-level {
-    font-size: 17px;
-  }
+  
+  
+  
+  
   .week-banner strong {
     font-size: 15px;
   }
