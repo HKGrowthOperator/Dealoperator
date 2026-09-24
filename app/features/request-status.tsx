@@ -2,16 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Check,
-  ChevronRight,
-  Clock,
-  MessageCircleQuestion,
-  PartyPopper,
-  Search,
-  UsersRound,
-  XCircle,
-} from "lucide-react";
+import { Check, ChevronRight, Search, UsersRound } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
 import ClaimAnswer from "./claim-answer";
 import { call, useStepHeading } from "./flow-parts";
@@ -105,9 +96,6 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
     return (
       <section className="auth-card card flow" aria-live="polite">
         <div className="flow-step">
-          <span className="icon-tile lime">
-            <PartyPopper />
-          </span>
           <h1 ref={heading} tabIndex={-1}>
             Dein Profil ist freigegeben.
           </h1>
@@ -138,15 +126,6 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
   return (
     <section className="auth-card card flow">
       <div className="flow-step" key={status}>
-        <span className="icon-tile lime">
-          {status === "info_needed" ? (
-            <MessageCircleQuestion />
-          ) : closed ? (
-            <XCircle />
-          ) : (
-            <Clock />
-          )}
-        </span>
         <h1 ref={heading} tabIndex={-1}>
           {status === "info_needed"
             ? "Rückfrage vom Team."
@@ -208,8 +187,8 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
 
         {status === "pending" && (
           <p className="flow-body">
-            Bis dahin kannst du das öffentliche Ranking ansehen. Nach der Freigabe
-            trägst du neue Tage selbst ein.
+            Bis dahin kannst du die öffentliche Rangliste ansehen. Nach der
+            Freigabe trägst du neue Tage selbst ein.
           </p>
         )}
 
@@ -268,7 +247,7 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
         {!closed && (
           <div className="flow-actions">
             <Link className="flow-link" href="/ranking">
-              Zum öffentlichen Ranking
+              Zur öffentlichen Rangliste
             </Link>
           </div>
         )}

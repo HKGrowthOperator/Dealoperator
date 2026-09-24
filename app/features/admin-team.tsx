@@ -267,7 +267,7 @@ export function TeamPanel({
 
       <h3 className="adm-subhead">Rolle für ein Profil vormerken</h3>
       <p className="adm-hint">
-        Für Personen mit Profil aus dem Ranking, die noch kein Konto haben. Die
+        Für Personen mit Profil aus der Rangliste, die noch kein Konto haben. Die
         Rolle gilt, sobald das Team die Übernahme dieses Profils freigegeben
         hat.
       </p>

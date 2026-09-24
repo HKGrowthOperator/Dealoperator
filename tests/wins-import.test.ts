@@ -125,7 +125,7 @@ test("a later lower value only blocks that metric; the other numbers still count
     ["neu", "prüffall"],
   );
   const conflict = preview.rows.find((r) => r.action === "prüffall")!;
-  assert.match(conflict.reasons.join(" "), /Anwahlversuche 50 → 30/);
+  assert.match(conflict.reasons.join(" "), /Anwahlen 50 → 30/);
   assert.doesNotMatch(conflict.reasons.join(" "), /attempts/);
   assert.equal(result.cases, 1);
   assert.deepEqual(await counts(alex, d1), { attempts: 50, settingsBooked: 3 });

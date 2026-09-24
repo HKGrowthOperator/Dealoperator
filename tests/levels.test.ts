@@ -52,7 +52,7 @@ test("partial progress: every unit counts, bar matches the ratio", () => {
   assert.equal(c.setter.remainingText, "Noch 2 Settings bis Level 1");
   assert.equal(c.setter.percent, 60);
   assert.equal(c.closer.remainingText, "Noch 2 Closings bis Level 1");
-  assert.equal(c.dialer.barLabel, "Dialer: Fortschritt bis Level 1");
+  assert.equal(c.dialer.barLabel, "Anwahlen: Fortschritt bis Level 1");
   assert.equal(byId({ attempts: 99 }).dialer.remainingText, "Noch 1 Anwahl bis Level 1");
 });
 

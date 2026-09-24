@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 
 export const metadata: Metadata = {
-  title: "Datenschutz — Deal Operator",
+  title: "Datenschutz · Deal Operator",
   description:
     "Welche Daten Deal Operator verarbeitet, auf welcher Grundlage und wer sie sieht.",
 };
@@ -111,12 +111,12 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>6. Gemeldete Zahlen, Reflexionen und öffentliches Ranking</h2>
+          <h2>6. Gemeldete Zahlen, Reflexionen und öffentliche Rangliste</h2>
           <p>
             Im persönlichen Bereich lassen sich Tageszahlen, persönliche Ziele und
             Reflexionen festhalten. E-Mail-Adressen, Telefonnummern, Notizen und
             Entwürfe sind privat, Unterstützungswünsche sieht nur das Team. Nichts
-            davon erscheint im öffentlichen Ranking.
+            davon erscheint in der öffentlichen Rangliste.
           </p>
           <p>
             Ein eingereichter Tagesabschluss (Anzeigename, Tag, Energie, was gut

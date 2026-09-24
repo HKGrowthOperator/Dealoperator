@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { CircleCheck, KeyRound, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { call, checkPassword, PasswordField, RequestError, useStepHeading } from "./flow-parts";
 
 /**
@@ -53,9 +53,6 @@ export default function PasswordForm({
     return (
       <section className="auth-card card flow">
         <div className="flow-step">
-          <span className="icon-tile lime">
-            <CircleCheck />
-          </span>
           <h1 ref={heading} tabIndex={-1}>
             Passwort gespeichert.
           </h1>
@@ -75,9 +72,6 @@ export default function PasswordForm({
   return (
     <section className="auth-card card flow">
       <div className="flow-step">
-        <span className="icon-tile lime">
-          <KeyRound />
-        </span>
         <h1 ref={heading} tabIndex={-1}>
           {hasPassword ? "Passwort ändern." : "Passwort festlegen."}
         </h1>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 import { getCurrentUser, isTeam } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { loadCommitmentSettings } from "@/server/settings";
@@ -313,7 +314,8 @@ export default async function Page() {
           </div>
           <a className="do-button do-button-secondary" href={discord} target="_blank" rel="noopener noreferrer">
             Discord öffnen
-            <span className="hw-external">(öffnet Discord)</span>
+            <ExternalLink size={16} aria-hidden="true" />
+            <span className="do-sr">(neues Fenster)</span>
           </a>
         </section>
 

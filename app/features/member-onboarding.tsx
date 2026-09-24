@@ -1,7 +1,7 @@
 "use client";
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
-import { LoaderCircle, PartyPopper, Plus, UserRound } from "lucide-react";
+import { LoaderCircle, Plus } from "lucide-react";
 import { DEFAULT_PHONE_COUNTRY, normalisePhone, PHONE_COUNTRIES } from "@/lib/phone";
 import { call, FlowProgress, RequestError, useStepHeading } from "./flow-parts";
 
@@ -93,9 +93,6 @@ export default function MemberOnboarding({
     return (
       <section className="auth-card card flow">
         <div className="flow-step">
-          <span className="icon-tile lime">
-            <PartyPopper />
-          </span>
           <h1 ref={heading} tabIndex={-1}>
             Dein Profil ist angelegt.
           </h1>
@@ -132,9 +129,6 @@ export default function MemberOnboarding({
           steps={["Weg wählen", "Deine Angaben", "E-Mail bestätigen", "Profil anlegen"]}
           current={3}
         />
-        <span className="icon-tile lime">
-          <UserRound />
-        </span>
         <h1 ref={heading} tabIndex={-1}>
           E-Mail bestätigt. Leg dein Profil an.
         </h1>
@@ -249,8 +243,8 @@ export default function MemberOnboarding({
               onChange={(e) => setValue({ ...value, publicConsent: e.target.checked })}
             />
             <span>
-              Meine Zahlen mit Anzeigename im öffentlichen Ranking zeigen. E-Mail
-              und Telefon bleiben privat. Das kannst du später ändern.
+              Meine Zahlen mit Anzeigename in der öffentlichen Rangliste zeigen.
+              E-Mail und Telefon bleiben privat. Das kannst du später ändern.
             </span>
           </label>
 
@@ -260,7 +254,7 @@ export default function MemberOnboarding({
           </button>
         </form>
         <p className="flow-small">
-          Deine Zahlen stehen schon im Ranking?{" "}
+          Deine Zahlen stehen schon in der Rangliste?{" "}
           <Link href="/profil-uebernehmen">Profil übernehmen</Link>
         </p>
       </div>

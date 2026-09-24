@@ -131,7 +131,7 @@ export default function ImportConsole({
         value: { rows, key, expected: preview },
       });
       setSuccess(
-        `${d.count} Tagesmeldungen gespeichert. Freigegebene Zahlen erscheinen im Ranking.`,
+        `${d.count} Tagesmeldungen gespeichert. Freigegebene Zahlen erscheinen in der Rangliste.`,
       );
       setRows([]);
       setPreview([]);
@@ -282,7 +282,7 @@ export default function ImportConsole({
                 <tr>
                   <th>Teilnehmer</th>
                   <th>Tag</th>
-                  <th>Calls</th>
+                  <th>Anwahlen</th>
                   <th>Settings</th>
                   <th>Sichtbarkeit</th>
                   <th>Änderung</th>
@@ -296,13 +296,13 @@ export default function ImportConsole({
                       <small> · {r.participantKey}</small>
                     </td>
                     <td>{r.date}</td>
-                    <td>{r.counts.attempts ?? "—"}</td>
-                    <td>{r.counts.settingsBooked ?? "—"}</td>
+                    <td>{r.counts.attempts ?? "–"}</td>
+                    <td>{r.counts.settingsBooked ?? "–"}</td>
                     <td>
                       {preview[i]?.claimed
                         ? "Einstellung des Mitglieds bleibt bestehen"
                         : r.publicConsent
-                          ? "Im öffentlichen Ranking"
+                          ? "In der öffentlichen Rangliste"
                           : "Privat"}
                     </td>
                     <td>{preview[i]?.change}</td>
@@ -352,7 +352,7 @@ export default function ImportConsole({
                       : p.company || "Einzelprofil"}{" "}
                     ·{" "}
                     {p.claimed ? "Profil übernommen" : "Noch nicht übernommen"}{" "}
-                    · {p.public_consent ? "Ranking sichtbar" : "Privat"}
+                    · {p.public_consent ? "In der Rangliste sichtbar" : "Privat"}
                   </small>
                 </div>
                 {!p.claimed && p.kind !== "joint" && (
@@ -367,7 +367,7 @@ export default function ImportConsole({
                           id: p.id,
                         });
                         setInvitation(
-                          `Deine Zahlen aus dem gemeinsamen Callen stehen im Ranking von Deal Operator. Wenn du deine Zahlen künftig selbst eintragen möchtest (freiwillig), frag hier die Übernahme an: ${window.location.origin}/profil-uebernehmen?profil=${encodeURIComponent(p.id)}&einladung=${encodeURIComponent(d.token)}\nDer Link ist 7 Tage gültig und nur für dich, bitte nicht weitergeben. Das Team prüft die Anfrage und gibt das Profil danach frei.`,
+                          `Deine Zahlen aus dem gemeinsamen Callen stehen in der Rangliste von Deal Operator. Wenn du deine Zahlen künftig selbst eintragen möchtest (freiwillig), frag hier die Übernahme an: ${window.location.origin}/profil-uebernehmen?profil=${encodeURIComponent(p.id)}&einladung=${encodeURIComponent(d.token)}\nDer Link ist 7 Tage gültig und nur für dich, bitte nicht weitergeben. Das Team prüft die Anfrage und gibt das Profil danach frei.`,
                         );
                       } catch (e) {
                         setMessage((e as Error).message);
@@ -439,14 +439,14 @@ export default function ImportConsole({
                       {c.registered ? "Konto verbunden" : "Profil vorbereitet"}
                     </td>
                     <td>
-                      {c.verified_email || c.imported_email || "—"}
+                      {c.verified_email || c.imported_email || "–"}
                       {c.verified_email
                         ? " · bestätigt"
                         : c.imported_email
                           ? " · importiert"
                           : ""}
                     </td>
-                    <td>{c.phone || "—"}</td>
+                    <td>{c.phone || "–"}</td>
                   </tr>
                 ))}
               </tbody>

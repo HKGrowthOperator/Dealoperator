@@ -7,7 +7,6 @@ import {
   EyeOff,
   LoaderCircle,
   Lock,
-  MailCheck,
   Plus,
   RefreshCw,
   Search,
@@ -240,7 +239,7 @@ export function ProfileSearch({
   return (
     <div className="flow-search">
       <div className="flow-field">
-        <label htmlFor={`${id}-q`}>Dein Name im Ranking</label>
+        <label htmlFor={`${id}-q`}>Dein Name in der Rangliste</label>
         <div className="flow-search-input">
           <Search size={18} aria-hidden="true" />
           <input
@@ -728,9 +727,6 @@ export function EmailSent({
 
   return (
     <>
-      <span className="icon-tile lime">
-        <MailCheck />
-      </span>
       <h1 ref={headingRef} tabIndex={-1}>
         Bestätige deine E-Mail.
       </h1>

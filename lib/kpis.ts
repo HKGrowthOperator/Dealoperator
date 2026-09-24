@@ -1,6 +1,6 @@
 import { z } from "zod";
 export const metricLabels = {
-  attempts: "Anwahlversuche",
+  attempts: "Anwahlen",
   decisionMakerConversations: "Entscheidergespräche",
   settingsBooked: "Settings vereinbart",
   settingsHeld: "Settings durchgeführt",
@@ -28,11 +28,11 @@ export const publicMetrics = [
 ] as const satisfies readonly Metric[];
 export type PublicMetric = (typeof publicMetrics)[number];
 export const shortMetricLabels: Record<PublicMetric, string> = {
-  attempts: "Calls",
+  attempts: "Anwahlen",
   settingsBooked: "Settings",
-  settingsHeld: "Settings gehalten",
+  settingsHeld: "Settings durchgeführt",
   closingsBooked: "Closings",
-  closingsHeld: "Closings gehalten",
+  closingsHeld: "Closings durchgeführt",
   dealsWon: "Deals",
 };
 // Public views and exports share the verified metric selection.
@@ -79,25 +79,25 @@ export const calendarDaySchema = z
 export const tracks = [
   {
     id: "dialer",
-    label: "Dialer",
+    label: "Anwahlen",
     metric: "attempts",
     thresholds: [100, 500, 1500, 5000, 15000],
   },
   {
     id: "setter",
-    label: "Setter",
+    label: "Settings",
     metric: "settingsBooked",
     thresholds: [5, 20, 50, 150, 400],
   },
   {
     id: "closer",
-    label: "Closer",
+    label: "Closings",
     metric: "closingsBooked",
     thresholds: [3, 10, 30, 100, 250],
   },
   {
     id: "deal-maker",
-    label: "Deal Maker",
+    label: "Deals",
     metric: "dealsWon",
     thresholds: [1, 5, 15, 50, 150],
   },

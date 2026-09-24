@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 
 export const metadata: Metadata = {
-  title: "Impressum — Deal Operator",
+  title: "Impressum · Deal Operator",
   description: "Anbieterkennzeichnung nach § 5 DDG.",
 };
 

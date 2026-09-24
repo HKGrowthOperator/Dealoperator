@@ -8,7 +8,6 @@ import {
   LogIn,
   Mail,
   Search,
-  Sparkles,
   UserPlus,
   UsersRound,
 } from "lucide-react";
@@ -569,7 +568,9 @@ export default function OnboardingStart({
         {!ready && (
           <div className="flow-notice">
             <strong>Die Anmeldung öffnet in Kürze.</strong>
-            <p>Das öffentliche Ranking zeigt schon jetzt den gemeldeten Stand.</p>
+            <p>
+              Die öffentliche Rangliste zeigt schon jetzt den gemeldeten Stand.
+            </p>
           </div>
         )}
 
@@ -642,9 +643,6 @@ export default function OnboardingStart({
 
         {step === "confirmed" && (
           <>
-            <span className="icon-tile lime">
-              <CircleCheck />
-            </span>
             <h1 ref={heading} tabIndex={-1}>
               E-Mail bestätigt.
             </h1>
@@ -663,9 +661,6 @@ export default function OnboardingStart({
 
         {step === "choice" && (
           <>
-            <span className="icon-tile lime">
-              <Sparkles />
-            </span>
             <h1 ref={heading} tabIndex={-1}>
               Willkommen bei Deal Operator.
             </h1>
@@ -715,9 +710,6 @@ export default function OnboardingStart({
 
         {step === "taken" && taken && (
           <>
-            <span className="icon-tile lime">
-              <UsersRound />
-            </span>
             <h1 ref={heading} tabIndex={-1}>
               Dieses Profil ist schon vergeben.
             </h1>

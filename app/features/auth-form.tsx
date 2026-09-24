@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { KeyRound, LoaderCircle, LogIn, Mail } from "lucide-react";
+import { LoaderCircle, LogIn, Mail } from "lucide-react";
 import {
   call,
   EmailSent,
@@ -199,7 +199,6 @@ export default function AuthForm({
   return (
     <section className="auth-card card flow">
       <div className="flow-step" key={mode}>
-        <span className="icon-tile lime">{mode === "password" ? <LogIn /> : <KeyRound />}</span>
         <h1 ref={heading} tabIndex={-1}>
           {mode === "password" ? "Bei Deal Operator anmelden." : "Passwort vergessen?"}
         </h1>
@@ -211,7 +210,9 @@ export default function AuthForm({
         {!ready && (
           <div className="flow-notice">
             <strong>Die Anmeldung öffnet in Kürze.</strong>
-            <p>Das öffentliche Ranking zeigt schon jetzt den gemeldeten Stand.</p>
+            <p>
+              Die öffentliche Rangliste zeigt schon jetzt den gemeldeten Stand.
+            </p>
           </div>
         )}
         {message && (

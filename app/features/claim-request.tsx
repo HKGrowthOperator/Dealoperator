@@ -215,7 +215,7 @@ export default function ClaimRequest({
               Finde dein Profil.
             </h1>
             <p className="flow-lead">
-              Such nach dem Namen, unter dem deine Zahlen im Ranking stehen.
+              Such nach dem Namen, unter dem deine Zahlen in der Rangliste stehen.
             </p>
             {message && (
               <p role="alert" className="form-error">
