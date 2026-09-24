@@ -375,8 +375,8 @@ export function EligibilityChecklist({
     {
       key: "phone",
       done: !needs.has("phone") && !needs.has("login"),
-      title: "Telefonnummer hinterlegt",
-      text: "Mit Ländervorwahl, zum Beispiel +49. Nur das Team sieht sie.",
+      title: "Nummer",
+      text: "",
       links: [
         {
           href: `/profil?modus=eigen&weiter=${encodeURIComponent(next)}#konto`,
@@ -410,7 +410,7 @@ export function EligibilityChecklist({
               </strong>
               {!item.done && (
                 <>
-                  <p>{item.text}</p>
+                  {item.text && <p>{item.text}</p>}
                   <div className="cm-checklist-links">
                     {item.links.map((l) => (
                       <Link key={l.href} className="cm-link" href={l.href}>

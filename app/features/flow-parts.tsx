@@ -399,7 +399,6 @@ export function ContactFields({
   const described = (field: ContactField, note?: boolean) =>
     errors[field] ? `${id}-${field}-error` : note ? `${id}-${field}-note` : undefined;
   const oneWord = value.fullName.trim() !== "" && !/\S\s+\S/.test(value.fullName.trim());
-  const country = PHONE_COUNTRIES.find((c) => c.code === value.phoneCountry);
 
   return (
     <>
@@ -464,7 +463,7 @@ export function ContactFields({
       {afterEmail}
 
       <div className="flow-field" data-invalid={errors.phone ? "" : undefined}>
-        <label htmlFor={`${id}-phone`}>Telefon</label>
+        <label htmlFor={`${id}-phone`}>Nummer</label>
         <div className="flow-phone">
           <select
             aria-label="Ländervorwahl"
@@ -490,19 +489,13 @@ export function ContactFields({
             value={value.phone}
             onChange={(e) => onChange({ phone: e.target.value })}
             aria-invalid={errors.phone ? true : undefined}
-            aria-describedby={described("phone", true)}
+            aria-describedby={described("phone")}
           />
         </div>
-        {errors.phone ? (
+        {errors.phone && (
           <p id={`${id}-phone-error`} className="flow-field-error">
             {errors.phone}
           </p>
-        ) : (
-          country?.trunk && (
-            <p id={`${id}-phone-note`} className="flow-note">
-              Mit oder ohne führende 0.
-            </p>
-          )
         )}
       </div>
 

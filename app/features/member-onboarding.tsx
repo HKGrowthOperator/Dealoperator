@@ -178,7 +178,7 @@ export default function MemberOnboarding({
 
           {needsPhone && (
             <div className="flow-field" data-invalid={errors.phone ? "" : undefined}>
-              <label htmlFor={`${id}-phone`}>Telefon</label>
+              <label htmlFor={`${id}-phone`}>Nummer</label>
               <div className="flow-phone">
                 <select
                   aria-label="Ländervorwahl"
@@ -201,13 +201,14 @@ export default function MemberOnboarding({
                   value={value.phone}
                   onChange={(e) => setValue({ ...value, phone: e.target.value })}
                   aria-invalid={errors.phone ? true : undefined}
-                  aria-describedby={`${id}-phone-note`}
+                  aria-describedby={errors.phone ? `${id}-phone-error` : undefined}
                 />
               </div>
-              <p id={`${id}-phone-note`} className={errors.phone ? "flow-field-error" : "flow-note"}>
-                {errors.phone ||
-                  "Nur für dich und das Team sichtbar."}
-              </p>
+              {errors.phone && (
+                <p id={`${id}-phone-error`} className="flow-field-error">
+                  {errors.phone}
+                </p>
+              )}
             </div>
           )}
 

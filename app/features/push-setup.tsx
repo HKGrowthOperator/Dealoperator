@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import {
   Bell,
@@ -9,9 +8,7 @@ import {
   LoaderCircle,
   Moon,
   Send,
-  Share,
   Smartphone,
-  SquarePlus,
   Trash2,
 } from "lucide-react";
 import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commitment";
@@ -345,8 +342,8 @@ export default function PushSetup({
     if (env.kind === "ios-browser")
       return {
         tone: "info",
-        title: "Auf dem iPhone oder iPad: erst zum Home-Bildschirm",
-        text: "Pushs gibt es dort nur für Web-Apps auf dem Home-Bildschirm, ab iOS 16.4.",
+        title: "In diesem Browser gibt es keine Push-Erinnerungen",
+        text: "Deal Operator funktioniert auch ganz ohne. Deinen Tagesabschluss findest du jederzeit unter Mein Tag.",
       };
     if (env.kind === "ios-old")
       return {
@@ -444,29 +441,6 @@ export default function PushSetup({
         </div>
       )}
 
-      {env.kind === "ios-browser" && (
-        <ol className="cm-ios-steps">
-          <li>
-            <Share size={17} aria-hidden="true" />
-            <span>
-              Öffne diese Seite in Safari und tippe unten auf <strong>Teilen</strong>.
-            </span>
-          </li>
-          <li>
-            <SquarePlus size={17} aria-hidden="true" />
-            <span>
-              Wähle <strong>„Zum Home-Bildschirm“</strong> und bestätige mit Hinzufügen.
-            </span>
-          </li>
-          <li>
-            <Smartphone size={17} aria-hidden="true" />
-            <span>
-              Öffne Deal Operator über das neue Symbol auf dem Home-Bildschirm, melde dich dort
-              einmal mit E-Mail und Passwort an und tippe auf „Erinnerungen einschalten“.
-            </span>
-          </li>
-        </ol>
-      )}
 
       <div className="cm-actions">
         {canEnable && (
@@ -711,8 +685,9 @@ const DECLINED = "do-push-abgelehnt";
  * Kurze Karte oben im Tagesabschluss: Erinnerungen mit einem Tipp einschalten.
  * Erscheint nur, wenn dieses Gerät Pushs kann, noch nicht eingetragen ist,
  * die Erinnerungen im Konto an sind und „Später“ nicht in den letzten sieben
- * Tagen gewählt wurde. Auf dem iPhone im Browser führt sie zu den Schritten
- * für den Home-Bildschirm. Gefragt wird nur auf ausdrücklichen Tipp.
+ * Tagen gewählt wurde. Nur wo Push im Browser direkt geht; keine Aufforderung,
+ * die Website zum Home-Bildschirm hinzuzufügen. Gefragt wird nur auf
+ * ausdrücklichen Tipp.
  */
 export function PushPrompt({
   settings = defaultCommitmentSettings,
@@ -822,9 +797,8 @@ export function PushPrompt({
       </p>
     );
   if (!info || !info.publicKey || !info.prefs.reminders || later) return null;
-  const ios = env.kind === "ios-browser";
-  if (!ios && (env.kind !== "supported" || env.permission === "denied" || registered !== false))
-    return null;
+  // Nur wo Push direkt geht. Keine Aufforderung, die Website irgendwo hinzuzufügen.
+  if (env.kind !== "supported" || env.permission === "denied" || registered !== false) return null;
 
   return (
     <section className={`cm-push-prompt md-push-${variant}`} aria-label="Erinnerungen">
@@ -838,25 +812,18 @@ export function PushPrompt({
             : "Erinnerung an deinen Tagesabschluss?"}
         </strong>
         <p>
-          {ios
-            ? "Auf dem iPhone gibt es Erinnerungen in der Web-App vom Home-Bildschirm. So richtest du sie ein:"
-            : `Um ${clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um ${clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.`}
+          Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um{" "}
+          {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.
         </p>
         <div className="cm-push-prompt-actions">
-          {ios ? (
-            <Link className="btn primary" href="/profil?modus=eigen#erinnerungen">
-              <SquarePlus size={17} aria-hidden="true" /> Zum Home-Bildschirm
-            </Link>
-          ) : (
-            <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
-              {busy ? (
-                <LoaderCircle className="spin" size={17} aria-hidden="true" />
-              ) : (
-                <Bell size={17} aria-hidden="true" />
-              )}
-              Erinnerungen einschalten
-            </button>
-          )}
+          <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
+            {busy ? (
+              <LoaderCircle className="spin" size={17} aria-hidden="true" />
+            ) : (
+              <Bell size={17} aria-hidden="true" />
+            )}
+            Erinnerungen einschalten
+          </button>
           <button type="button" className="btn secondary" onClick={postpone}>
             {variant === "after-submit" ? "Nein, danke" : "Später"}
           </button>

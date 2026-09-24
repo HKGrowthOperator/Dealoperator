@@ -498,6 +498,7 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
       role: z.string().trim().max(80),
       publicConsent: z.boolean(),
       phone: z.string().trim().max(40),
+      phoneCountry: z.string().trim().max(4).optional(),
       contactOptIn: z.boolean(),
     })
     .parse(raw);
@@ -505,7 +506,7 @@ export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   // nicht per SMS geprüft, sondern nur einheitlich gespeichert.
   let phone = "";
   if (v.phone) {
-    const checked = normalisePhone(v.phone);
+    const checked = normalisePhone(v.phone, v.phoneCountry);
     if (!checked.ok) throw new AppError(checked.reason);
     phone = checked.value;
   }

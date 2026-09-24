@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { PHONE_COUNTRIES, splitPhone } from "@/lib/phone";
 
 /** Rückweg nach dem Ergänzen, z. B. zum begonnenen Tagesabschluss. */
 function returnTarget(value: string | null) {
@@ -12,6 +13,7 @@ function returnTarget(value: string | null) {
 
 export default function AccountSettings({ demo }: { demo: boolean }) {
   const router = useRouter();
+  const uid = useId();
   const back = returnTarget(useSearchParams().get("weiter"));
   const [value, setValue] = useState({
     name: demo ? "Alex · Beispiel" : "",
@@ -19,6 +21,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
     role: demo ? "Sales" : "",
     publicConsent: false,
     phone: "",
+    phoneCountry: "DE",
     contactOptIn: false,
   });
   const [exists, setExists] = useState(demo);
@@ -40,7 +43,9 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
             company: d.participant.company,
             role: d.participant.role,
             publicConsent: d.participant.public_consent,
-            phone: d.contact.phone,
+            // Gespeichert ist +49170…; im Feld stehen Land und nationale Ziffern.
+            phone: splitPhone(d.contact.phone || "").national,
+            phoneCountry: splitPhone(d.contact.phone || "").country,
             contactOptIn: d.contact.contact_opt_in,
           });
       })
@@ -53,14 +58,11 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
     <section className="card padded operator-account" id="konto">
       <h2>Konto und Sichtbarkeit</h2>
       <p className="hint">
-        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Für den
-        Tagesabschluss und die Reflexionen brauchst du eine Telefonnummer mit
-        Ländervorwahl. Nur das Team sieht sie.
+        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}
       </p>
       {back && (
         <p className="account-return" role="status">
-          Ergänze deine Telefonnummer und speichere. Danach geht es mit deinem
-          Entwurf weiter.
+          Nummer eintragen und speichern, dann geht es mit deinem Entwurf weiter.
         </p>
       )}
       {error && (
@@ -137,17 +139,32 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
                 onChange={(e) => setValue({ ...value, role: e.target.value })}
               />
             </label>
-            <label>
-              Telefonnummer · nur für das Team, mit Ländervorwahl
-              <input
-                type="tel"
-                maxLength={40}
-                autoComplete="tel"
-                autoFocus={!!back && !value.phone}
-                value={value.phone}
-                onChange={(e) => setValue({ ...value, phone: e.target.value })}
-              />
-            </label>
+            <div className="account-phone">
+              <label htmlFor={`${uid}-phone`}>Nummer</label>
+              <span className="flow-phone">
+                <select
+                  aria-label="Ländervorwahl"
+                  value={value.phoneCountry}
+                  onChange={(e) => setValue({ ...value, phoneCountry: e.target.value })}
+                >
+                  {PHONE_COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} +{c.dial}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  id={`${uid}-phone`}
+                  type="tel"
+                  inputMode="tel"
+                  maxLength={40}
+                  autoComplete="tel"
+                  autoFocus={!!back && !value.phone}
+                  value={value.phone}
+                  onChange={(e) => setValue({ ...value, phone: e.target.value })}
+                />
+              </span>
+            </div>
           </div>
           <label className="checkbox-line">
             <input

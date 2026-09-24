@@ -793,7 +793,7 @@ export default function OnboardingStart({
                 ? "Noch deine Kontaktdaten und ein Passwort, dann bestätigst du einmal deine E-Mail."
                 : mode === "assign"
                   ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
-                  : "Name, E-Mail, Passwort und Telefon. Danach bestätigst du einmal deine E-Mail."}
+                  : "Name, E-Mail, Passwort und Nummer. Danach bestätigst du einmal deine E-Mail."}
             </p>
             {isTeamProfile(selected) && mode === "claim" && (
               <div className="flow-notice">
