@@ -10,10 +10,12 @@ import {
   visibleMetrics as metrics,
   type Metric,
 } from "@/lib/kpis";
-import CheckinEditor from "./features/checkin-editor";
-import { StreakStrip } from "./features/commitment-dashboard";
+import CommitmentDashboard from "./features/commitment-dashboard";
 import RankProgress from "./features/rank-progress";
 import AccountSettings from "./features/account-settings";
+import PushSetup from "./features/push-setup";
+import DiscordLink from "./features/discord-link";
+import type { CommitmentSettings } from "@/lib/commitment";
 import BuddyInbox from "./features/buddy-inbox";
 import ExchangeBoard from "./features/exchange-board";
 import DiscordNudge from "./features/discord-nudge";
@@ -23,54 +25,35 @@ import {
   SESSION_LEAD_HOURS,
   sessionLeadError,
 } from "@/lib/session-rules";
-import OperatorWordmark from "./features/operator-wordmark";
 import { ConfirmAction } from "./features/shared";
 import { emptyWorkflows } from "./workflow-data";
 
 import {
   BarChart3,
-  BookOpen,
   Bookmark,
   CalendarDays,
   Check,
-  CheckCheck,
   Clock3,
   Copy,
-  Flame,
   Headphones,
-  LayoutDashboard,
   MessageCircle,
   Phone,
   Plus,
   Search,
   Send,
-  Settings2,
   ShieldCheck,
   Sparkles,
   Target,
   Users,
   LoaderCircle,
-  Heart,
   LogIn,
   Download,
   Info,
   Lock,
   ArrowUpRight,
 } from "lucide-react";
-import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
+import { OperatorHeader, OperatorFooter } from "./features/operator-shell";
+import AreaNav from "./features/area-nav";
 import {
   Dialog,
   DialogContent,
@@ -97,7 +80,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Toaster, toast } from "sonner";
 import {
-  labels,
   views,
   dateKey,
   offset,
@@ -111,28 +93,7 @@ import {
   type RecordDay,
   type Session,
 } from "./data";
-const icons = {
-  heute: LayoutDashboard,
-  zahlen: BarChart3,
-  reflexion: MessageCircle,
-  partner: Users,
-  sessions: Headphones,
-  wissen: BookOpen,
-  profil: Settings2,
-  "so-funktionierts": Info,
-};
 const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
-const blankRecord = (): RecordDay => ({
-  date: dateKey(),
-  attempts: 0,
-  conversations: 0,
-  meetings: 0,
-  energy: null,
-  win: "",
-  next: "",
-  help: "",
-  shared: false,
-});
 const blankData: AppData = {
   ...emptyWorkflows,
   profile: emptyProfile,
@@ -244,36 +205,6 @@ function Empty({
     </div>
   );
 }
-function Stat({
-  icon: Icon,
-  label,
-  value,
-  note,
-  accent = false,
-  onClick,
-}: {
-  icon: any;
-  label: string;
-  value: string | number;
-  note: string;
-  accent?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`stat card ${accent ? "stat-accent" : ""}`}
-    >
-      <div className="stat-top">
-        <span>{label}</span>
-        <Icon size={19} />
-      </div>
-      <strong>{value}</strong>
-      <span className="stat-note">{note}</span>
-    </button>
-  );
-}
 function MiniChart({
   records,
   days = 7,
@@ -332,10 +263,18 @@ export default function CommunityApp({
   initialView,
   signedIn,
   discordUrl,
+  settings,
+  discordLink,
+  discordResult,
 }: {
   initialView: View;
   signedIn: boolean;
   discordUrl: string;
+  /** Regeln für Erinnerungen (nur Profil). */
+  settings?: CommitmentSettings;
+  /** Stand der Discord-Verknüpfung (nur Profil). */
+  discordLink?: { available: boolean; link: { name: string; since: string } | null } | null;
+  discordResult?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -358,7 +297,6 @@ export default function CommunityApp({
   const [resource, setResource] = useState<(typeof resources)[number] | null>(
     null,
   );
-  const [record, setRecord] = useState<RecordDay>(blankRecord);
   const [profile, setProfile] = useState<Profile>(demoData().profile);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("Alle");
@@ -374,7 +312,6 @@ export default function CommunityApp({
     minutes: 50,
     capacity: 2,
   });
-  const [recordPeriod, setRecordPeriod] = useState("7");
   const href = (v: View) => `/${v}?modus=${demo ? "demo" : "eigen"}`;
   const refresh = useCallback(
     async (quiet = false, background = false, signal?: AbortSignal) => {
@@ -400,10 +337,6 @@ export default function CommunityApp({
         setData(result);
         if (!background) {
           setProfile(result.profile);
-          setRecord(
-            result.records.find((r: RecordDay) => r.date === dateKey()) ||
-              blankRecord(),
-          );
         }
       } catch (e) {
         if (signal?.aborted || background) return;
@@ -612,10 +545,6 @@ export default function CommunityApp({
     });
     setModal("create-session");
   }
-  function openMetrics() {
-    if (initialView === "zahlen") setModal("metrics");
-    else router.push(href("zahlen"));
-  }
   // Zahlen und Reflexion laufen über den Tagesabschluss (/api/closing).
   function openClosing(date?: string) {
     router.push(
@@ -635,31 +564,6 @@ export default function CommunityApp({
       setModal(null);
       toast.success(
         demo ? "Beispielprofil aktualisiert." : "Dein Profil ist gespeichert.",
-      );
-    }
-  }
-  function reflectionText(r: RecordDay) {
-    const counts = r.counts || {
-      ...emptyCounts(),
-      attempts: r.attempts,
-      legacyMeetings: r.meetings,
-    };
-    return `Mein Tagesabschluss · ${prettyDate(r.date)}\n${metrics
-      .filter((k) => counts[k] !== null)
-      .map((k) => `${metricLabels[k]}: ${counts[k]}`)
-      .join(
-        " · ",
-      )}${r.energy != null ? `\nEnergie: ${r.energy}/10` : ""}\nMein Learning: ${r.win || "–"}\nNächster Schritt: ${r.next}\nWobei ich Hilfe suche: ${r.help || "–"}`;
-  }
-  async function copyReflection(r: RecordDay) {
-    const text = reflectionText(r);
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success("Kopiert.");
-    } catch {
-      setShareText(text);
-      toast.info(
-        "Markiere den Text im geöffneten Fenster und kopiere ihn.",
       );
     }
   }
@@ -700,10 +604,6 @@ export default function CommunityApp({
   const weekRecords = data.records.filter(
     (r) => r.date >= dateKey(weekStart) && r.date <= dateKey(),
   );
-  const total = (
-    key: "attempts" | "conversations" | "meetings",
-    records = weekRecords,
-  ) => records.reduce((sum, r) => sum + (r[key] ?? 0), 0);
   const totals = aggregate(
     weekRecords.map(
       (r) =>
@@ -715,19 +615,6 @@ export default function CommunityApp({
     ),
   );
   const metricTotal = (k: Metric) => (totals[k] === null ? "—" : totals[k]!);
-  const doneToday = data.records.some((r) => r.date === dateKey());
-  const percent = Math.min(
-    100,
-    Math.round((total("attempts") / data.profile.goal) * 100),
-  );
-  const nextSession = data.sessions
-    .filter(
-      (s) =>
-        !s.cancelled &&
-        new Date(s.startsAt || `${s.date}T${s.time}`) > new Date(),
-    )
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))[0];
-  const name = data.profile.name.split(" ")[0] || "";
   function downloadCalendar(s: Session) {
     const start = new Date(s.startsAt || `${s.date}T${s.time}`);
     const end = new Date(start.getTime() + s.minutes * 60000);
@@ -754,26 +641,6 @@ export default function CommunityApp({
       (sessionFilter === "Meine Sessions"
         ? s.joined || s.mine || s.owner === data.viewerId
         : s.kind === sessionFilter)
-    );
-  }
-  function nav(v: View) {
-    return (
-      <NavigationItem
-        key={v}
-        view={v}
-        href={href(v)}
-        active={initialView === v}
-      />
-    );
-  }
-  function reflectionForm() {
-    return (
-      <CheckinEditor
-        initialDate={record.date}
-        onSubmitted={async () => {
-          if (!demo) await refresh(true);
-        }}
-      />
     );
   }
   function planForm() {
@@ -965,11 +832,9 @@ export default function CommunityApp({
           <span>
             Mein Profil bei den Call-Partnern anzeigen
             <small>
-              Andere angemeldete Nutzer sehen Name, Rolle, Zielgruppe,
-              Call-Zeit, Wochenziel, Call-Tage, bevorzugten Kanal und
-              Beschreibung. Deine E-Mail und Telefonnummer bleiben privat.
-              Eingereichte Reflexionen stehen unabhängig davon unter
-              Reflexionen.
+              Andere Angemeldete sehen Name, Rolle, Zielgruppe, Call-Zeit,
+              Wochenziel, Call-Tage und Beschreibung. E-Mail und
+              Telefonnummer bleiben privat.
             </small>
           </span>
         </label>
@@ -980,93 +845,14 @@ export default function CommunityApp({
       </form>
     );
   }
+  const exchangeView = ["partner", "sessions", "wissen"].includes(initialView);
   return (
-    <SidebarProvider
-      style={{ "--sidebar-width": "242px" } as React.CSSProperties}
-    >
-      <Sidebar className="app-sidebar">
-        <SidebarHeader>
-          <Link
-            href={href("heute")}
-            className="brand"
-            aria-label="Deal Operator – Übersicht"
-          >
-            <OperatorWordmark />
-          </Link>
-          <span className="brand-sub">GEMEINSAM DRANBLEIBEN.</span>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>DEIN FORTSCHRITT</SidebarGroupLabel>
-            <SidebarMenu>
-              {(["heute", "zahlen", "reflexion"] as View[]).map(nav)}
-            </SidebarMenu>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>AUSTAUSCH</SidebarGroupLabel>
-            <SidebarMenu>
-              {(["partner", "sessions", "wissen"] as View[]).map(nav)}
-            </SidebarMenu>
-          </SidebarGroup>
-          <div className="sidebar-note">
-            <span className="small-circle">
-              <Heart size={15} />
-            </span>
-            <strong>Hier zählt, dass du dranbleibst.</strong>
-            <p>Dranbleiben, auch an zähen Tagen.</p>
-            <Link href={href("so-funktionierts")}>So funktioniert’s</Link>
-          </div>
-        </SidebarContent>
-        <SidebarFooter>
-          <Link href={href("profil")} className="profile-nav">
-            <Avatar name={name} color="green" small />
-            <span>
-              <strong>{name || "Dein Profil"}</strong>
-              <small>
-                {demo ? "Beispielprofil" : "Dein persönlicher Bereich"}
-              </small>
-            </span>
-            <Settings2 size={17} />
-          </Link>
-        </SidebarFooter>
-      </Sidebar>
-      <div className="app-shell">
-        <header className="topbar">
-          <div className="topbar-left">
-            <SidebarTrigger />
-            <span className="breadcrumb">
-              Dein Bereich <strong>{labels[initialView]}</strong>
-            </span>
-          </div>
-          <div className="topbar-right">
-            <button
-              className="icon-button"
-              onClick={() => setModal("about")}
-              aria-label="So funktioniert Deal Operator"
-            >
-              <Info size={19} />
-            </button>
-            <Link href={href("profil")} aria-label="Mein Profil">
-              <Avatar name={name} small />
-            </Link>
-          </div>
-        </header>
-        <div className="mode-bar own-mode">
-          <span>
-            <span className="mode-dot" />
-            <strong>Dein persönlicher Bereich</strong>
-            <span className="mode-description">
-              {" "}
-              – was andere sehen, steht beim Tagesabschluss.
-            </span>
-          </span>
-          <Link href="/ranking">Zum Ranking</Link>
-        </div>
-        <main className="main-content">
-          <div className="signup-inline">
-            <p>Wo stehst du heute im Vergleich?</p>
-            <Link href="/ranking">Ranking ansehen</Link>
-          </div>
+    <div className="operator-site">
+      <OperatorHeader discordUrl={discordUrl} />
+      <main id="inhalt" className="do-page ca-main">
+        {initialView !== "so-funktionierts" && (
+          <AreaNav area={exchangeView ? "exchange" : "mine"} />
+        )}
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
@@ -1090,357 +876,94 @@ export default function CommunityApp({
             </Empty>
           ) : (
             <>
-              {["heute", "zahlen"].includes(initialView) && (
-                <RankProgress records={data.records} />
-              )}
               {initialView === "heute" && (
                 <>
-                  <div className="page-heading">
-                    <div>
-                      <p className="eyebrow">
-                        DEIN TAG. DEINE ZAHLEN. DEIN FORTSCHRITT.
-                      </p>
-                      <h1>
-                        Dein Tag im Blick<span className="lime-dot">.</span>
-                      </h1>
-                      <p>
-                        Hey{name ? ` ${name}` : ""}, schön, dass du da bist.
-                        Lass uns heute dranbleiben.
-                      </p>
-                    </div>
-                  </div>
-                  <StreakStrip />
-                  {!demo && (
-                    <ActiveCallerCard
-                      state={data.activeCaller}
-                      team={data.viewerTeam}
-                      compact
-                    />
-                  )}
-                  <div className="dashboard-top">
-                    <div className="week-banner">
-                      <span className="round-icon">
-                        <Flame size={23} />
+                  <PageHeading
+                    title="Mein Fortschritt"
+                    text="Deine Woche, deine Abschluss-Serie, aktive Calling-Tage und Leistungslevel."
+                  />
+                  <section className="ca-section" aria-labelledby="ca-week">
+                    <div className="ca-section-head">
+                      <h2 id="ca-week">Diese Woche</h2>
+                      <span>
+                        {prettyDate(dateKey(weekStart))} bis {prettyDate(dateKey())}
                       </span>
+                    </div>
+                    <dl className="ca-week-stats">
                       <div>
-                        <strong>Eine gute Woche beginnt mit einem Call.</strong>
-                        <p>
-                          Dein Ziel: {data.profile.goal} Anrufversuche. Jeder
-                          ehrliche Schritt zählt.
-                        </p>
+                        <dt>Anwahlen</dt>
+                        <dd>{metricTotal("attempts")}</dd>
+                        <small>
+                          {data.profile.goal
+                            ? `Wochenziel ${data.profile.goal.toLocaleString("de-DE")}`
+                            : "Kein Wochenziel"}
+                        </small>
                       </div>
+                      <div>
+                        <dt>Settings</dt>
+                        <dd>{metricTotal("settingsBooked")}</dd>
+                        <small>vereinbart</small>
+                      </div>
+                      <div>
+                        <dt>Closings</dt>
+                        <dd>{metricTotal("closingsBooked")}</dd>
+                        <small>vereinbart</small>
+                      </div>
+                    </dl>
+                    <div className="ca-chart">
+                      <p className="ca-chart-title">Anwahlen der letzten 7 Tage</p>
+                      <MiniChart
+                        onSelect={(date) => openClosing(date)}
+                        records={data.records}
+                      />
+                    </div>
+                    <div className="ca-section-actions">
                       <button
-                        className="text-button"
+                        className="do-button do-button-secondary"
                         onClick={() => {
                           setProfile(data.profile);
                           setModal("plan");
                         }}
                       >
-                        Ziel anpassen
+                        Wochenziel anpassen
                       </button>
-                    </div>
-                  </div>
-                  <div className="section-caption">
-                    <span>DEINE WOCHE IM BLICK</span>
-                    <span>
-                      {prettyDate(dateKey(weekStart))} – {prettyDate(dateKey())}
-                    </span>
-                  </div>
-                  <div className="stats-grid">
-                    <Stat
-                      onClick={openMetrics}
-                      icon={Phone}
-                      label="Anrufversuche"
-                      value={metricTotal("attempts")}
-                      note={`${percent} % deines Wochenziels`}
-                      accent
-                    />
-                    <Stat
-                      onClick={openMetrics}
-                      icon={CalendarDays}
-                      label="Settings vereinbart"
-                      value={metricTotal("settingsBooked")}
-                      note="Aus Anwahlen werden nächste Schritte."
-                    />
-                    <Stat
-                      onClick={openMetrics}
-                      icon={CheckCheck}
-                      label="Settings gehalten"
-                      value={metricTotal("settingsHeld")}
-                      note="Termine, die wirklich stattgefunden haben."
-                    />
-                  </div>
-                  <div className="dashboard-grid">
-                    <section className="card chart-card">
-                      <div className="card-heading">
-                        <div>
-                          <h2>Deine letzten 7 Tage</h2>
-                          <p>Anrufversuche pro Tag</p>
-                        </div>
-                        <Link
-                          href={href("zahlen")}
-                          className="icon-button"
-                          aria-label="Alle Zahlen ansehen"
-                        ></Link>
-                      </div>
-                      <MiniChart
-                        onSelect={(date) => openClosing(date)}
-                        records={data.records}
-                      />
-                      <div className="chart-footer">
-                        <span>
-                          <i />
-                          Anrufversuche
-                        </span>
-                        <span>Dein Tempo. Dein Fortschritt.</span>
-                      </div>
-                    </section>
-                    <section className="session-spotlight">
-                      <div className="spotlight-top">
-                        <Tag tone="dark">DEIN NÄCHSTER TERMIN</Tag>
-                        <Headphones size={23} />
-                      </div>
-                      <div className="spotlight-art">
-                        <div className="orbit orbit-one" />
-                        <div className="orbit orbit-two" />
-                        <Phone size={35} />
-                        <span className="orbit-dot one" />
-                        <span className="orbit-dot two" />
-                      </div>
-                      <h2>
-                        {nextSession
-                          ? nextSession.title
-                          : "Noch kein zusätzlicher Termin geplant."}
-                      </h2>
-                      <p>
-                        {nextSession
-                          ? `${sessionDay(nextSession.date)}, ${nextSession.time} Uhr · ${nextSession.minutes} Minuten`
-                          : "Wenn du mit einem Call-Partner üben oder einen Extra-Block machen willst, kannst du ihn hier anlegen."}
-                      </p>
-                      {nextSession && (
-                        <div className="session-people">
-                          <span className="avatar-stack">
-                            {data.members.slice(0, 3).map((m) => (
-                              <Avatar
-                                key={m.id}
-                                name={m.name}
-                                color={m.color}
-                                small
-                              />
-                            ))}
-                          </span>
-                          <span>
-                            {nextSession.attendees} von {nextSession.capacity}{" "}
-                            Plätzen belegt
-                          </span>
-                        </div>
-                      )}
-                      <button
-                        className="btn lime full"
-                        onClick={() =>
-                          nextSession
-                            ? setSession(nextSession)
-                            : openNewSession()
-                        }
-                      >
-                        {nextSession ? "Session ansehen" : "Termin anlegen"}
-                      </button>
-                      <small>Zusage jederzeit änderbar.</small>
-                    </section>
-                  </div>
-                  <div className="dashboard-bottom">
-                    <section className="card routine-card">
-                      <div className="card-heading">
-                        <div>
-                          <h2>Dein kleiner täglicher Fortschritt</h2>
-                          <p>Eine Routine, die dich weiterbringt.</p>
-                        </div>
-                        <span className="icon-tile">
-                          <CheckCheck size={21} />
-                        </span>
-                      </div>
-                      <div className="routine-row">
-                        <span className="step-number done">
-                          <Check size={17} />
-                        </span>
-                        <div>
-                          <strong>Setz dir ein realistisches Ziel</strong>
-                          <p>
-                            {data.profile.goal} Versuche an{" "}
-                            {data.profile.days.length} geplanten Call-Tagen
-                          </p>
-                        </div>
-                        <button
-                          className="icon-button"
-                          aria-label="Wochenziel bearbeiten"
-                          onClick={() => {
-                            setProfile(data.profile);
-                            setModal("plan");
-                          }}
-                        ></button>
-                      </div>
-                      <div className="routine-row">
-                        <span
-                          className={`step-number ${doneToday ? "done" : ""}`}
-                        >
-                          {doneToday ? <Check size={17} /> : 2}
-                        </span>
-                        <div>
-                          <strong>
-                            {doneToday
-                              ? "Heute reflektiert. Stark."
-                              : "Zahlen rein. Kopf frei."}
-                          </strong>
-                          <p>Zahlen und Reflexion in einem Tagesabschluss</p>
-                        </div>
-                        <button
-                          className="icon-button"
-                          aria-label="Tagesabschluss öffnen"
-                          onClick={() => openClosing()}
-                        ></button>
-                      </div>
-                      <div className="routine-row">
-                        <span className="step-number">3</span>
-                        <div>
-                          <strong>Hol dir Rückenwind von anderen Callern</strong>
-                          <p>
-                            Ein Learning teilen oder einen Call-Partner finden
-                          </p>
-                        </div>
-                        <Link
-                          className="icon-button"
-                          href={href("partner")}
-                          aria-label="Call-Partner öffnen"
-                        ></Link>
-                      </div>
-                    </section>
-                    <section className="card buddy-teaser">
-                      <div className="card-heading">
-                        <h2>Finde einen Call-Partner.</h2>
-                        <Users size={21} />
-                      </div>
-                      <p>
-                        Ähnlicher Rhythmus. Ehrliches Feedback.
-                        <br />
-                        Jemand, der mit dir dranbleibt.
-                      </p>
-                      <div className="buddy-faces">
-                        {data.members.slice(0, 4).map((m) => (
-                          <button
-                            key={m.id}
-                            onClick={() => setMember(m)}
-                            aria-label={`Profil von ${m.name}`}
-                          >
-                            <Avatar name={m.name} color={m.color} />
-                          </button>
-                        ))}
-                        {data.members.length === 0 && (
-                          <span className="quiet-text">
-                            Hier erscheinen Call-Partner, sobald sie ihr Profil zeigen.
-                          </span>
-                        )}
-                      </div>
-                      <Link className="text-link" href={href("partner")}>
-                        Call-Partner finden
+                      <Link className="do-link" href={href("zahlen")}>
+                        Alle Tage ansehen
                       </Link>
-                    </section>
-                  </div>
+                    </div>
+                  </section>
+                  <CommitmentDashboard />
+                  {!demo && (
+                    <ActiveCallerCard
+                      state={data.activeCaller}
+                      team={data.viewerTeam}
+                    />
+                  )}
+                  <RankProgress records={data.records} />
                 </>
               )}
 
               {initialView === "zahlen" && (
                 <>
                   <PageHeading
-                    eyebrow="MEHR KLARHEIT. WENIGER BAUCHGEFÜHL."
-                    title="Dein Fortschritt in Zahlen."
-                    text="Verstehe deine Entwicklung und plane den nächsten realistischen Schritt."
+                    title="Meine Zahlen"
+                    text="Jeder Tag einzeln, mit Zahlen und Reflexion. Einen Tag korrigierst du im Tagesabschluss."
                   >
                     <div className="button-row">
                       <button
-                        className="btn secondary"
+                        className="do-button do-button-secondary"
                         disabled={!data.records.length}
                         onClick={exportNumbers}
                       >
-                        <Download size={17} />
-                        CSV exportieren
-                      </button>
-                      <button
-                        className="btn primary"
-                        onClick={() => openClosing()}
-                      >
-                        <Plus size={18} />
-                        Tagesabschluss
+                        <Download size={17} aria-hidden="true" />
+                        Als CSV herunterladen
                       </button>
                     </div>
                   </PageHeading>
-                  <div className="stats-grid">
-                    <Stat
-                      onClick={openMetrics}
-                      icon={Phone}
-                      label="Anrufversuche diese Woche"
-                      value={metricTotal("attempts")}
-                      note={`Von ${data.profile.goal} geplanten Versuchen`}
-                      accent
-                    />
-                    <Stat
-                      onClick={openMetrics}
-                      icon={MessageCircle}
-                      label="Settings vereinbart"
-                      value={metricTotal("settingsBooked")}
-                      note="Neu gebuchte Setting-Termine"
-                    />
-                    <Stat
-                      onClick={openMetrics}
-                      icon={Target}
-                      label="Deals gewonnen"
-                      value={metricTotal("dealsWon")}
-                      note="Gewonnene Aufträge im Zeitraum"
-                    />
-                  </div>
-                  <section className="card chart-card">
-                    <div className="card-heading">
-                      <div>
-                        <h2>Deine Aktivität</h2>
-                        <p>Ehrliche Zahlen, auch an ruhigen Tagen.</p>
-                      </div>
-                      <FieldSelect
-                        label="Zeitraum"
-                        value={recordPeriod}
-                        onChange={setRecordPeriod}
-                        options={["7", "14"]}
-                      />
-                    </div>
-                    <MiniChart
-                      onSelect={(date) => openClosing(date)}
-                      records={data.records}
-                      days={Number(recordPeriod)}
-                    />
-                  </section>
-                  <section className="card goal-card">
-                    <div>
-                      <h3>Dein Wochenziel</h3>
-                      <p>
-                        {total("attempts")} von {data.profile.goal}{" "}
-                        Anrufversuchen · {percent} %
-                      </p>
-                    </div>
-                    <Progress value={percent} />
-                    <button
-                      className="btn secondary"
-                      onClick={() => {
-                        setProfile(data.profile);
-                        setModal("plan");
-                      }}
-                    >
-                      <Settings2 size={16} />
-                      Anpassen
-                    </button>
-                  </section>
                   <section className="card">
                     <div className="card-heading padded">
                       <div>
                         <h2>Deine Tage</h2>
-                        <p>Wähle einen Tag, um ihn im Tagesabschluss zu öffnen.</p>
                       </div>
                       <Tag>{data.records.length} Einträge</Tag>
                     </div>
@@ -1470,8 +993,7 @@ export default function CommunityApp({
                                     className="btn secondary"
                                     onClick={() => openClosing(r.date)}
                                   >
-                                    <Settings2 size={15} />
-                                    Bearbeiten
+                                    Im Tagesabschluss öffnen
                                   </button>
                                 </div>
                                 <dl className="checkin-card-kpis">
@@ -1539,73 +1061,10 @@ export default function CommunityApp({
                 </>
               )}
 
-              {initialView === "reflexion" && (
-                <>
-                  <PageHeading
-                    eyebrow="ZWEI MINUTEN FÜR DICH."
-                    title="Was nimmst du heute mit?"
-                    text="Zahlen zeigen, was passiert. Deine Reflexion zeigt, was du daraus machst."
-                  />
-                  <div className="two-columns">
-                    <section className="card padded">
-                      <div className="card-heading">
-                        <h2>Dein Tagesabschluss</h2>
-                      </div>
-                      {reflectionForm()}
-                    </section>
-                    <aside>
-                      <DiscordNudge context="reflection" url={discordUrl} />
-                      <div className="reflection-note">
-                        <Sparkles size={26} />
-                        <h2>Ein Learning ist auch ein Win.</h2>
-                        <p>
-                          Du brauchst keinen perfekten Tag. Nur einen ehrlichen
-                          Blick darauf, was funktioniert hat und was du morgen
-                          probieren möchtest.
-                        </p>
-                        <span>DRANBLEIBEN &gt; PERFEKT SEIN</span>
-                      </div>
-                      <div className="card padded recent-reflections">
-                        <h3>Deine letzten Gedanken</h3>
-                        {data.records.length ? (
-                          [...data.records]
-                            .sort((a, b) => b.date.localeCompare(a.date))
-                            .slice(0, 3)
-                            .map((r) => (
-                              <div className="reflection-snippet" key={r.date}>
-                                <small>
-                                  {prettyDate(r.date)}
-                                  {r.energy != null ? ` · Energie ${r.energy}/10` : ""}
-                                </small>
-                                <p>{r.win || "Kein Learning eingetragen."}</p>
-                                <button
-                                  className="text-button"
-                                  onClick={() => copyReflection(r)}
-                                >
-                                  <Copy size={14} />
-                                  Text kopieren
-                                </button>
-                              </div>
-                            ))
-                        ) : (
-                          <p>
-                            Deine eingereichten Reflexionen erscheinen hier.
-                          </p>
-                        )}
-                        <Link className="text-link" href="/reflexionen">
-                          Reflexionen der anderen ansehen
-                        </Link>
-                      </div>
-                    </aside>
-                  </div>
-                </>
-              )}
-
               {initialView === "partner" && (
                 <>
                   <PageHeading
-                    eyebrow="CALL-PARTNER"
-                    title="Finde Call-Partner mit ähnlichem Rhythmus."
+                    title="Call-Partner"
                     text="Zum Üben, für ehrliches Feedback oder einen zusätzlichen Block, ergänzend zum gemeinsamen Callen."
                   >
                     <button
@@ -1727,9 +1186,8 @@ export default function CommunityApp({
               {initialView === "sessions" && (
                 <>
                   <PageHeading
-                    eyebrow="ZUSÄTZLICH MIT CALL-PARTNERN"
-                    title="Übungstermine & Call-Blöcke."
-                    text="Roleplay, Feedback oder ein zusätzlicher Block mit deinen Call-Partnern, ergänzend zum gemeinsamen Callen. Getroffen wird sich im Discord: Jede Session bekommt dort ihren eigenen Raum. Dabei ist, wer zusagt."
+                    title="Sessions und Roleplay"
+                    text="Übungstermine und zusätzliche Call-Blöcke. Getroffen wird sich im Discord: Jede Session bekommt dort ihren eigenen Raum."
                   >
                     {sessionsOpen ? (
                       <button className="btn primary" onClick={openNewSession}>
@@ -1880,8 +1338,7 @@ export default function CommunityApp({
               {initialView === "wissen" && (
                 <>
                   <PageHeading
-                    eyebrow="AUS DEM CALL-ALLTAG."
-                    title="Besser werden. Wissen teilen."
+                    title="Wissen und Feedback"
                     text="Echte Erfahrungen anderer Caller und kurze Impulse für deine nächsten Calls."
                   />
                   <Tabs value={knowledgeTab} onValueChange={setKnowledgeTab}>
@@ -2024,107 +1481,29 @@ export default function CommunityApp({
 
               {initialView === "profil" && (
                 <>
-                  <AccountSettings key={demo ? "demo" : "own"} demo={demo} />
                   <PageHeading
-                    eyebrow="DEIN RHYTHMUS. DEINE ENTSCHEIDUNG."
-                    title="So passt Deal Operator zu dir."
-                    text="Ein klares Profil hilft dir, passende Call-Partner und realistische Ziele zu finden."
+                    title="Profil und Einstellungen"
+                    text="Wie du im Ranking erscheinst, deine Erinnerungen und die Verknüpfung mit Discord."
                   />
-                  <div className="two-columns">
-                    <section className="card padded">{profileForm()}</section>
-                    <aside>
-                      <section className="card padded">
-                        <h3>Dein persönlicher Bereich</h3>
-                        <p>
-                          Entwürfe und deinen Unterstützungswunsch sehen nur
-                          du und das Team. Eingereichte Reflexionen lesen alle
-                          Angemeldeten mit eigenem Profil und Telefonnummer.
-                          Deine Zahlen erscheinen nur mit deiner Zustimmung im
-                          Ranking.
-                        </p>
-                        <p>
-                          Du kannst dein sichtbares Profil jederzeit ausblenden.
-                          Dein privater Fortschritt bleibt erhalten.
-                        </p>
-                      </section>
-                      <section className="card padded requests">
-                        <h3>Deine Call-Partner-Anfragen</h3>
-                        {!data.buddies.length ? (
-                          <p>
-                            Noch keine Anfragen. Schau bei den Call-Partnern
-                            vorbei und finde einen passenden Rhythmus.
-                          </p>
-                        ) : (
-                          data.buddies.map((b: any) => (
-                            <div key={b.id} className="request">
-                              <strong>
-                                {b.incoming
-                                  ? b.name
-                                  : `An ${b.peerName || "deinen Call-Partner"}`}
-                              </strong>
-                              <p>{b.message}</p>
-                              <Tag>
-                                {b.status === "accepted"
-                                  ? "Angenommen"
-                                  : b.status === "declined"
-                                    ? "Abgelehnt"
-                                    : "Offen"}
-                              </Tag>
-                              {b.incoming && b.status === "pending" && (
-                                <div className="button-row">
-                                  <button
-                                    className="btn secondary"
-                                    onClick={() =>
-                                      mutate(
-                                        "buddyReply",
-                                        { id: b.id, status: "accepted" },
-                                        (d) => ({
-                                          ...d,
-                                          buddies: d.buddies.map((x) =>
-                                            x.id === b.id
-                                              ? { ...x, status: "accepted" }
-                                              : x,
-                                          ),
-                                        }),
-                                      )
-                                    }
-                                  >
-                                    Annehmen
-                                  </button>
-                                  <button
-                                    className="text-button"
-                                    onClick={() =>
-                                      mutate(
-                                        "buddyReply",
-                                        { id: b.id, status: "declined" },
-                                        (d) => ({
-                                          ...d,
-                                          buddies: d.buddies.map((x) =>
-                                            x.id === b.id
-                                              ? { ...x, status: "declined" }
-                                              : x,
-                                          ),
-                                        }),
-                                      )
-                                    }
-                                  >
-                                    Ablehnen
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
-                      </section>
-                    </aside>
+                  <div className="ca-settings">
+                    <AccountSettings key={demo ? "demo" : "own"} demo={demo} />
+                    <section className="card padded" aria-labelledby="ca-profile-title">
+                      <h2 id="ca-profile-title">Call-Profil</h2>
+                      <p className="hint">
+                        Für die Suche nach Call-Partnern. Deine E-Mail und
+                        Telefonnummer bleiben privat.
+                      </p>
+                      {profileForm()}
+                    </section>
+                    <PushSetup settings={settings} />
+                    <DiscordLink initial={discordLink} result={discordResult} />
                   </div>
                 </>
               )}
               {initialView === "so-funktionierts" && (
                 <>
                   <PageHeading
-                    eyebrow="FÜR ALLE, DIE REGELMÄSSIG CALLEN."
-                    title="Gemeinsam dranbleiben."
+                    title="So funktioniert’s"
                     text="Deal Operator begleitet das gemeinsame Callen: Zahlen festhalten, kurz reflektieren, dranbleiben."
                   />
                   <div className="community-manifest">
@@ -2246,14 +1625,8 @@ export default function CommunityApp({
               )}
             </>
           )}
-          <footer className="page-footer">
-            <span>
-              Deal Operator <span>Gemeinsam dranbleiben.</span>
-            </span>
-            <Link href={href("so-funktionierts")}>So funktioniert’s</Link>
-          </footer>
-        </main>
-      </div>
+      </main>
+      <OperatorFooter discordUrl={discordUrl} />
 
       <Dialog open={!!modal} onOpenChange={(open) => !open && setModal(null)}>
         <DialogContent
@@ -2305,8 +1678,6 @@ export default function CommunityApp({
                 Tagesabschluss öffnen
               </button>
             </div>
-          ) : modal === "reflection" ? (
-            reflectionForm()
           ) : modal === "profile" ? (
             profileForm()
           ) : modal === "plan" ? (
@@ -2982,24 +2353,23 @@ export default function CommunityApp({
         }}
       />
       <Toaster richColors position="bottom-right" closeButton />
-    </SidebarProvider>
+    </div>
   );
 }
 function PageHeading({
-  eyebrow,
   title,
   text,
   children,
 }: {
-  eyebrow: string;
+  /** Frühere Unterzeile; nicht mehr angezeigt. */
+  eyebrow?: string;
   title: string;
   text: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="page-heading">
+    <div className="do-page-head">
       <div>
-        <p className="eyebrow">{eyebrow}</p>
         <h1>{title}</h1>
         <p>{text}</p>
       </div>
@@ -3008,25 +2378,3 @@ function PageHeading({
   );
 }
 
-function NavigationItem({
-  view,
-  href,
-  active,
-}: {
-  view: View;
-  href: string;
-  active: boolean;
-}) {
-  const { setOpenMobile } = useSidebar();
-  const Icon = icons[view];
-  return (
-    <SidebarMenuItem>
-      <SidebarMenuButton asChild isActive={active}>
-        <Link href={href} onClick={() => setOpenMobile(false)}>
-          <Icon size={19} />
-          <span>{labels[view]}</span>
-        </Link>
-      </SidebarMenuButton>
-    </SidebarMenuItem>
-  );
-}

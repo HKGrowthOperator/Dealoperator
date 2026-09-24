@@ -44,8 +44,8 @@ export default function ActiveCallerCard({
           <Flame size={22} />
         </span>
         <div>
-          <p className="ac-kicker">Dein Rang</p>
-          <strong>Aktiver Caller</strong>
+          <p className="ac-kicker">Aktive Calling-Tage</p>
+          <strong>Du bist Aktiver Caller</strong>
           <p>
             {state.since ? `Freigeschaltet am ${day(state.since)}. ` : ""}
             Sessions &amp; Roleplay stehen dir offen, im Discord trägst du den Rang
@@ -69,9 +69,10 @@ export default function ActiveCallerCard({
         <Lock size={20} />
       </span>
       <div>
-        <p className="ac-kicker">Rang „Aktiver Caller“</p>
+        <p className="ac-kicker">Aktive Calling-Tage</p>
         <strong>
-          {left === 1 ? "Noch 1 Calling-Tag" : `Noch ${left} Calling-Tage`} bis zur Freischaltung
+          {left === 1 ? "Noch 1 aktiver Calling-Tag" : `Noch ${left} aktive Calling-Tage`} bis
+          zum Rang „Aktiver Caller“
         </strong>
         <div className="ac-progress">
           {dots}

@@ -323,8 +323,7 @@ export default function CommitmentDashboard({
     <section className="cm-card cm-dashboard" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
-          <p className="cm-kicker">DRANBLEIBEN</p>
-          <h2 id={`${uid}-title`}>Deine Serie</h2>
+          <h2 id={`${uid}-title`}>Abschluss-Serie</h2>
         </div>
         <p className="cm-muted">
           Calling-Tage sind {workdays}. Rechtzeitig ist ein Abschluss bis{" "}
@@ -335,7 +334,7 @@ export default function CommitmentDashboard({
 
       <dl className="cm-stats">
         <div className="accent">
-          <dt>Serie</dt>
+          <dt>Abschluss-Serie</dt>
           <dd>
             <strong>{summary.streak.current}</strong>
             <span>Bestwert {summary.streak.best}</span>
@@ -503,8 +502,10 @@ export default function CommitmentDashboard({
         )}
       </div>
 
-      <div className="cm-pauses">
-        <h3>Pause melden</h3>
+      <details className="cm-pauses" open={data.pauses.some((p) => p.status === "requested") || undefined}>
+        <summary>
+          <h3>Pause melden</h3>
+        </summary>
         <p className="cm-muted">
           Urlaub, Krankheit oder bewusster Abstand sind okay. In einer bestätigten Pause zählen die
           Tage nicht für deine Serie, sie wartet so lange. Eine Pause beginnt frühestens heute und
@@ -583,7 +584,7 @@ export default function CommitmentDashboard({
             ))}
           </ul>
         )}
-      </div>
+      </details>
     </section>
   );
 }
