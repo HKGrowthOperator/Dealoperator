@@ -10,7 +10,7 @@ The home page and `/ranking` now lead with the crew's results, followed by the s
 - Browser back/forward and reload preserve the URL selection.
 - Selecting a chart bar, calendar day or daily winner opens that day's ranking.
 
-`GET /api/ranking/month?month=YYYY-MM&day=YYYY-MM-DD` returns the selected day's rows plus the month's daily summaries and winners. Omit `day` for monthly rows. One date-bounded query supplies the whole response, respecting `participants.public_consent`. No private contact fields or reflections are selected. Future/invalid dates and days outside the selected month are rejected. The response is not cached.
+`GET /api/ranking/month?month=YYYY-MM&day=YYYY-MM-DD` returns the selected day's rows plus the month's daily summaries and winners. Omit `day` for monthly rows. One date-bounded query supplies the whole response; every reported day counts, there is no private mode. No private contact fields or reflections are selected. Future/invalid dates and days outside the selected month are rejected. The response is not cached.
 
 Daily bars are **daily values, never cumulative**. Missing days and unknown metrics are not fabricated zeros. Monthly aggregation is bounded to the selected month. Positive equal values retain every tied daily winner. Zero is a valid recorded value but is not celebrated as a daily win. Imported team profiles count once. Corrections replace the existing `(participant, day)` record and consequently update the archive; this is a view of reported day totals, not an immutable event snapshot.
 
