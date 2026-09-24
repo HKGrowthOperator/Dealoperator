@@ -16,6 +16,7 @@ import {
   Search,
   ShieldCheck,
   Sparkles,
+  UsersRound,
   X,
 } from "lucide-react";
 import {
@@ -841,6 +842,15 @@ function PersonalPanel({ home }: { home: HomeState }) {
       >
         {state.action}
       </Link>
+      {home.participant && (
+        <p className="rb-me-more">
+          <span>Jemanden zum Üben oder für Feedback?</span>
+          <Link className="do-link" href="/partner?modus=eigen">
+            <UsersRound size={16} aria-hidden="true" />
+            Call-Partner finden
+          </Link>
+        </p>
+      )}
     </section>
   );
 }
