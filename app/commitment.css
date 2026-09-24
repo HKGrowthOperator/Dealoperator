@@ -73,7 +73,7 @@
 }
 .cm-kicker {
   color: #486386;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
@@ -115,7 +115,7 @@
   line-height: 1.65;
 }
 .cm-small {
-  font-size: 12.5px;
+  font-size: 13px;
 }
 .cm-sr {
   position: absolute;
@@ -211,7 +211,7 @@
 }
 .cm-field-error {
   color: var(--cm-error-text);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -279,7 +279,7 @@
   gap: 6px;
   padding: 6px 12px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   background: var(--cm-soft);
@@ -317,7 +317,7 @@
   align-items: center;
   gap: 6px 8px;
   color: var(--cm-muted);
-  font-size: 13.5px;
+  font-size: 14px;
 }
 .cm-chip {
   display: inline-flex;
@@ -329,7 +329,7 @@
   background: #fff;
   color: #174a9e;
   font-weight: 650;
-  font-size: 13.5px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 .cm-chip:hover {
@@ -368,7 +368,7 @@
   display: block;
   margin-top: 3px;
   color: var(--cm-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 500;
 }
 /* Alle Zahlenkästen einer Gruppe sind gleich hoch, egal wie ihre Texte
@@ -411,7 +411,7 @@
 }
 .cm-count label small {
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.45;
 }
@@ -452,7 +452,7 @@
 }
 .cm-field > small {
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .cm-energy {
@@ -461,7 +461,7 @@
 }
 .cm-energy > small {
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .cm-energy-scale {
   display: grid;
@@ -554,7 +554,7 @@
   align-items: flex-start;
   gap: 8px;
   color: var(--cm-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.55;
 }
 .cm-draft-line svg {
@@ -647,7 +647,7 @@
   background: #ffffffb3;
 }
 .cm-imported dt {
-  font-size: 12px;
+  font-size: 13px;
 }
 .cm-imported dd {
   margin: 0;
@@ -708,7 +708,7 @@
 .cm-checklist li p {
   margin-top: 3px;
   color: var(--cm-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.55;
 }
 .cm-checklist-links {
@@ -767,7 +767,7 @@
 }
 .cm-strip-stats dt {
   color: #a9bedb;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 .cm-strip-stats dd {
@@ -805,7 +805,7 @@
 }
 .cm-stats dt {
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
   overflow-wrap: anywhere;
 }
@@ -824,13 +824,13 @@
 .cm-stats dd span {
   display: block;
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 .cm-stats p {
   margin-top: 8px;
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
   hyphens: auto;
 }
@@ -891,7 +891,7 @@
 }
 .cm-weekdays span {
   color: var(--cm-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   text-align: center;
 }
@@ -1019,7 +1019,7 @@
   align-items: flex-start;
   gap: 8px;
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.45;
 }
 .cm-legend strong {
@@ -1116,7 +1116,7 @@
 .cm-pause-list small {
   flex-basis: 100%;
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 .cm-pill {
@@ -1126,7 +1126,7 @@
   border-radius: 999px;
   background: var(--cm-soft);
   color: #174a9e;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 .cm-pill.p-approved {
@@ -1189,7 +1189,7 @@
 .cm-device-state p {
   margin-top: 3px;
   color: var(--cm-muted);
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.55;
 }
 .cm-device-state.ok {
@@ -1236,7 +1236,7 @@
   border-radius: 50%;
   background: var(--cm-blue);
   color: #fff;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 800;
 }
 .cm-ios-steps svg {
@@ -1310,7 +1310,7 @@
   display: block;
   margin-top: 2px;
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -1357,7 +1357,7 @@
 }
 .cm-devices small {
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* ---- Discord ------------------------------------------------------------ */
@@ -1383,7 +1383,7 @@
 }
 .cm-linked small {
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .cm-device-state .cm-link {
   display: inline;
@@ -1490,11 +1490,11 @@
 .cm-feed-card > header p {
   margin-top: 2px;
   color: var(--cm-text);
-  font-size: 13.5px;
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 .cm-feed-card > header .cm-muted {
-  font-size: 13px;
+  font-size: 14px;
 }
 .cm-dot {
   margin: 0 6px;
@@ -1512,7 +1512,7 @@
   align-items: center;
   gap: 8px;
   color: var(--cm-muted);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 .cm-energy-read strong {
@@ -1546,7 +1546,7 @@
 }
 .cm-feed-numbers dt {
   color: var(--cm-muted);
-  font-size: 11.5px;
+  font-size: 13px;
   font-weight: 650;
 }
 .cm-feed-numbers dd {
@@ -1562,7 +1562,7 @@
 .cm-feed-text h4 {
   margin: 14px 0 4px;
   color: #486386;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1584,7 +1584,7 @@
 }
 .cm-feed-card > footer small {
   color: var(--cm-muted);
-  font-size: 12.5px;
+  font-size: 13px;
   line-height: 1.5;
 }
 .cm-more {

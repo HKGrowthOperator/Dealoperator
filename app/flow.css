@@ -48,7 +48,7 @@
 .flow .flow-small {
   margin: 14px 0 0;
   color: var(--flow-soft);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
 }
 .flow .flow-status:empty {
@@ -74,7 +74,7 @@
 .flow-progress p {
   margin: 0 0 8px;
   color: var(--flow-soft);
-  font-size: 13px;
+  font-size: 14px;
 }
 .flow-progress p span {
   color: var(--flow-blue);
@@ -235,7 +235,7 @@
 .flow .flow-note {
   margin: 0;
   color: var(--flow-soft);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .flow .flow-note:empty {
@@ -370,7 +370,7 @@
 .flow-profile span {
   display: block;
   color: var(--flow-soft);
-  font-size: 13px;
+  font-size: 14px;
 }
 .flow-profile strong {
   display: block;
@@ -424,7 +424,7 @@
   gap: 8px;
   margin: 18px 0 0;
   color: var(--flow-soft);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
 }
 .flow-privacy svg {

@@ -103,7 +103,7 @@ body {
 .brand-sub {
   margin-left: 0;
   color: #647b9d;
-  font-size: 8px;
+  font-size: 13px;
   letter-spacing: 1.5px;
 }
 .app-sidebar [data-slot="sidebar-header"] {
@@ -200,7 +200,7 @@ body {
 }
 .section-kicker {
   color: #486386;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.035em;
   font-weight: 600;
 }
@@ -253,7 +253,7 @@ body {
 .hero-promise {
   justify-content: center;
   color: #b9cbe3;
-  font-size: 12px;
+  font-size: 13px;
 }
 .hero-promise svg {
   color: #68d8ff;
@@ -275,7 +275,7 @@ body {
   background: #f7faff;
   color: #254c7e;
   padding: 18px 24px;
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.035em;
 }
 .routine-eyebrow > span {
@@ -306,7 +306,7 @@ body {
 }
 .hero-step p {
   color: #b2c7e0;
-  font-size: 13px;
+  font-size: 14px;
   margin-top: 9px;
   line-height: 1.75;
 }
@@ -315,14 +315,14 @@ body {
   right: 24px;
   top: 35px;
   color: #83a3ca;
-  font-size: 11px;
+  font-size: 13px;
 }
 .hero-routine > a {
   grid-column: 1 / -1;
   border-top: 1px solid #38557a;
   color: #a1e4ff;
   padding: 17px 24px;
-  font-size: 13px;
+  font-size: 14px;
   background: #0b2342;
 }
 .hero-routine > a:hover {
@@ -357,7 +357,7 @@ body {
 }
 .crew-stats > div > span {
   color: #456187;
-  font-size: 12px;
+  font-size: 13px;
 }
 .crew-stats svg {
   color: #3b79d1;
@@ -427,7 +427,7 @@ body {
 }
 .discord-card .section-kicker {
   color: #9adfff;
-  font-size: 11px;
+  font-size: 13px;
 }
 .discord-card h2 {
   color: #fff;
@@ -451,7 +451,7 @@ body {
 }
 .discord-card small {
   color: #aec4e0;
-  font-size: 11px;
+  font-size: 13px;
 }
 .claim-teaser {
   background: #f7faff;
@@ -459,7 +459,7 @@ body {
 }
 .claim-teaser p {
   color: #52647e;
-  font-size: 13px;
+  font-size: 14px;
 }
 .claim-teaser > svg {
   color: #2860ae;
@@ -494,7 +494,7 @@ body {
 }
 .benefit-grid > a > span {
   color: #3971ba;
-  font-size: 12px;
+  font-size: 13px;
 }
 .benefit-grid h3 {
   color: #102f58;
@@ -509,7 +509,7 @@ body {
 .benefit-grid small {
   background: #deebff;
   color: #245696;
-  font-size: 11px;
+  font-size: 13px;
 }
 .operator-footer {
   max-width: none;
@@ -517,7 +517,7 @@ body {
   background: #fff;
   border-color: #d4e3f7;
   color: #526882;
-  font-size: 12px;
+  font-size: 13px;
 }
 .operator-footer p {
   color: #526882;
@@ -565,7 +565,7 @@ body {
 [data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-group-label"] {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 13px;
   margin-bottom: 10px;
 }
 [data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-menu-button"] {
@@ -669,7 +669,7 @@ body {
     font-size: 24px;
   }
   .operator-header .btn {
-    font-size: 12px;
+    font-size: 13px;
     padding: 11px 13px;
   }
   .operator-main > :is(.ranking-section, .community-benefits, .ranking-title) {
@@ -684,7 +684,7 @@ body {
     letter-spacing: -0.055em;
   }
   .hero-copy .section-kicker {
-    font-size: 12px;
+    font-size: 13px;
   }
   .hero-copy > p {
     font-size: 16px;
@@ -700,7 +700,7 @@ body {
     font-size: 14px;
   }
   .hero-step p {
-    font-size: 12px;
+    font-size: 13px;
   }
   .hero-step > small {
     right: 16px;
@@ -743,7 +743,7 @@ body {
     gap: 0;
   }
   .operator-header .btn {
-    font-size: 11px;
+    font-size: 13px;
     padding-inline: 11px;
     min-height: 41px;
     gap: 6px;
@@ -759,7 +759,7 @@ body {
     margin-block: 25px;
   }
   .hero-copy .section-kicker {
-    font-size: 10px;
+    font-size: 13px;
   }
   .hero-copy > p {
     font-size: 15px;
@@ -775,7 +775,7 @@ body {
     min-width: 230px;
   }
   .hero-promise {
-    font-size: 10px;
+    font-size: 13px;
     align-items: flex-start;
     text-align: left;
     max-width: 310px;
@@ -789,7 +789,7 @@ body {
     grid-template-columns: 1fr;
   }
   .routine-eyebrow {
-    font-size: 9px;
+    font-size: 13px;
     padding: 16px 18px;
   }
   .hero-step {
@@ -815,16 +815,16 @@ body {
     font-size: 14px;
   }
   .hero-step p {
-    font-size: 12px;
+    font-size: 13px;
     margin-top: 5px;
   }
   .hero-step > small {
     top: 25px;
     right: 12px;
-    font-size: 9px;
+    font-size: 13px;
   }
   .hero-routine > a {
-    font-size: 11px;
+    font-size: 13px;
     padding: 16px 18px;
   }
   .crew-stats > div {
@@ -834,7 +834,7 @@ body {
     font-size: 32px;
   }
   .crew-stats > div > span {
-    font-size: 11px;
+    font-size: 13px;
   }
   .benefit-grid > a {
     padding: 22px;
@@ -855,7 +855,7 @@ body {
     font-size: 20px;
   }
   .operator-header .btn {
-    font-size: 10px;
+    font-size: 13px;
     padding-inline: 9px;
   }
 }
