@@ -11,10 +11,12 @@ import {
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
+  Smartphone,
   Sparkles,
   UserSearch,
   UsersRound,
 } from "lucide-react";
+import Link from "next/link";
 import { berlinDate } from "@/lib/kpis";
 import { AKQUISE_DAY, eventLabel, formatDay } from "@/lib/ranking-history";
 import type { RankingEvent } from "@/lib/ranking-history";
@@ -275,6 +277,7 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
           ) : (
             <>
               {loaded.error && <Feedback error={loaded.error} />}
+              <PushDeviceHint />
               {tab === "inbox" && (
                 <InboxPanel
                   focus={focusEntry}
@@ -395,6 +398,40 @@ function inboxBody(item: InboxItem) {
       /seit (\d{4}-\d{2}-\d{2})/,
       (_, day: string) => `seit dem ${formatDay(day)}`,
     );
+}
+
+/**
+ * Team-Hinweise kommen als Push nur auf Geräte, die dieses Konto selbst
+ * eingerichtet hat. Fehlt das Handy, merkt man es erst, wenn eine Übernahme
+ * wartet; deshalb steht es hier.
+ */
+function PushDeviceHint() {
+  const [devices, setDevices] = useState<{ label: string }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/push", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { prefs?: { devices?: { label: string }[] } } | null) => {
+        if (alive) setDevices(d?.prefs?.devices ?? []);
+      })
+      .catch(() => alive && setDevices([]));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!devices || devices.some((d) => /iPhone|Android/.test(d.label))) return null;
+  return (
+    <p className="adm-push-hint">
+      <Smartphone size={18} aria-hidden="true" />
+      <span>
+        {devices.length === 0
+          ? "Dieses Konto hat kein Gerät für Push-Hinweise. Neue Übernahmen und Registrierungen kommen dann nur per E-Mail."
+          : `Push-Hinweise gehen bisher nur an: ${devices.map((d) => d.label).join(", ")}. Am Handy kommt nichts an.`}{" "}
+        Für das Handy: dort anmelden, Deal Operator als App hinzufügen und unter{" "}
+        <Link href="/profil?modus=eigen#erinnerungen">Benachrichtigungen</Link> einschalten.
+      </span>
+    </p>
+  );
 }
 
 function InboxPanel({

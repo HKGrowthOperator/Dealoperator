@@ -3964,3 +3964,26 @@ li[data-medal="gold"] .rb-bar i {
     grid-column: 1 / -1;
   }
 }
+
+/* Verwaltung: Push-Hinweise nur auf eingerichteten Geräten. */
+.adm-push-hint {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid color-mix(in oklab, var(--do-amber) 35%, white);
+  border-radius: var(--radius-m);
+  background: var(--do-amber-soft);
+  color: var(--do-ink);
+  font-size: var(--text-label);
+}
+.adm-push-hint svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--do-amber);
+}
+.adm-push-hint a {
+  color: var(--do-blue);
+  font-weight: 650;
+}
