@@ -87,14 +87,18 @@ export async function teamInbox(db: Database, actor: Actor) {
 /**
  * Registrierungen mit noch nicht bestätigter E-Mail — nur gesammelt, ohne
  * Push und ohne eigene Inbox-Einträge (die Adresse kann vertippt oder fremd
- * sein). Namen nur im geschützten Verwaltungsbereich.
+ * sein). Namen nur im geschützten Verwaltungsbereich. Kam die Mail nicht an,
+ * kann das Team sie von hier neu anfordern.
  */
 export async function unconfirmedRegistrations(db: Database, actor: Actor) {
   requireTeam(actor);
   const rows = await db.query(
-    `SELECT id,kind,full_name,created_at,updated_at FROM onboarding_requests
-      WHERE status='awaiting_email' AND updated_at > now() - interval '14 days'
-      ORDER BY updated_at DESC LIMIT 50`,
+    `SELECT r.id,r.kind,r.full_name,r.created_at,r.updated_at,
+            (SELECT max(e.created_at) FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='mail_sent') AS last_mail_at
+       FROM onboarding_requests r
+      WHERE r.status='awaiting_email' AND r.updated_at > now() - interval '14 days'
+      ORDER BY r.updated_at DESC LIMIT 50`,
   );
   const [{ n }] = await db.query(
     "SELECT count(*)::int AS n FROM onboarding_requests WHERE status='awaiting_email' AND updated_at > now() - interval '14 days'",
@@ -106,6 +110,7 @@ export async function unconfirmedRegistrations(db: Database, actor: Actor) {
       kind: r.kind as "new" | "claim",
       name: r.full_name as string,
       since: new Date(r.updated_at).toISOString(),
+      lastMail: r.last_mail_at ? new Date(r.last_mail_at).toISOString() : null,
     })),
   };
 }

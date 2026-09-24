@@ -325,6 +325,42 @@ export async function markMailSent(db: Database, id: string, email: string) {
   await log(db, id, email, "mail_sent", "");
 }
 
+/** Wie lange eine vom Team neu geschickte Bestätigung die Anfrage bindet. */
+export const TEAM_RESEND_DAYS = 7;
+
+/**
+ * Das Team schickt die Bestätigungsmail einer Registrierung noch einmal, etwa
+ * wenn die erste Mail nie ankam. Die Mail geht nur an die Adresse aus der
+ * Anfrage; bestätigen kann also nur, wer dieses Postfach hat. Danach meldet
+ * sich die Person mit ihrem Passwort an, und die Anfrage wird wie gewohnt
+ * gebunden (Übernahmen gehen in die Teamprüfung). Der Versand selbst ist
+ * übergeben (`send`), damit er ohne Browser-Sitzung des Teams läuft.
+ */
+export async function resendConfirmationByTeam(
+  db: Database,
+  actor: Actor,
+  raw: unknown,
+  send: (email: string, request: string) => Promise<void>,
+) {
+  if (!isTeam(actor)) throw new AppError("Nur für das Team.", 403);
+  const { id } = z.object({ id: z.string().uuid() }).strict().parse(raw);
+  const [r] = await db.query("SELECT id,email,status FROM onboarding_requests WHERE id=$1", [id]);
+  if (!r) throw new AppError("Diese Anfrage gibt es nicht mehr.", 404);
+  if (r.status !== "awaiting_email")
+    throw new AppError("Die E-Mail dieser Anfrage ist schon bestätigt oder die Anfrage ist erledigt.", 409);
+  await rateLimit(
+    db,
+    `team-resend:${id}`,
+    3,
+    3600,
+    "Für diese Anfrage gingen in der letzten Stunde schon mehrere Mails raus. Bitte später noch einmal.",
+  );
+  await send(r.email as string, id);
+  await log(db, id, actor.userId, "team_resent", "");
+  await log(db, id, actor.userId, "mail_sent", "team");
+  return { ok: true };
+}
+
 async function log(
   tx: Database,
   request: string,
@@ -367,12 +403,17 @@ export async function bindConfirmedRequest(
           [actor.email, requestId],
         )
       : await tx.query(
-          `SELECT * FROM onboarding_requests
-            WHERE lower(email)=$1 AND status='awaiting_email'
-              AND updated_at > now() - interval '2 hours'
-            ORDER BY updated_at DESC LIMIT 1
-            FOR UPDATE`,
-          [actor.email],
+          // Ausnahme: das Team hat die Bestätigung für genau diese Anfrage
+          // neu geschickt. Dann zählt sie einige Tage, auch ohne Cookie.
+          `SELECT r.* FROM onboarding_requests r
+            WHERE lower(r.email)=$1 AND r.status='awaiting_email'
+              AND (r.updated_at > now() - interval '2 hours'
+                OR EXISTS(SELECT 1 FROM onboarding_events e
+                           WHERE e.request=r.id AND e.action='team_resent'
+                             AND e.created_at > now() - make_interval(days => $2)))
+            ORDER BY r.updated_at DESC LIMIT 1
+            FOR UPDATE OF r`,
+          [actor.email, TEAM_RESEND_DAYS],
         );
     if (!request) return null;
     if (onlyParticipant !== undefined && request.participant !== onlyParticipant) return null;
@@ -557,6 +598,8 @@ export async function reviewQueue(db: Database, actor: Actor) {
             (SELECT e.note FROM onboarding_events e
               WHERE e.request=r.id AND e.action='applicant_answered'
               ORDER BY e.created_at DESC LIMIT 1) AS applicant_answer,
+            (SELECT max(e.created_at) FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='mail_sent') AS last_mail_at,
             (SELECT count(*) FROM onboarding_requests o
               WHERE o.participant=r.participant AND o.id<>r.id
                 AND o.status IN (${OPEN_LIST})) AS competing,

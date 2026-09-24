@@ -12,6 +12,7 @@ import {
   noteConfirmedAccount,
   requestClaimSignedIn,
   requestForActor,
+  resendConfirmationByTeam,
   reviewQueue,
   startRequest,
 } from "../server/onboarding";
@@ -519,4 +520,53 @@ test("a signed-in takeover pushes once with the requested profile; assignment re
   const [other] = await db.query("SELECT body,url FROM notifications WHERE channel='push' AND ref=$1", [`registration:${open.id}`]);
   assert.match(other.body, /^Bob Beispiel möchte ein bestehendes Profil übernehmen\./);
   assert.equal(other.url, `/verwaltung?bereich=uebernahmen&anfrage=${open.id}`);
+});
+
+test("the team sends the confirmation again; after the click the request binds days later, review stays", async () => {
+  const p = await profile("Alice B.");
+  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" });
+  // Die erste Mail kam nie an; die Anfrage ist einen Tag alt.
+  await db.query("UPDATE onboarding_requests SET updated_at=now()-interval '1 day' WHERE id=$1", [r.id]);
+  assert.equal(await bindConfirmedRequest(db, alice, null), null);
+
+  const sent: [string, string][] = [];
+  const send = async (email: string, request: string) => {
+    sent.push([email, request]);
+  };
+  // Nur das Team, nur offene unbestätigte Anfragen.
+  await assert.rejects(resendConfirmationByTeam(db, alice, { id: r.id }, send), /Nur für das Team/);
+  await assert.rejects(resendConfirmationByTeam(db, mo, { id: randomUUID() }, send), /gibt es nicht/);
+  assert.deepEqual(await resendConfirmationByTeam(db, mo, { id: r.id }, send), { ok: true });
+  assert.deepEqual(sent, [[alice.email, r.id]]);
+  const events = await db.query("SELECT actor,action,note FROM onboarding_events WHERE request=$1 AND action IN ('team_resent','mail_sent') ORDER BY id", [r.id]);
+  assert.deepEqual(events.map((e) => `${e.actor}:${e.action}:${e.note}`), ["mo:team_resent:", "mo:mail_sent:team"]);
+  assert.ok((await reviewQueue(db, admin)).find((q) => q.id === r.id)?.last_mail_at);
+
+  // Ein Versand, der scheitert, gilt nicht als geschickt.
+  const failing = async () => {
+    throw new Error("SMTP");
+  };
+  await assert.rejects(resendConfirmationByTeam(db, admin, { id: r.id }, failing), /SMTP/);
+  assert.equal(await count("SELECT count(*) AS n FROM onboarding_events WHERE request=$1 AND action='team_resent'", [r.id]), 1);
+
+  // Nach dem Klick meldet sich Alice ohne Cookie an: die Anfrage wird gebunden
+  // und geht in die Teamprüfung, nichts wird automatisch freigegeben.
+  const bound = await bindConfirmedRequest(db, alice, null);
+  assert.equal(bound?.id, r.id);
+  assert.equal((await db.query("SELECT status FROM onboarding_requests WHERE id=$1", [r.id]))[0].status, "pending");
+  assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, null);
+  // Erledigt: kein weiterer Versand.
+  await assert.rejects(resendConfirmationByTeam(db, mo, { id: r.id }, send), /schon bestätigt/);
+  assert.equal(sent.length, 1);
+});
+
+test("a team resend binds only for a week and is limited per request", async () => {
+  const p = await profile("Alice B.");
+  const r = await startRequest(db, { kind: "claim", participantId: p, email: alice.email, fullName: "Alice Beispiel", phone: "+49 170 1234567" });
+  const send = async () => undefined;
+  for (let i = 0; i < 3; i++) await resendConfirmationByTeam(db, admin, { id: r.id }, send);
+  await assert.rejects(resendConfirmationByTeam(db, admin, { id: r.id }, send), /mehrere Mails/);
+  await db.query("UPDATE onboarding_requests SET updated_at=now()-interval '9 days' WHERE id=$1", [r.id]);
+  await db.query("UPDATE onboarding_events SET created_at=now()-interval '8 days' WHERE request=$1", [r.id]);
+  assert.equal(await bindConfirmedRequest(db, alice, null), null);
 });

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 import { AppError } from "./operator";
 import { safeNext } from "../lib/navigation";
 
@@ -45,6 +46,25 @@ export function emailRedirect(
   if (via) url.searchParams.set("via", via);
   if (request) url.searchParams.set("anfrage", request);
   return url.toString();
+}
+
+/**
+ * Bestätigungsmail einer Registrierung erneut senden, ausgelöst vom Team.
+ * Eigener Client ohne Cookies: Der PKCE-Schlüssel bleibt im Speicher dieser
+ * Anfrage und verfällt. Der Link bestätigt so nur die Adresse und öffnet in
+ * keinem Browser eine Sitzung, auch nicht in dem des Teams. Angemeldet wird
+ * danach wie immer mit E-Mail und Passwort.
+ */
+export async function resendSignupForTeam(email: string, request: string) {
+  const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { flowType: "pkce", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const { error } = await client.auth.resend({
+    type: "signup",
+    email,
+    options: { emailRedirectTo: emailRedirect("/tagesabschluss", "starten", request) },
+  });
+  if (error) throw sendFailure(error);
 }
 
 /**

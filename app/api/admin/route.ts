@@ -25,6 +25,9 @@ import {
 import { discordStatus, discordInventory } from "@/server/discord-admin";
 import { runDiscordRooms } from "@/server/discord-sessions";
 import { designateRole, setTeamRole, teamList } from "@/server/roles";
+import { resendConfirmationByTeam } from "@/server/onboarding";
+import { resendSignupForTeam } from "@/server/email-auth";
+import { authReady } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -112,6 +115,9 @@ export async function POST(request: Request) {
         return json(await setTeamRole(db, actor, v));
       case "designateRole":
         return json(await designateRole(db, actor, v));
+      case "resendConfirmation":
+        if (!authReady()) throw new AppError("Die Anmeldung ist noch nicht eingerichtet.", 503);
+        return json(await resendConfirmationByTeam(db, actor, v, resendSignupForTeam));
       default:
         throw new AppError("Unbekannte Aktion.");
     }
