@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  CalendarDays,
   Check,
   CircleAlert,
   CircleCheck,
@@ -21,6 +22,7 @@ import {
   previousDueDay,
   summarize,
   type Closing,
+  type ImportedDay,
   type CommitmentSettings,
   type DayStatus,
   type Pause,
@@ -54,8 +56,8 @@ const COUNT_LABELS: Record<CountKey, string> = {
   attempts: "Anwahlen",
   settingsBooked: "Settings vereinbart",
   closingsBooked: "Closings vereinbart",
-  settingsHeld: "Settings gehalten",
-  closingsHeld: "Closings gehalten",
+  settingsHeld: "Settings durchgeführt",
+  closingsHeld: "Closings durchgeführt",
   dealsWon: "Deals gewonnen",
 };
 const COUNT_HINTS: Record<CountKey, string> = {
@@ -262,6 +264,17 @@ export function formatMoment(iso: string, timeZone = "Europe/Berlin") {
     timeZone,
   }).format(new Date(iso))} Uhr`;
 }
+/** „heute 10:00 Uhr“, „morgen 10:00 Uhr“ oder „Mo. 10:00 Uhr“: kurz für die Statuszeile. */
+export function formatDeadlineShort(iso: string, timeZone = "Europe/Berlin", now = Date.now()) {
+  const day = localDay(new Date(iso), timeZone);
+  const today = localDay(new Date(now), timeZone);
+  const tomorrow = localDay(new Date(now + 86_400_000), timeZone);
+  const clock = formatClock(iso, timeZone);
+  if (day === today) return `heute ${clock} Uhr`;
+  if (day === tomorrow) return `morgen ${clock} Uhr`;
+  const weekday = new Intl.DateTimeFormat("de-DE", { weekday: "short", timeZone }).format(new Date(iso));
+  return `${weekday} ${clock} Uhr`;
+}
 export function formatClock(iso: string, timeZone = "Europe/Berlin") {
   return new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
@@ -286,11 +299,21 @@ export function commitmentClosings(rows: ClosingRecord[]): Closing[] {
       callsDocumentedAt: r.callsDocumentedAt ?? null,
     }));
 }
+/** Übernommene Tage ohne eigenen Abschluss, wie toImported() auf dem Server. */
+export function commitmentImports(rows: ClosingRecord[]): ImportedDay[] {
+  return rows
+    .filter((r) => r.origin === "import")
+    .map((r) => ({
+      day: r.day,
+      attempts: typeof r.counts.attempts === "number" ? r.counts.attempts : null,
+    }));
+}
 /** Status eines einzelnen Tages nach denselben Regeln wie auf dem Server. */
 export function statusOf(state: ClosingState, day: string): DayStatus {
   try {
     const result = summarize({
       closings: commitmentClosings(state.closings),
+      imported: commitmentImports(state.closings),
       pauses: approvedPauses(state.pauses),
       trackingStart: state.trackingStart,
       from: day,
@@ -366,7 +389,7 @@ export function EligibilityChecklist({
           key: "profile",
           done: !needs.has("profile") && !needs.has("login"),
           title: "Eigenes persönliches Profil",
-          text: "Lege ein neues Profil an oder frag die Übernahme an, wenn deine Zahlen schon im Ranking stehen.",
+          text: "Lege ein neues Profil an oder frag die Übernahme an, wenn deine Zahlen schon in der Rangliste stehen.",
           links: [
             { href: `/start?weiter=eigen&next=${encodeURIComponent(next)}`, label: "Profil anlegen" },
             { href: "/profil-uebernehmen", label: "Meine Zahlen sind schon hier" },
@@ -461,7 +484,7 @@ type Confirmation = {
   publicConsent: boolean;
   /** Aktuelle Abschluss-Serie nach dem Einreichen, falls bekannt. */
   streak: number | null;
-  /** Neu erreichte Leistungslevel, z. B. „Dialer Level 2“. Nur echte Sprünge. */
+  /** Neu erreichte Leistungslevel, z. B. „Anwahlen auf Level 2“. Nur echte Sprünge. */
   levelUps: string[];
 };
 
@@ -475,7 +498,7 @@ function levelUps(before: ClosingState, after: ClosingState) {
   const old = new Map(levelsOf(before).map((t) => [t.id, t.level]));
   return levelsOf(after)
     .filter((t) => t.level > (old.get(t.id) ?? 0))
-    .map((t) => `${t.label} Level ${t.level}`);
+    .map((t) => `${t.label} auf Level ${t.level}`);
 }
 type FieldKey = CountKey | "energy" | "win" | "next" | "acknowledged";
 
@@ -633,6 +656,8 @@ export default function ClosingForm({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [showOptional, setShowOptional] = useState(false);
+  // Die Tagesauswahl erscheint erst auf Wunsch: meistens geht es um heute.
+  const [pickDay, setPickDay] = useState(false);
 
   const timer = useRef<number | null>(null);
   const pending = useRef<FormState | null>(null);
@@ -1015,7 +1040,16 @@ export default function ClosingForm({
         : hasDraft
           ? { tone: "draft", icon: <Check size={15} aria-hidden="true" />, text: "Entwurf gespeichert" }
           : due
-            ? { tone: "open", icon: null, text: status === "missed" ? "Nachtragen möglich" : "Noch offen" }
+            ? {
+                tone: "open",
+                icon: null,
+                text:
+                  status === "missed"
+                    ? "Nachtragen möglich"
+                    : deadline && nowMs < deadline.getTime()
+                      ? `Offen · bis ${formatDeadlineShort(deadline.toISOString(), tz, nowMs)}`
+                      : "Noch offen",
+              }
             : { tone: "free", icon: null, text: paused ? "Pause" : "Freiwillig" };
 
   const dayNote = (() => {
@@ -1026,8 +1060,8 @@ export default function ClosingForm({
     if (!due)
       return "Kein Calling-Tag: Ein Abschluss ist freiwillig. Er zählt als Bonus, deine Serie bleibt unberührt.";
     if (submitted) return null;
-    if (deadline && nowMs < deadline.getTime())
-      return `Für deine Serie rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
+    // Die laufende Frist steht schon in der Statuszeile.
+    if (deadline && nowMs < deadline.getTime()) return null;
     if (deadline)
       return `Rechtzeitig war bis ${formatMoment(deadline.toISOString(), tz)}. Deine Zahlen zählen trotzdem, nur für die Serie zählt der Tag nicht mehr.`;
     return null;
@@ -1160,26 +1194,47 @@ export default function ClosingForm({
       </header>
 
       <div className="md-day">
-        <label htmlFor={`${uid}-day`}>Anderen Tag wählen</label>
-        <div className="md-day-row">
-          <input
-            id={`${uid}-day`}
-            type="date"
-            value={form.day}
-            max={today}
-            min={state.firstClosableDay || undefined}
-            disabled={busy}
-            onChange={(e) => {
-              const day = e.target.value;
-              if (/^\d{4}-\d{2}-\d{2}$/.test(day)) selectDay(day);
-            }}
-          />
-          {form.day !== today && (
-            <button type="button" className="do-button do-button-secondary" onClick={() => selectDay(today)}>
-              Heute
+        {pickDay ? (
+          <>
+            <label htmlFor={`${uid}-day`}>Anderen Tag wählen</label>
+            <div className="md-day-row">
+              <input
+                id={`${uid}-day`}
+                type="date"
+                value={form.day}
+                max={today}
+                min={state.firstClosableDay || undefined}
+                disabled={busy}
+                onChange={(e) => {
+                  const day = e.target.value;
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) selectDay(day);
+                }}
+              />
+              {form.day !== today && (
+                <button type="button" className="do-button do-button-secondary" onClick={() => selectDay(today)}>
+                  Heute
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="md-day-links">
+            <button
+              type="button"
+              className="do-link"
+              aria-expanded={false}
+              onClick={() => setPickDay(true)}
+            >
+              <CalendarDays size={16} aria-hidden="true" />
+              Anderen Tag wählen
             </button>
-          )}
-        </div>
+            {form.day !== today && (
+              <button type="button" className="do-link" onClick={() => selectDay(today)}>
+                Zu heute
+              </button>
+            )}
+          </div>
+        )}
         {otherDrafts.length > 0 && (
           <p className="cm-other-drafts">
             Weitere Entwürfe:{" "}
@@ -1425,8 +1480,9 @@ export default function ClosingForm({
                   }}
                 />
                 <span>
-                  Verstanden. Diese Frage kommt nur einmal.
+                  Verstanden
                   <span className="cm-required" aria-hidden="true"> *</span>
+                  <small>Dieser Hinweis erscheint nur vor deinem ersten Abschluss.</small>
                 </span>
               </label>
               {ackError && (

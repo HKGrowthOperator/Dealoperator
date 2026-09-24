@@ -72,8 +72,8 @@ export default async function Page({
                 Call-Partner für den nächsten Calling-Tag?{" "}
                 <a href={discordDestination().url} target="_blank" rel="noopener noreferrer">
                   Im Discord Sessions und Roleplay finden
+                  <span className="do-sr"> (neues Fenster)</span>
                 </a>
-                <span> (öffnet Discord)</span>
               </p>
               <PushPrompt settings={initial?.settings} variant="after-submit" />
             </>

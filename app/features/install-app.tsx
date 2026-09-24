@@ -39,6 +39,16 @@ export function keepInstallPrompt(event: Event) {
 
 type Platform = "unknown" | "installed" | "ios" | "android" | "mac-safari" | "desktop";
 
+/** Safari auf iPhone/iPad bzw. Chrome auf Android: dort heißen Menüs anders. */
+function readBrowser(): "default" | "other" {
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod|Macintosh/.test(ua))
+    return /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua) ? "other" : "default";
+  if (/Android/.test(ua))
+    return /SamsungBrowser|Firefox|OPR|EdgA/.test(ua) ? "other" : "default";
+  return "default";
+}
+
 function readPlatform(): Platform {
   const ua = navigator.userAgent;
   const standalone =
@@ -71,6 +81,7 @@ const TITLE: Record<Exclude<Platform, "unknown" | "installed">, string> = {
 export default function InstallApp() {
   const platform = useSyncExternalStore(subscribe, readPlatform, () => "unknown" as Platform);
   const canPrompt = useSyncExternalStore(subscribe, () => !!deferred, () => false);
+  const browser = useSyncExternalStore(subscribe, readBrowser, () => "default" as const);
   const [result, setResult] = useState("");
 
   async function install() {
@@ -123,8 +134,17 @@ export default function InstallApp() {
               <li>
                 <Share size={17} aria-hidden="true" />
                 <span>
-                  Tippe in Safari auf <strong>Teilen</strong>. Bei neueren iOS-Versionen steckt es
-                  unter <strong>„…“</strong>.
+                  {browser === "default" ? (
+                    <>
+                      Tippe in Safari auf <strong>Teilen</strong>. Bei neueren iOS-Versionen steckt es
+                      unter <strong>„…“</strong>.
+                    </>
+                  ) : (
+                    <>
+                      Tippe in der Adressleiste auf <strong>Teilen</strong>. Klappt das nicht, öffne
+                      diese Seite in Safari.
+                    </>
+                  )}
                 </span>
               </li>
               <li>
@@ -147,7 +167,13 @@ export default function InstallApp() {
               <li>
                 <EllipsisVertical size={17} aria-hidden="true" />
                 <span>
-                  Öffne in Chrome das Menü <strong>⋮</strong>.
+                  {browser === "default" ? (
+                    <>
+                      Öffne in Chrome das Menü <strong>⋮</strong>.
+                    </>
+                  ) : (
+                    <>Öffne das Menü deines Browsers.</>
+                  )}
                 </span>
               </li>
               <li>

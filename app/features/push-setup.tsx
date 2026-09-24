@@ -379,7 +379,6 @@ export default function PushSetup({
     <section id="erinnerungen" className="cm-card cm-push" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
-          <p className="cm-kicker">ERINNERUNGEN</p>
           <h2 id={`${uid}-title`}>Push auf deinem Gerät</h2>
         </div>
         <p className="cm-muted">
@@ -420,7 +419,6 @@ export default function PushSetup({
           </div>
         </div>
       )}
-
 
       <div className="cm-actions">
         {canEnable && (
@@ -494,7 +492,11 @@ export default function PushSetup({
               <span className="cm-switch-track" aria-hidden="true" />
               <span>
                 <strong>Erinnerungen an meinen Tagesabschluss</strong>
-                <small>Abends und vor der Frist, wie oben beschrieben.</small>
+                <small>
+                  {devices.length
+                    ? "Abends und vor der Frist, wie oben beschrieben."
+                    : "Gilt, sobald ein Gerät eingetragen ist."}
+                </small>
               </span>
             </label>
           </div>
@@ -737,19 +739,42 @@ export function PushPrompt({
           Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um{" "}
           {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.
         </p>
-        <div className="cm-push-prompt-actions">
-          <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
-            {busy ? (
-              <LoaderCircle className="spin" size={17} aria-hidden="true" />
-            ) : (
-              <Bell size={17} aria-hidden="true" />
-            )}
-            Erinnerungen einschalten
-          </button>
-          <button type="button" className="btn secondary" onClick={postpone}>
-            {variant === "after-submit" ? "Nein, danke" : "Später"}
-          </button>
-        </div>
+        {variant === "after-submit" ? (
+          // In der Bestätigung bleibt „Zu den Ergebnissen“ der einzige
+          // Hauptknopf; das einmalige Angebot ist ruhig und bricht um.
+          <div className="cm-push-prompt-actions">
+            <button
+              type="button"
+              className="do-button do-button-secondary"
+              disabled={busy}
+              onClick={() => void enable()}
+            >
+              {busy ? (
+                <LoaderCircle className="spin" size={17} aria-hidden="true" />
+              ) : (
+                <Bell size={17} aria-hidden="true" />
+              )}
+              Erinnerungen einschalten
+            </button>
+            <button type="button" className="do-link" onClick={postpone}>
+              Nein, danke
+            </button>
+          </div>
+        ) : (
+          <div className="cm-push-prompt-actions">
+            <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
+              {busy ? (
+                <LoaderCircle className="spin" size={17} aria-hidden="true" />
+              ) : (
+                <Bell size={17} aria-hidden="true" />
+              )}
+              Erinnerungen einschalten
+            </button>
+            <button type="button" className="btn secondary" onClick={postpone}>
+              Später
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );

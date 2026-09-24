@@ -75,6 +75,9 @@ export default function DiscordLink({
     };
   }, [initial]);
 
+  // Solange die Verknüpfung nicht angeboten wird, gibt es hier nichts zu tun.
+  const hidden = !!state && !state.available && !state.link && !notice && !error;
+
   async function start() {
     setBusy(true);
     setNotice(null);
@@ -103,11 +106,11 @@ export default function DiscordLink({
     }
   }
 
+  if (hidden) return null;
   return (
     <section className="cm-card cm-discord" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
-          <p className="cm-kicker">DISCORD</p>
           <h2 id={`${uid}-title`}>Discord-Konto verknüpfen</h2>
         </div>
         <p className="cm-muted">
