@@ -19,10 +19,10 @@ import { noteLinkOpened } from "@/server/onboarding";
  *   abgelaufen — Supabase meldet einen abgelaufenen Link
  *   verwendet  — Link bereits eingelöst
  *   browser    — PKCE-Link in einem anderen Browser geöffnet (kein Verifier)
- *   bestaetigt — dasselbe bei der Registrierung: Supabase hat die Adresse
- *                bestätigt (sonst gäbe es keinen code), nur dieses Gerät
- *                bekommt keine Sitzung. Das Gerät, auf dem registriert wurde,
- *                meldet sich dann selbst an (siehe /starten).
+ *   bestaetigt — Registrierung, Einlösen gescheitert: Supabase hat die
+ *                Adresse bestätigt (sonst gäbe es keinen code), nur dieses
+ *                Gerät bekommt keine Sitzung. Das wartende Gerät meldet sich
+ *                selbst an, sonst mit E-Mail und Passwort (siehe /starten).
  *   technik    — Supabase gerade nicht erreichbar
  *   link       — unvollständig oder unbekannt
  * Ist bereits eine gültige Sitzung da, gibt es keinen Fehler, sondern es geht
@@ -103,7 +103,12 @@ export async function GET(request: Request) {
   if (await getCurrentUser()) return forward(base, next);
 
   if ((error.status || 0) >= 500) return back(base, "technik", next, via);
-  if (!hasVerifier && via === "starten") {
+  // Registrierung: Einen code gibt es nur, wenn Supabase die Adresse gerade
+  // bestätigt hat. Scheitert allein das Einlösen (anderes Gerät, ein älterer
+  // Schlüssel in diesem Browser, eine vom Team neu geschickte Mail), bleibt
+  // die Adresse bestätigt. Dann geht es mit der Anmeldung weiter statt mit
+  // einer Fehlermeldung, die zu einer weiteren, nie kommenden Mail rät.
+  if (via === "starten") {
     if (databaseReady()) await noteLinkOpened(database(), requestId).catch(() => undefined);
     return go(base, "/starten?bestaetigt=1");
   }

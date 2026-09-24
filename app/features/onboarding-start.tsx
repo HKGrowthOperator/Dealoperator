@@ -649,13 +649,13 @@ export default function OnboardingStart({
               E-Mail bestätigt.
             </h1>
             <p className="flow-lead">
-              Auf dem Gerät, auf dem du dich registriert hast, geht es jetzt von
-              selbst weiter. Du willst hier weitermachen? Dann melde dich mit
-              E-Mail und Passwort an.
+              Melde dich jetzt mit deiner E-Mail und deinem Passwort an. Ist die
+              Seite, auf der du dich registriert hast, noch offen, geht es dort
+              auch von selbst weiter.
             </p>
             <div className="flow-actions">
               <Link className="btn primary full" href="/anmelden?next=%2Ftagesabschluss">
-                Hier anmelden
+                Anmelden
               </Link>
             </div>
           </>
