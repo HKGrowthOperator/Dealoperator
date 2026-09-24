@@ -255,7 +255,7 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
             <dd>{request.email}</dd>
           </div>
           <div>
-            <dt>Telefon (nicht geprüft)</dt>
+            <dt>Telefon</dt>
             <dd>{formatPhone(request.phone)}</dd>
           </div>
           {request.hint && (

@@ -45,8 +45,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
       <p className="hint">
         {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Für deinen
         eigenen Tagesabschluss und das Lesen der Reflexionen brauchst du eine
-        Telefonnummer mit Ländervorwahl. Sie wird nicht per SMS geprüft und ist
-        nur für das Team sichtbar.
+        Telefonnummer mit Ländervorwahl. Sie ist nur für das Team sichtbar.
       </p>
       {error && (
         <p className="form-error" role="alert">

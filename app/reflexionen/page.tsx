@@ -47,8 +47,7 @@ export default async function Page() {
             </h2>
             <p>
               Lesen können alle Angemeldeten mit bestätigter E-Mail, hinterlegter Telefonnummer und
-              eigenem Profil. Die Telefonnummer wird nicht per SMS geprüft; wer neu ist, kann sich
-              selbst registrieren.
+              eigenem Profil.
             </p>
             <p>
               Zahlen stehen nur auf den Karten von Personen, die der öffentlichen Anzeige

@@ -206,7 +206,7 @@ export default function MemberOnboarding({
               </div>
               <p id={`${id}-phone-note`} className={errors.phone ? "flow-field-error" : "flow-note"}>
                 {errors.phone ||
-                  "Nur für dich und das Team sichtbar. Wird nicht per SMS geprüft."}
+                  "Nur für dich und das Team sichtbar."}
               </p>
             </div>
           )}

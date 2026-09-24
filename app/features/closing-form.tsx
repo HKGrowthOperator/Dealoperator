@@ -365,7 +365,7 @@ export function EligibilityChecklist({
       key: "phone",
       done: !needs.has("phone") && !needs.has("login"),
       title: "Telefonnummer hinterlegt",
-      text: "Mit Ländervorwahl, zum Beispiel +49 … Sie wird nicht per SMS geprüft und ist nur für das Team sichtbar.",
+      text: "Mit Ländervorwahl, zum Beispiel +49 … Sie ist nur für das Team sichtbar.",
       links: [{ href: "/profil?modus=eigen", label: "Nummer im Profil ergänzen" }],
     },
   ];
@@ -1358,8 +1358,7 @@ export default function ClosingForm({
                 in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
                 zugestimmt hast. Deine Reflexion erscheint im Austausch unter
                 /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,
-                hinterlegter Telefonnummer und eigenem Profil. Die Telefonnummer wird
-                nicht per SMS geprüft; wer neu ist, kann sich selbst registrieren.
+                hinterlegter Telefonnummer und eigenem Profil.
               </p>
               <p className="cm-muted">
                 {eligibility.participant?.publicConsent

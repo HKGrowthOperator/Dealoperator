@@ -498,11 +498,11 @@ export function ContactFields({
             {errors.phone}
           </p>
         ) : (
-          <p id={`${id}-phone-note`} className="flow-note">
-            {country?.trunk
-              ? "Mit oder ohne führende 0. Wird nicht per SMS geprüft."
-              : "Wird nicht per SMS geprüft."}
-          </p>
+          country?.trunk && (
+            <p id={`${id}-phone-note`} className="flow-note">
+              Mit oder ohne führende 0.
+            </p>
+          )
         )}
       </div>
 
