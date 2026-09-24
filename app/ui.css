@@ -449,8 +449,15 @@ button.do-link {
     color: var(--do-blue);
   }
   @media (max-width: 374px) {
+    /* Sehr schmale Handys: volle Spaltenbreite, damit „Reflexionen“ passt. */
+    .do-tabbar {
+      padding-right: env(safe-area-inset-right);
+      padding-left: env(safe-area-inset-left);
+    }
     .do-tabbar a {
+      padding: 4px 0;
       font-size: var(--text-meta);
+      letter-spacing: -0.01em;
     }
   }
   .do-tabbar a[aria-current="page"] svg {
