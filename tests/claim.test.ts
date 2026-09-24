@@ -171,6 +171,17 @@ test("a question from the team can be answered and goes back into review", async
   assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, null);
 });
 
+test("a rejection needs a reason for the person and leaves the request open without one", async () => {
+  const p = await profile("Alice B.");
+  const r = await requestClaimSignedIn(db, alice, details(p));
+  await assert.rejects(
+    decideRequest(db, admin, { id: r.id, decision: "reject", applicantMessage: " " }),
+    /Grund der Ablehnung/,
+  );
+  const [row] = await db.query("SELECT status FROM onboarding_requests WHERE id=$1", [r.id]);
+  assert.equal(row.status, "pending");
+});
+
 test("after a rejection the account can ask for another profile or start its own", async () => {
   const p = await profile("Alice B.");
   const q = await profile("Alice Beispiel");
@@ -178,7 +189,7 @@ test("after a rejection the account can ask for another profile or start its own
   await decideRequest(db, admin, { id: r.id, decision: "reject", applicantMessage: "Das Profil gehört jemand anderem." });
   const next = await requestClaimSignedIn(db, alice, details(q));
   assert.notEqual(next.id, r.id);
-  await decideRequest(db, admin, { id: next.id, decision: "reject" });
+  await decideRequest(db, admin, { id: next.id, decision: "reject", applicantMessage: "Wir konnten die Zuordnung nicht bestätigen." });
   const own = await createMember(db, alice, { name: "Alice", company: "", role: "", publicConsent: false });
   assert.ok(own.id);
 });
@@ -210,7 +221,7 @@ test("an old unconfirmed request turned into a takeover counts as the newest", a
   await db.query("UPDATE onboarding_requests SET status='superseded' WHERE participant=$1 AND id<>$2", [p, forQ.id]);
   const bound = await bindConfirmedRequest(db, alice, forQ.id);
   assert.ok(bound);
-  await decideRequest(db, admin, { id: forQ.id, decision: "reject" });
+  await decideRequest(db, admin, { id: forQ.id, decision: "reject", applicantMessage: "Wir konnten die Zuordnung nicht bestätigen." });
   await requestClaimSignedIn(db, alice, details(p));
   const mine = await requestForActor(db, alice);
   assert.equal(mine?.status, "pending");

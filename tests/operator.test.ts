@@ -839,7 +839,7 @@ test("a rejected applicant can still start a separate new profile", async () => 
   const { createMember } = await import("../server/operator");
   const id = await imported();
   const requestId = await request(id, alice);
-  await decideRequest(db, admin, { id: requestId, decision: "reject" });
+  await decideRequest(db, admin, { id: requestId, decision: "reject", applicantMessage: "Wir konnten die Zuordnung nicht bestätigen." });
   const result = await createMember(db, alice, {
     name: "Alice neu",
     company: "",

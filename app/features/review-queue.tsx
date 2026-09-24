@@ -5,7 +5,6 @@ import {
   Clock,
   LoaderCircle,
   MessageCircleQuestion,
-  ShieldAlert,
   XCircle,
 } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
@@ -79,6 +78,8 @@ export default function ReviewQueue({
   const [note, setNote] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState("");
+  // Ablehnen braucht einen zweiten, bewussten Klick.
+  const [confirmReject, setConfirmReject] = useState(false);
   // Zuordnungsanfragen ohne vorgewähltes Profil: das Team wählt es hier aus.
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [pick, setPick] = useState("");
@@ -148,6 +149,7 @@ export default function ReviewQueue({
       setReply("");
       setAssignTo("");
       setPick("");
+      setConfirmReject(false);
       await load();
     } catch (e) {
       setError((e as Error).message);
@@ -186,9 +188,6 @@ export default function ReviewQueue({
   return (
     <section className="card review-queue">
       <header>
-        <span className="icon-tile">
-          <ShieldAlert />
-        </span>
         <div>
           <h2>Übernahmeanfragen</h2>
           <p>
@@ -422,52 +421,94 @@ export default function ReviewQueue({
                       </small>
                     </div>
                   )}
-                  <div className="review-actions">
-                    <button
-                      className="btn primary"
-                      disabled={!!busy || (r.kind === "claim" && !r.participant && !assignTo)}
-                      onClick={() => decide(r.id, "approve")}
+                  {confirmReject ? (
+                    <div
+                      className="review-confirm"
+                      role="group"
+                      aria-labelledby={`reject-${r.id}`}
                     >
-                      {busy === r.id + "approve" ? (
-                        <LoaderCircle className="spin" size={16} />
-                      ) : (
-                        <Check size={16} />
-                      )}
-                      {r.kind === "claim" && !r.participant ? "Zuordnen und freigeben" : "Freigeben"}
-                    </button>
-                    <button
-                      className="btn secondary"
-                      disabled={!!busy || reply.trim().length < 3}
-                      title={
-                        reply.trim().length < 3
-                          ? "Bitte zuerst die Frage unter „Nachricht an die Person“ eintragen."
-                          : undefined
-                      }
-                      onClick={() => decide(r.id, "info")}
-                    >
-                      Rückfrage nötig
-                    </button>
-                    <button
-                      className="btn secondary"
-                      disabled={!!busy}
-                      onClick={() => decide(r.id, "reject")}
-                    >
-                      Ablehnen
-                    </button>
-                    <button
-                      type="button"
-                      className="text-link"
-                      onClick={() => setOpen("")}
-                    >
-                      Abbrechen
-                    </button>
-                  </div>
+                      <p id={`reject-${r.id}`}>
+                        <strong>Anfrage wirklich ablehnen?</strong> Das lässt
+                        sich nicht zurücknehmen. Die Person sieht deine
+                        Nachricht auf ihrer Statusseite.
+                      </p>
+                      <div className="review-actions">
+                        <button
+                          className="btn adm-danger"
+                          disabled={!!busy}
+                          onClick={() => decide(r.id, "reject")}
+                        >
+                          {busy === r.id + "reject" && (
+                            <LoaderCircle className="spin" size={16} />
+                          )}
+                          Ja, ablehnen
+                        </button>
+                        <button
+                          type="button"
+                          className="btn secondary"
+                          disabled={!!busy}
+                          onClick={() => setConfirmReject(false)}
+                        >
+                          Zurück
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="review-actions">
+                      <button
+                        className="btn primary"
+                        disabled={
+                          !!busy ||
+                          (r.kind === "claim" && !r.participant && !assignTo)
+                        }
+                        onClick={() => decide(r.id, "approve")}
+                      >
+                        {busy === r.id + "approve" ? (
+                          <LoaderCircle className="spin" size={16} />
+                        ) : (
+                          <Check size={16} />
+                        )}
+                        {r.kind === "claim" && !r.participant
+                          ? "Zuordnen und freigeben"
+                          : "Freigeben"}
+                      </button>
+                      <button
+                        className="btn secondary"
+                        disabled={!!busy || reply.trim().length < 3}
+                        aria-describedby={`reply-need-${r.id}`}
+                        onClick={() => decide(r.id, "info")}
+                      >
+                        Rückfrage nötig
+                      </button>
+                      <button
+                        className="btn secondary"
+                        disabled={!!busy || reply.trim().length < 3}
+                        aria-describedby={`reply-need-${r.id}`}
+                        onClick={() => setConfirmReject(true)}
+                      >
+                        Ablehnen
+                      </button>
+                      <button
+                        type="button"
+                        className="text-link"
+                        onClick={() => setOpen("")}
+                      >
+                        Abbrechen
+                      </button>
+                      <small className="review-need" id={`reply-need-${r.id}`}>
+                        {reply.trim().length < 3
+                          ? "Für „Rückfrage nötig“ und „Ablehnen“ zuerst die Nachricht an die Person schreiben."
+                          : ""}
+                      </small>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button
                   className="btn secondary"
                   onClick={() => {
                     setOpen(r.id);
+                    setConfirmReject(false);
                     setNote(r.internal_note || "");
                     setReply("");
                     setAssignTo("");

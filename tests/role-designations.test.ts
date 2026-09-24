@@ -152,7 +152,7 @@ test("no role without the team's approval of exactly that profile", async () => 
   await decideRequest(db, admin, { id: r.id, decision: "info", applicantMessage: "Unter welchem Namen callst du?" });
   assert.equal(await roleOf("alice"), null);
   await answerInfoRequest(db, alice, { message: "Als Alex im Gruppenchat" });
-  await decideRequest(db, admin, { id: r.id, decision: "reject" });
+  await decideRequest(db, admin, { id: r.id, decision: "reject", applicantMessage: "Wir konnten die Zuordnung nicht bestätigen." });
   assert.equal(await roleOf("alice"), null);
   // Ein selbst angelegtes neues Profil bringt ebenfalls keine Rolle.
   await createMember(db, alice, { name: "Alice", company: "", role: "", publicConsent: false });

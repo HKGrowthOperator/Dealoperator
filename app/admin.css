@@ -3,14 +3,16 @@
    zuerst: Karten statt Tabellen, Tippflächen mindestens 44 px, kein
    seitliches Schieben der Seite. */
 .adm {
-  --adm-ink: #0f2442;
-  --adm-muted: #5a6c84;
-  --adm-line: #d9e3ef;
-  --adm-soft: #f4f7fc;
-  --adm-blue: #0755f5;
-  width: min(1100px, calc(100% - 32px));
+  --adm-ink: var(--do-ink);
+  --adm-muted: var(--do-ink-3);
+  --adm-line: var(--do-line);
+  --adm-soft: var(--do-surface-2);
+  --adm-blue: var(--do-blue);
+  /* Gleiche Kante wie der Seitenkopf. */
+  width: 100%;
+  max-width: var(--page-width);
   margin: 0 auto;
-  padding: 36px 0 72px;
+  padding: var(--space-6) var(--gutter) var(--space-8);
   color: var(--adm-ink);
 }
 .adm button,
@@ -35,17 +37,17 @@
 
 /* Kopf mit Reitern */
 .adm-top h1 {
-  margin: 8px 0 0;
-  font-size: clamp(28px, 4vw, 36px);
+  margin: 0;
+  font-size: var(--text-title);
   font-weight: 800;
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
 }
 .adm-top > p {
-  margin: 8px 0 18px;
-  max-width: 68ch;
-  font-size: 15px;
+  margin: var(--space-2) 0 var(--space-5);
+  max-width: 60ch;
+  font-size: var(--text-body);
   line-height: 1.6;
-  color: var(--adm-muted);
+  color: var(--do-ink-2);
 }
 .adm-title-row {
   display: flex;
@@ -53,52 +55,70 @@
   justify-content: space-between;
   gap: 12px;
 }
-.adm-refresh,
-.adm-reload {
+.adm .adm-refresh,
+.adm .adm-reload {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid var(--adm-line);
-  border-radius: 10px;
-  background: #ffffffc8;
-  color: #2f5c92;
-  font-size: 13px;
+  border: 1px solid var(--do-line-strong);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
   font-weight: 700;
 }
+/* Reiter in drei Gruppen, gestaltet wie die Bereichsnavigation. */
 .adm-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid var(--adm-line);
-  border-radius: 16px;
-  background: #ffffffa8;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  gap: var(--space-3) var(--space-5);
+}
+.adm-tab-group {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.adm-tab-group-label {
+  padding-left: 2px;
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+  font-weight: 700;
+}
+.adm-tab-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px;
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
 }
 .adm-tabs button {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   min-height: 44px;
-  padding: 0 13px;
-  border: 1px solid transparent;
-  border-radius: 11px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-s);
   background: transparent;
-  color: #435a78;
-  font-size: 13.5px;
-  font-weight: 650;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-weight: 700;
+  transition:
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
 }
 .adm-tabs button:hover {
-  background: #edf3fc;
+  color: var(--do-ink);
 }
-.adm-tabs button[aria-pressed="true"] {
-  background: #fff;
-  border-color: #c9dbf5;
-  color: #0b4bc4;
-  box-shadow: 0 3px 10px #173f7a12;
+.adm-tabs button[aria-current="page"] {
+  background: var(--do-blue-soft);
+  color: var(--do-blue);
 }
 .adm-count {
   display: inline-flex;
@@ -108,7 +128,7 @@
   height: 22px;
   padding: 0 6px;
   border-radius: 11px;
-  background: #0755f5;
+  background: var(--do-blue);
   color: #fff;
   font-size: 11.5px;
   font-weight: 800;
@@ -119,22 +139,17 @@
 }
 .adm-main {
   display: grid;
-  gap: 18px;
-  margin-top: 20px;
+  gap: var(--space-5);
+  margin-top: var(--space-5);
 }
 
 /* Karten */
 .adm-card {
   min-width: 0;
-  padding: 24px;
+  padding: var(--space-5);
   border: 1px solid var(--adm-line);
-  border-radius: 18px;
-  background: #ffffffc4;
-  box-shadow:
-    0 10px 30px #1a3e7508,
-    inset 0 1px #fff;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--radius-l);
+  background: var(--do-surface);
 }
 .adm-card > h2 {
   font-size: 20px;
@@ -158,7 +173,7 @@
   font-size: 14px;
   line-height: 1.6;
   color: var(--adm-muted);
-  max-width: 75ch;
+  max-width: 60ch;
 }
 .adm-card-icon {
   display: flex;
@@ -294,10 +309,10 @@
 }
 .adm-item {
   min-width: 0;
-  padding: 16px 18px;
-  border: 1px solid #dfe7f2;
-  border-radius: 14px;
-  background: #ffffffd9;
+  padding: var(--space-4);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
 }
 /* Eintrag aus einem Team-Push: hervorgehoben, damit er sofort auffällt. */
 .adm-item[data-focus],
@@ -440,9 +455,9 @@
   gap: 6px;
   min-height: 44px;
   padding: 0 13px;
-  border: 1px solid #dbe4ef;
+  border: 1px solid var(--do-line);
   border-radius: 10px;
-  background: #ffffffc0;
+  background: var(--do-surface);
   color: #4a5f7c;
   font-size: 13px;
   font-weight: 650;
@@ -581,9 +596,9 @@
   gap: 12px;
   min-height: 44px;
   padding: 12px 14px;
-  border: 1px solid #dfe7f2;
+  border: 1px solid var(--do-line);
   border-radius: 12px;
-  background: #ffffffc0;
+  background: var(--do-surface);
   font-size: 14px;
   font-weight: 650;
   line-height: 1.5;
@@ -605,10 +620,9 @@
 }
 .adm-explain {
   padding: 14px 16px;
-  border: 1px solid #d4e2f5;
-  border-left: 3px solid #4f86e8;
-  border-radius: 12px;
-  background: #f4f8ff;
+  border: 1px solid var(--do-blue-line);
+  border-radius: var(--radius-m);
+  background: var(--do-blue-soft);
   font-size: 13.5px;
   line-height: 1.65;
   color: #33496a;
@@ -639,10 +653,14 @@
   min-height: 44px;
   gap: 8px;
 }
-.adm .btn.adm-danger {
-  background: #b33a2e;
-  border-color: #b33a2e;
-  color: #fff;
+.operator-site .adm .btn.adm-danger {
+  border-color: oklch(50% 0.17 28);
+  background: oklch(50% 0.17 28);
+  color: var(--do-surface);
+}
+.operator-site .adm .btn.adm-danger:hover {
+  border-color: oklch(44% 0.16 28);
+  background: oklch(44% 0.16 28);
 }
 .adm-case-form {
   display: grid;
@@ -673,14 +691,16 @@
   padding-top: 18px;
   border-top: 1px solid #e3eaf4;
 }
+/* Die Art der Änderung steht als Kennzeichen im Kopf; die Karte selbst
+   bekommt nur eine ruhige Randfarbe. */
 .adm-win[data-action="neu"] {
-  border-left: 3px solid #2f9e67;
+  border-color: oklch(80% 0.08 155);
 }
 .adm-win[data-action="korrektur"] {
-  border-left: 3px solid #1f6ff0;
+  border-color: var(--do-blue-line);
 }
 .adm-win[data-action="prüffall"] {
-  border-left: 3px solid #e09a2d;
+  border-color: oklch(82% 0.1 75);
 }
 .adm-win[data-action="unverändert"],
 .adm-win[data-action="bekannt"],
@@ -767,9 +787,9 @@
   align-content: start;
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid #dfe7f2;
+  border: 1px solid var(--do-line);
   border-radius: 14px;
-  background: #ffffffd9;
+  background: var(--do-surface);
   font-size: 13.5px;
   line-height: 1.55;
   color: #2c4260;
@@ -913,8 +933,7 @@
 
 @media (max-width: 760px) {
   .adm {
-    width: calc(100% - 24px);
-    padding-top: 24px;
+    padding-top: var(--space-5);
   }
   .adm-tabs {
     display: none;
@@ -938,8 +957,7 @@
     font-weight: 700;
   }
   .adm-card {
-    padding: 18px 16px;
-    border-radius: 16px;
+    padding: var(--space-4);
   }
   .adm-card-head {
     grid-template-columns: minmax(0, 1fr);
@@ -987,5 +1005,63 @@
   }
   .adm-diff {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Ablehnen einer Übernahme: bewusster zweiter Schritt. */
+.review-confirm {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid oklch(85% 0.05 25);
+  border-radius: var(--radius-m);
+  background: oklch(97.5% 0.012 25);
+}
+.review-confirm p {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.55;
+}
+.review-confirm strong {
+  color: var(--do-ink);
+}
+.review-need {
+  flex: 1 1 100%;
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+}
+.review-need:empty {
+  display: none;
+}
+
+/* Übernahmeprüfung in der Verwaltung: gleiche Karte wie die anderen Bereiche. */
+.adm .review-queue.card {
+  padding: var(--space-5);
+  border: 1px solid var(--adm-line);
+  border-radius: var(--radius-l);
+  background: var(--do-surface);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.adm .review-queue > header h2 {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.adm .review-queue > header p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--adm-muted);
+}
+.adm .review-item {
+  border-color: var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+}
+@media (max-width: 760px) {
+  .adm .review-queue.card {
+    padding: var(--space-4);
   }
 }

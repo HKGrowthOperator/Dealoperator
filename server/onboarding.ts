@@ -638,6 +638,9 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
   const v = decisionSchema.parse(raw);
   if (v.decision === "info" && v.applicantMessage.length < 3)
     throw new AppError("Bitte schreib die Rückfrage an die Person ins Nachrichtenfeld.");
+  // Eine Ablehnung erklärt sich: Die Person liest den Grund auf ihrer Statusseite.
+  if (v.decision === "reject" && v.applicantMessage.length < 3)
+    throw new AppError("Bitte schreib der Person kurz den Grund der Ablehnung ins Nachrichtenfeld.");
   return db.transaction(async (tx) => {
     // Feste Sperrreihenfolge: zuerst das Profil, dann die Anfrage. So können
     // sich zwei gleichzeitige Entscheidungen nicht gegenseitig blockieren.

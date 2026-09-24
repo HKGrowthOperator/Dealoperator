@@ -253,9 +253,9 @@ export function newKey() {
 }
 
 export function formatDateTime(iso: string | null | undefined) {
-  if (!iso) return "—";
+  if (!iso) return "–";
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "–";
   return date.toLocaleString("de-DE", {
     timeZone: "Europe/Berlin",
     day: "2-digit",

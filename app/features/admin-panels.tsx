@@ -40,20 +40,27 @@ import { DiscordPanel, NotificationsPanel } from "./admin-status";
 import { TeamPanel } from "./admin-team";
 import ResendConfirmation from "./resend-confirmation";
 
+// Drei Gruppen: was heute zu entscheiden ist, Zahlen einspielen, Einstellungen.
+const GROUPS = [
+  { id: "heute", label: "Heute" },
+  { id: "import", label: "Import" },
+  { id: "einstellungen", label: "Einstellungen" },
+] as const;
+
 // adminOnly: Einstellungen, Diagnose, Kontaktliste und Rollen. Moderatoren
 // sehen diese Reiter nicht; der Server lehnt die Aktionen zusätzlich ab.
 const TABS = [
-  { id: "inbox", label: "Team-Inbox", icon: Inbox, adminOnly: false },
-  { id: "wins", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
-  { id: "faelle", label: "Prüffälle", icon: UserSearch, adminOnly: false },
-  { id: "pausen", label: "Pausen", icon: CirclePause, adminOnly: false },
-  { id: "uebernahmen", label: "Übernahmen", icon: ShieldCheck, adminOnly: false },
-  { id: "events", label: "Akquise Days", icon: Sparkles, adminOnly: true },
-  { id: "regeln", label: "Dranbleiben-Regeln", icon: SlidersHorizontal, adminOnly: true },
-  { id: "benachrichtigungen", label: "Benachrichtigungen", icon: Bell, adminOnly: true },
-  { id: "discord", label: "Discord", icon: Headphones, adminOnly: true },
-  { id: "csv", label: "CSV-Import", icon: FileInput, adminOnly: true },
-  { id: "team", label: "Team & Rollen", icon: UsersRound, adminOnly: true },
+  { id: "inbox", group: "heute", label: "Team-Inbox", icon: Inbox, adminOnly: false },
+  { id: "uebernahmen", group: "heute", label: "Übernahmen", icon: ShieldCheck, adminOnly: false },
+  { id: "faelle", group: "heute", label: "Prüffälle", icon: UserSearch, adminOnly: false },
+  { id: "pausen", group: "heute", label: "Pausen", icon: CirclePause, adminOnly: false },
+  { id: "wins", group: "import", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
+  { id: "csv", group: "import", label: "CSV-Import", icon: FileInput, adminOnly: true },
+  { id: "events", group: "einstellungen", label: "Akquise Days", icon: Sparkles, adminOnly: true },
+  { id: "regeln", group: "einstellungen", label: "Dranbleiben-Regeln", icon: SlidersHorizontal, adminOnly: true },
+  { id: "benachrichtigungen", group: "einstellungen", label: "Benachrichtigungen", icon: Bell, adminOnly: true },
+  { id: "discord", group: "einstellungen", label: "Discord", icon: Headphones, adminOnly: true },
+  { id: "team", group: "einstellungen", label: "Team & Rollen", icon: UsersRound, adminOnly: true },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 const isTab = (value: string | null): value is TabId =>
@@ -162,7 +169,6 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
   return (
     <div className="adm">
       <div className="adm-top">
-        <span className="section-kicker">DEAL OPERATOR · VERWALTUNG</span>
         <div className="adm-title-row">
           <h1>Verwaltung</h1>
           <button
@@ -176,41 +182,67 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
           </button>
         </div>
         <p>
-          Team-Inbox, tägliche Meldungen, Pausen und Regeln an einem Ort.
-          Kontaktdaten erscheinen nur hier im Team-Bereich.
+          Unter Heute steht, was auf eine Entscheidung wartet. Kontaktdaten
+          erscheinen nur hier im Team-Bereich.
         </p>
         <nav className="adm-tabs" aria-label="Bereiche der Verwaltung">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const count = counts[t.id];
+          {GROUPS.map((g) => {
+            const items = tabs.filter((t) => t.group === g.id);
+            if (!items.length) return null;
             return (
-              <button
-                key={t.id}
-                aria-pressed={tab === t.id}
-                aria-current={tab === t.id ? "page" : undefined}
-                onClick={() => go(t.id)}
+              <div
+                className="adm-tab-group"
+                key={g.id}
+                role="group"
+                aria-labelledby={`adm-group-${g.id}`}
               >
-                <Icon size={16} aria-hidden="true" />
-                <span>{t.label}</span>
-                {count ? (
-                  <span className="adm-count">
-                    {count}
-                    <span className="sr-only"> offen</span>
-                  </span>
-                ) : null}
-              </button>
+                <span className="adm-tab-group-label" id={`adm-group-${g.id}`}>
+                  {g.label}
+                </span>
+                <div className="adm-tab-row">
+                  {items.map((t) => {
+                    const Icon = t.icon;
+                    const count = counts[t.id];
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        aria-current={tab === t.id ? "page" : undefined}
+                        onClick={() => go(t.id)}
+                      >
+                        <Icon size={16} aria-hidden="true" />
+                        <span>{t.label}</span>
+                        {count ? (
+                          <span className="adm-count">
+                            {count}
+                            <span className="sr-only"> offen</span>
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             );
           })}
         </nav>
         <label className="adm-tab-select">
           <span>Bereich</span>
           <select value={tab} onChange={(e) => go(e.target.value as TabId)}>
-            {tabs.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-                {counts[t.id] ? ` (${counts[t.id]} offen)` : ""}
-              </option>
-            ))}
+            {GROUPS.map((g) => {
+              const items = tabs.filter((t) => t.group === g.id);
+              if (!items.length) return null;
+              return (
+                <optgroup key={g.id} label={g.label}>
+                  {items.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                      {counts[t.id] ? ` (${counts[t.id]} offen)` : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              );
+            })}
           </select>
         </label>
       </div>
@@ -345,6 +377,21 @@ function stateInfo(item: InboxItem): {
   return { label: item.state || "Offen", tone: "neutral" };
 }
 
+/**
+ * Ältere Prüfhinweise tragen den Hinweis zum Ausschluss noch im Text und ein
+ * ISO-Datum; beides steht jetzt einheitlich darunter bzw. deutsch formatiert.
+ */
+function inboxBody(item: InboxItem) {
+  if (item.kind !== "review") return item.body;
+  return item.body
+    .replace(/\s*Kein automatischer Ausschluss[\s\S]*$/, "")
+    .replace(/offene fehlende/, "fehlende")
+    .replace(
+      /seit (\d{4}-\d{2}-\d{2})/,
+      (_, day: string) => `seit dem ${formatDay(day)}`,
+    );
+}
+
 function InboxPanel({
   focus,
   items,
@@ -419,7 +466,7 @@ function InboxPanel({
           </span>
         </div>
         <h3>{item.title}</h3>
-        {item.body && <p className="adm-body">{item.body}</p>}
+        {item.body && <p className="adm-body">{inboxBody(item)}</p>}
         {s.hint && <p className="adm-hint">{s.hint}</p>}
         {item.delivery && item.delivery.length > 0 && (
           <div className="adm-item-head" aria-label="Zustellung der Team-Hinweise">
@@ -823,9 +870,9 @@ function EventsPanel({
         <div>
           <h2 id="adm-events-title">Akquise Days und Event-Tage</h2>
           <p>
-            Ein Event kennzeichnet einen Tag mit Titel, Partner und Dank. Das
-            Ranking zeigt dann dieses Tagesranking hervorgehoben. Die Zahlen des
-            Tages zählen wie an jedem anderen Tag genau einmal, es gibt keine
+            Ein Event kennzeichnet einen Tag mit Titel, Partner und Dank. Die
+            Rangliste zeigt diesen Tag dann hervorgehoben. Die Zahlen des Tages
+            zählen wie an jedem anderen Tag genau einmal, es gibt keine
             Zusatzwertung.
           </p>
         </div>

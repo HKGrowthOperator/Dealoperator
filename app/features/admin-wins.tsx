@@ -74,7 +74,7 @@ const ACTIONS: { id: WinsAction; label: string; tone: Tone; hint: string }[] =
 const actionInfo = (id: WinsAction) =>
   ACTIONS.find((a) => a.id === id) ?? ACTIONS[0];
 const fmt = (v: number | null | undefined) =>
-  v === null || v === undefined ? "—" : v.toLocaleString("de-DE");
+  v === null || v === undefined ? "–" : v.toLocaleString("de-DE");
 
 type PreviewState = WinsPreview & { text: string; day: string; key: string };
 type CommitResult = {
