@@ -1483,7 +1483,7 @@ export default function ClosingForm({
             )}
             {!canSubmit && (
               <p className="cm-muted">
-                Einreichen geht, sobald oben alles erledigt ist. Dein Entwurf bleibt gespeichert.
+                Einreichen geht, sobald oben alles erledigt ist.
               </p>
             )}
             <button
