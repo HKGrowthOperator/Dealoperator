@@ -148,7 +148,7 @@ test("switching off team pushes keeps the separate email safeguard", async () =>
 });
 
 test("everyone can save reminder settings; team members also their team switches", async () => {
-  const base = { reminders: true, quietStart: null, quietEnd: null };
+  const base = { reminders: true };
   // Mitglied: keine Team-Schalter, aber speichern klappt.
   await savePrefs(db, alice, base);
   await assert.rejects(savePrefs(db, alice, { ...base, teamAlerts: false }), /Team/);
@@ -166,10 +166,15 @@ test("everyone can save reminder settings; team members also their team switches
   prefs = await notificationPrefs(db, "owner");
   assert.equal(prefs.reminders, false);
   assert.equal(prefs.teamEmail, true);
+  // Eine noch offene ältere Seite schickt die frühere Ruhezeit mit: speichern
+  // klappt, und es gibt keine Ruhezeit mehr.
+  prefs = await savePrefs(db, alice, { reminders: true, quietStart: 1320, quietEnd: 420 });
+  assert.equal(prefs.reminders, true);
+  assert.equal("quietStart" in prefs, false);
 });
 
 test("someone who saved reminders before becoming team still gets team emails", async () => {
-  await savePrefs(db, alice, { reminders: true, quietStart: null, quietEnd: null });
+  await savePrefs(db, alice, { reminders: true });
   await setTeamRole(db, owner, { owner: "alice", role: "moderator" });
   const moderator = { ...alice, moderator: true };
   await ensureAdminPrefs(db, moderator);

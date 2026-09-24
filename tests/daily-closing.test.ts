@@ -329,6 +329,11 @@ test("reminders are planned once, and skipped when the closing arrived in betwee
   const id = await member(alice, "Alice");
   await db.query("UPDATE participants SET eligible_since=now()-interval '10 days' WHERE id=$1", [id]);
   await subscribe(db, alice, { endpoint: endpoint(3), keys }, "iPhone");
+  // Eine früher gespeicherte Ruhezeit (20 bis 7 Uhr) zählt nicht mehr.
+  await db.query(
+    "INSERT INTO notification_prefs(owner,reminders,quiet_start,quiet_end) VALUES($1,true,1200,420)",
+    [alice.userId],
+  );
   // Ein Werktag um 20:35 Berliner Zeit.
   let day = today();
   while ([6, 0].includes(new Date(`${day}T12:00:00Z`).getUTCDay())) {

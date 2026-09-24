@@ -3,9 +3,7 @@ import { database, databaseReady } from "./database";
 import { berlinDate } from "../lib/kpis";
 import {
   deadlineFor,
-  inQuietHours,
   isDueDay,
-  localMinutes,
   remindersDue,
   summarize,
   zonedTime,
@@ -32,15 +30,7 @@ type Member = {
   name: string;
   eligible_since: string;
   reminders: boolean | null;
-  quiet_start: number | null;
-  quiet_end: number | null;
 };
-
-function quiet(m: { quiet_start: number | null; quiet_end: number | null }) {
-  return m.quiet_start === null || m.quiet_end === null
-    ? null
-    : { start: m.quiet_start, end: m.quiet_end };
-}
 
 const TEXT = {
   evening: {
@@ -60,7 +50,7 @@ export async function planReminders(
 ) {
   const members = (await tx.query(
     `SELECT p.id AS participant,p.owner,p.name,p.eligible_since,
-            np.reminders,np.quiet_start,np.quiet_end
+            np.reminders
        FROM participants p
        LEFT JOIN notification_prefs np ON np.owner=p.owner
       WHERE p.owner IS NOT NULL AND p.kind='person' AND p.eligible_since IS NOT NULL
@@ -68,9 +58,7 @@ export async function planReminders(
         AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.owner=p.owner AND s.disabled_at IS NULL)`,
   )) as Member[];
   let planned = 0;
-  const minutes = localMinutes(now, settings.timeZone);
   for (const m of members) {
-    if (inQuietHours(minutes, quiet(m))) continue;
     const [rows, pauses] = await Promise.all([
       ownClosings(tx, m.participant),
       approvedPauses(tx, m.participant),
@@ -168,7 +156,7 @@ export const recheck: Recheck = async (db, n) => {
     const [participant, day] = n.ref.split(":");
     const settings = await loadCommitmentSettings(db);
     const [row] = await db.query(
-      `SELECT p.owner,np.reminders,np.quiet_start,np.quiet_end,
+      `SELECT p.owner,np.reminders,
               EXISTS(SELECT 1 FROM checkins c WHERE c.participant=p.id AND c.day=$2 AND c.origin='closing') AS closed
          FROM participants p LEFT JOIN notification_prefs np ON np.owner=p.owner
         WHERE p.id=$1`,
@@ -179,8 +167,6 @@ export const recheck: Recheck = async (db, n) => {
     if (row.reminders === false) return "Erinnerungen ausgeschaltet.";
     const pauses = await approvedPauses(db, participant);
     if (!isDueDay(day, settings, pauses)) return "Kein Pflicht-Tag (Wochenende oder Pause).";
-    if (inQuietHours(localMinutes(new Date(), settings.timeZone), quiet(row as Member)))
-      return "Ruhezeit.";
     return null;
   }
   if (n.kind.startsWith("team:")) {

@@ -403,15 +403,6 @@ function inWindow(minutes: number, at: Clock, width: number) {
   const start = at.hour * 60 + at.minute;
   return minutes >= start && minutes < start + width;
 }
-export function inQuietHours(
-  minutes: number,
-  quiet: { start: number; end: number } | null,
-) {
-  if (!quiet || quiet.start === quiet.end) return false;
-  return quiet.start < quiet.end
-    ? minutes >= quiet.start && minutes < quiet.end
-    : minutes >= quiet.start || minutes < quiet.end;
-}
 
 /**
  * Welche Erinnerung wäre jetzt für diese Person fällig?

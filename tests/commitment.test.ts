@@ -4,7 +4,6 @@ import {
   addDays,
   deadlineFor,
   defaultCommitmentSettings as S,
-  inQuietHours,
   isDueDay,
   isoWeekday,
   nextDueDay,
@@ -448,12 +447,6 @@ test("streak warning: Monday 09:00 for a missing Friday, only if a streak actual
     );
 });
 
-test("quiet hours wrap around midnight", () => {
-  const quiet = { start: 22 * 60, end: 7 * 60 };
-  assert.equal(inQuietHours(23 * 60, quiet), true);
-  assert.equal(inQuietHours(6 * 60 + 59, quiet), true);
-  assert.equal(inQuietHours(7 * 60, quiet), false);
-  assert.equal(inQuietHours(20 * 60 + 30, quiet), false);
-  assert.equal(inQuietHours(20 * 60 + 30, null), false);
+test("adding days crosses the year", () => {
   assert.equal(addDays("2026-12-31", 1), "2027-01-01");
 });

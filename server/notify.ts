@@ -137,14 +137,16 @@ export async function unsubscribe(db: Database, actor: Actor, raw: unknown) {
   return { ok: true };
 }
 
-const minutes = z.number().int().min(0).max(1439).nullable();
+// Die frühere Ruhezeit gibt es nicht mehr. Noch offene ältere Seiten
+// schicken die Felder mit; sie werden angenommen und ignoriert.
+const legacyMinutes = z.number().int().min(0).max(1439).nullable().optional();
 const prefsSchema = z
   .object({
     reminders: z.boolean(),
     teamAlerts: z.boolean().optional(),
     teamEmail: z.boolean().optional(),
-    quietStart: minutes,
-    quietEnd: minutes,
+    quietStart: legacyMinutes,
+    quietEnd: legacyMinutes,
   })
   .strict();
 
@@ -159,8 +161,6 @@ export async function notificationPrefs(db: Database, owner: string) {
     teamAlerts: row ? !!row.team_alerts : true,
     teamEmail: row ? !!row.team_email : false,
     email: row?.email || null,
-    quietStart: row?.quiet_start ?? null,
-    quietEnd: row?.quiet_end ?? null,
     devices: subs.map((s) => ({
       endpoint: s.endpoint as string,
       label: deviceLabel(s.user_agent || ""),
@@ -180,8 +180,6 @@ function deviceLabel(ua: string) {
 
 export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
   const v = prefsSchema.parse(raw);
-  if ((v.quietStart === null) !== (v.quietEnd === null))
-    throw new AppError("Bitte Beginn und Ende der Ruhezeit angeben oder beide leer lassen.");
   if ((v.teamAlerts !== undefined || v.teamEmail !== undefined) && !isTeam(actor))
     throw new AppError("Team-Benachrichtigungen gibt es nur für das Team.", 403);
   await db.query(
@@ -190,13 +188,13 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
     // boolean-Spalte. team_email ist standardmäßig an; für Konten ohne
     // Team-Rolle bleibt das folgenlos, weil der Versand die Rolle prüft, und
     // wer später eine Rolle bekommt, hat die Absicherung gleich an.
-    `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email,quiet_start,quiet_end)
-     VALUES($1,$2::boolean,COALESCE($3::boolean,true),COALESCE($4::boolean,true),$5,$6::integer,$7::integer)
+    `INSERT INTO notification_prefs(owner,reminders,team_alerts,team_email,email)
+     VALUES($1,$2::boolean,COALESCE($3::boolean,true),COALESCE($4::boolean,true),$5)
      ON CONFLICT(owner) DO UPDATE SET reminders=excluded.reminders,
        team_alerts=COALESCE($3::boolean,notification_prefs.team_alerts),
        team_email=COALESCE($4::boolean,notification_prefs.team_email),
        email=CASE WHEN $4::boolean IS NULL THEN notification_prefs.email ELSE excluded.email END,
-       quiet_start=excluded.quiet_start,quiet_end=excluded.quiet_end,updated_at=now()`,
+       updated_at=now()`,
     [
       actor.userId,
       v.reminders,
@@ -206,8 +204,6 @@ export async function savePrefs(db: Database, actor: Actor, raw: unknown) {
       // nie an eine frei eingetippte. Für die Verwaltung ist sie
       // standardmäßig an.
       (v.teamEmail ?? isTeam(actor)) ? actor.email : null,
-      v.quietStart,
-      v.quietEnd,
     ],
   );
   return notificationPrefs(db, actor.userId);
