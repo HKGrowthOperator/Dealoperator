@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  CalendarCheck,
   CalendarDays,
   Check,
   ChevronDown,
@@ -11,11 +12,15 @@ import {
   CircleCheck,
   CircleDashed,
   Clock3,
+  Handshake,
   Link2,
+  Medal,
   NotebookPen,
+  Phone,
   Search,
   ShieldCheck,
   Sparkles,
+  Trophy,
   UsersRound,
   X,
 } from "lucide-react";
@@ -339,11 +344,14 @@ export default function RankingBoard({
     }
   }
   function showOwn() {
-    if (!own) return;
+    if (own) showRow(own.id);
+  }
+  /** Zeile öffnen, hinscrollen und kurz aufleuchten lassen. */
+  function showRow(id: string) {
     setSearch("");
-    setOpenId(own.id);
+    setOpenId(id);
     window.setTimeout(() => {
-      const row = document.getElementById(`rb-row-${own.id}`);
+      const row = document.getElementById(`rb-row-${id}`);
       if (!row) return;
       const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
       row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
@@ -355,6 +363,7 @@ export default function RankingBoard({
   }
 
   const signedIn = viewer?.signedIn ?? !!home;
+  const KPI_ICON = { attempts: Phone, settingsBooked: CalendarCheck, closingsBooked: Handshake, people: UsersRound } as const;
   const kpis: { key: VisibleMetric | "people"; label: string; value: number | null; note: string }[] = [
     { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
     { key: "settingsBooked", label: "Settings", value: totals.settingsBooked, note: totals.settingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
@@ -495,7 +504,13 @@ export default function RankingBoard({
             <div className="rb-kpis" data-loading={loading || undefined} aria-busy={loading}>
               {kpis.map((kpi) => (
                 <div key={kpi.key} className="rb-kpi">
-                  <span className="rb-kpi-label">{kpi.label}</span>
+                  <span className="rb-kpi-label">
+                    {(() => {
+                      const Icon = KPI_ICON[kpi.key as keyof typeof KPI_ICON];
+                      return Icon ? <Icon size={17} aria-hidden="true" /> : null;
+                    })()}
+                    {kpi.label}
+                  </span>
                   <strong key={`${requestKey}-${kpi.key}`} className="rb-kpi-value">
                     {loading ? " " : fmt(kpi.value)}
                   </strong>
@@ -601,6 +616,9 @@ export default function RankingBoard({
             </p>
           )}
 
+          {!commitmentView && !loading && !error && !search && (
+            <Podium rows={filtered} metric={metric} ownId={ownId} onShow={showRow} />
+          )}
           {commitmentView ? (
             <CommitmentList state={commitmentState} rows={commitmentFiltered} total={commitmentRows.length} search={search} ownId={ownId} month={month} onRetry={() => setRetry((v) => v + 1)} />
           ) : loading ? (
@@ -865,6 +883,81 @@ function formatDeadline(iso: string) {
     minute: "2-digit",
     timeZone: "Europe/Berlin",
   }).format(new Date(iso))} Uhr`;
+}
+
+/** „A“, „A und B“, „A, B und C“. */
+function joinNames(names: string[]) {
+  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names.at(-1)}`;
+}
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
+/**
+ * Podium der Plätze 1 bis 3. Je Platz eine Karte; wer gleichauf liegt, steht
+ * in derselben Karte. Die vollständige Rangliste folgt darunter.
+ */
+function Podium({
+  rows,
+  metric,
+  ownId,
+  onShow,
+}: {
+  rows: (RankingRow & { rank: number })[];
+  metric: VisibleMetric;
+  ownId: string | null;
+  onShow: (id: string) => void;
+}) {
+  const places: { rank: number; rows: (RankingRow & { rank: number })[] }[] = [];
+  for (const row of rows) {
+    const value = row.counts[metric];
+    if (!value || value <= 0 || row.rank > 3) continue;
+    const place = places.find((p) => p.rank === row.rank);
+    if (place) place.rows.push(row);
+    else places.push({ rank: row.rank, rows: [row] });
+  }
+  if (!places.length) return null;
+  return (
+    <ol className="rb-podium" data-count={places.length} aria-label="Spitzenplätze">
+      {places.map((place) => {
+        const tier = (["gold", "silver", "bronze"] as const)[place.rank - 1];
+        const Icon = place.rank === 1 ? Trophy : Medal;
+        const first = place.rows[0];
+        const single = place.rows.length === 1;
+        const value = first.counts[metric];
+        const own = place.rows.some((r) => r.id === ownId);
+        return (
+          <li key={place.rank} data-medal={tier} data-own={own || undefined}>
+            <button type="button" onClick={() => onShow(first.id)}>
+              <span className="rb-podium-place">
+                <Icon size={15} aria-hidden="true" />
+                Platz {place.rank}
+                {!single && <span className="rb-podium-tie">gleichauf</span>}
+              </span>
+              <span className="rb-podium-avatars" aria-hidden="true">
+                {place.rows.slice(0, 3).map((r) => (
+                  <span key={r.id}>{initials(r.name)}</span>
+                ))}
+                {place.rows.length > 3 && <span>+{place.rows.length - 3}</span>}
+              </span>
+              <span className="rb-podium-who">
+                <strong>{joinNames(place.rows.map((r) => r.name))}</strong>
+                {single && first.company && <small>{first.company}</small>}
+              </span>
+              <span className="rb-podium-value">
+                <strong>{fmt(value)}</strong>
+                <small>{metricShortLabels[metric]}</small>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 function RankRow({

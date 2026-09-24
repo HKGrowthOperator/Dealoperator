@@ -3561,3 +3561,331 @@ li[data-open] .rb-chevron {
     flex: 1 1 100%;
   }
 }
+
+/* ---- Ergebnisse im Premium-Stil ------------------------------------------ */
+/* Gemeinsam erreicht: tiefe Fläche mit Lichtverlauf, Kennzahlen mit Symbol,
+   große Zahlen, Trennlinien statt Kästen. */
+.rb-results {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: var(--space-6);
+  border: 1px solid oklch(38% 0.09 262);
+  border-radius: 20px;
+  background:
+    radial-gradient(90% 120% at 100% 0%, oklch(47% 0.17 262 / 0.55), transparent 62%),
+    radial-gradient(70% 90% at 0% 100%, oklch(38% 0.11 245 / 0.4), transparent 66%),
+    linear-gradient(165deg, oklch(29% 0.1 262), oklch(19.5% 0.065 262));
+  box-shadow:
+    0 30px 60px -30px oklch(26% 0.12 262 / 0.65),
+    inset 0 1px 0 oklch(100% 0 0 / 0.07);
+}
+.rb-results .rb-kpis {
+  gap: 0;
+  margin-top: var(--space-6);
+}
+.rb-results .rb-kpi {
+  gap: var(--space-1);
+  padding: 0 var(--space-5);
+  border: 0;
+  border-left: 1px solid oklch(100% 0 0 / 0.12);
+  border-radius: 0;
+  background: transparent;
+}
+.rb-results .rb-kpi:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+.rb-results .rb-kpi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: oklch(90% 0.035 255);
+}
+.rb-results .rb-kpi-label svg {
+  color: oklch(78% 0.1 250);
+}
+.rb-results .rb-kpi-value {
+  margin-top: var(--space-1);
+  font-size: clamp(2.75rem, 4.8vw, 4rem);
+  letter-spacing: -0.035em;
+  text-shadow: 0 2px 18px oklch(60% 0.18 262 / 0.35);
+}
+.rb-results .rb-kpi-note {
+  color: oklch(80% 0.035 255);
+}
+.rb-results .rb-kpi-foot {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid oklch(100% 0 0 / 0.12);
+}
+.rb-results .rb-kpi-foot:empty {
+  display: none;
+}
+@media (max-width: 799px) {
+  .rb-results .rb-kpi {
+    padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
+  }
+  .rb-results .rb-kpi:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+  .rb-results .rb-kpi:nth-child(n + 3) {
+    border-top: 1px solid oklch(100% 0 0 / 0.12);
+  }
+  .rb-results .rb-kpis {
+    margin-top: var(--space-4);
+  }
+}
+@media (max-width: 599px) {
+  .rb-results {
+    padding: var(--space-5) var(--space-4);
+    border-radius: var(--radius-l);
+  }
+  .rb-results .rb-kpi {
+    padding: var(--space-3) 0 var(--space-3) var(--space-4);
+  }
+  .rb-results .rb-kpi-value {
+    font-size: 2.5rem;
+  }
+}
+
+/* Podium: je Platz eine Karte, Gleichstände gemeinsam. */
+.rb-podium {
+  display: grid;
+  grid-template-columns: repeat(var(--podium-cols, 3), minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-2) 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+.rb-podium[data-count="1"] {
+  --podium-cols: 1;
+}
+.rb-podium[data-count="2"] {
+  --podium-cols: 2;
+}
+.rb-podium > li {
+  --tier: var(--do-blue);
+  --tier-soft: var(--do-blue-soft);
+  --tier-ink: var(--do-blue);
+  min-width: 0;
+  animation: rb-row 280ms var(--ease-out) both;
+}
+.rb-podium > li[data-medal="gold"] {
+  --tier: var(--do-gold);
+  --tier-soft: var(--do-gold-soft);
+  --tier-ink: oklch(42% 0.09 75);
+}
+.rb-podium > li[data-medal="silver"] {
+  --tier: var(--do-silver);
+  --tier-soft: var(--do-silver-soft);
+  --tier-ink: oklch(40% 0.02 255);
+  animation-delay: 60ms;
+}
+.rb-podium > li[data-medal="bronze"] {
+  --tier: var(--do-bronze);
+  --tier-soft: var(--do-bronze-soft);
+  --tier-ink: oklch(42% 0.08 50);
+  animation-delay: 120ms;
+}
+.rb-podium button {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-l);
+  background:
+    radial-gradient(120% 70% at 50% 0%, var(--tier-soft), transparent 70%),
+    var(--do-surface);
+  box-shadow: 0 16px 34px -26px oklch(30% 0.08 262 / 0.45);
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition:
+    transform 200ms var(--ease-out),
+    box-shadow 200ms var(--ease-out);
+}
+.rb-podium button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 40px -26px oklch(30% 0.1 262 / 0.55);
+}
+.rb-podium > li[data-medal="gold"] button {
+  border-color: oklch(86% 0.07 85);
+}
+.rb-podium > li[data-own] button {
+  border-color: var(--do-blue-line);
+}
+.rb-podium-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tier-ink);
+  font-size: var(--text-meta);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.rb-podium-place svg {
+  color: var(--tier);
+}
+.rb-podium-tie {
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--tier-soft);
+  letter-spacing: 0;
+  text-transform: none;
+}
+.rb-podium-avatars {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-1) 0;
+}
+.rb-podium-avatars span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  margin-left: -10px;
+  border: 3px solid var(--do-surface);
+  border-radius: 50%;
+  background: var(--do-blue-soft);
+  color: var(--do-blue);
+  font-size: var(--text-label);
+  font-weight: 800;
+}
+.rb-podium-avatars span:first-child {
+  margin-left: 0;
+}
+.rb-podium > li[data-medal="gold"] .rb-podium-avatars span {
+  background: linear-gradient(150deg, oklch(66% 0.2 262), oklch(48% 0.24 264));
+  color: var(--do-surface);
+  box-shadow: 0 8px 20px -8px oklch(50% 0.22 262 / 0.7);
+}
+.rb-podium-who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.rb-podium-who strong {
+  font-size: var(--text-body);
+  font-weight: 750;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.rb-podium-who small {
+  color: var(--do-ink-3);
+  font-size: var(--text-label);
+  overflow-wrap: anywhere;
+}
+.rb-podium-value {
+  display: grid;
+  justify-items: center;
+  margin-top: auto;
+}
+.rb-podium-value strong {
+  color: oklch(36% 0.16 262);
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.rb-podium > li[data-medal="gold"] .rb-podium-value strong {
+  font-size: 2.625rem;
+}
+.rb-podium-value small {
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+}
+@media (max-width: 599px) {
+  .rb-podium {
+    --podium-cols: 2;
+    gap: var(--space-2);
+  }
+  .rb-podium[data-count="1"] {
+    --podium-cols: 1;
+  }
+  /* Platz 1 als breite Karte; bei drei Plätzen stehen 2 und 3 darunter
+     nebeneinander, sonst ebenfalls breit. */
+  .rb-podium > li:first-child,
+  .rb-podium[data-count="2"] > li {
+    grid-column: 1 / -1;
+  }
+  .rb-podium > li:first-child button,
+  .rb-podium[data-count="2"] > li button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    justify-items: start;
+    align-items: center;
+    column-gap: var(--space-3);
+    text-align: left;
+  }
+  .rb-podium > li:first-child .rb-podium-place,
+  .rb-podium[data-count="2"] > li .rb-podium-place {
+    grid-column: 1 / -1;
+  }
+  .rb-podium > li:first-child .rb-podium-avatars,
+  .rb-podium[data-count="2"] > li .rb-podium-avatars {
+    margin: 0;
+  }
+  .rb-podium > li:first-child .rb-podium-value,
+  .rb-podium[data-count="2"] > li .rb-podium-value {
+    justify-items: end;
+    margin: 0;
+  }
+  .rb-podium button {
+    padding: var(--space-4) var(--space-3);
+  }
+  .rb-podium-avatars span {
+    width: 42px;
+    height: 42px;
+  }
+  .rb-podium-value strong {
+    font-size: 1.875rem;
+  }
+  .rb-podium > li[data-medal="gold"] .rb-podium-value strong {
+    font-size: 2.125rem;
+  }
+}
+
+/* Rangliste: Medaillen-Chips, kräftigere Verlaufsbalken, ruhige Tiefe. */
+.rb-list {
+  box-shadow: 0 18px 40px -30px oklch(30% 0.08 262 / 0.4);
+}
+li[data-medal="gold"] {
+  background: transparent;
+}
+li[data-own] {
+  background: var(--do-blue-soft);
+}
+.rb-bar {
+  height: 4px;
+  margin-top: 8px;
+  border-radius: 4px;
+}
+.rb-bar i {
+  border-radius: inherit;
+  background: linear-gradient(90deg, oklch(80% 0.07 250), oklch(64% 0.15 258));
+}
+li[data-medal] .rb-bar i,
+li[data-own] .rb-bar i {
+  background: linear-gradient(90deg, oklch(70% 0.14 252), var(--do-blue));
+}
+li[data-medal="gold"] .rb-bar i {
+  background: linear-gradient(90deg, oklch(86% 0.1 88), oklch(70% 0.15 72));
+}
+.rb-value strong {
+  color: oklch(30% 0.12 262);
+}
+@media (prefers-reduced-motion: reduce) {
+  .rb-podium > li {
+    animation: none;
+  }
+  .rb-podium button {
+    transition: none;
+  }
+}
