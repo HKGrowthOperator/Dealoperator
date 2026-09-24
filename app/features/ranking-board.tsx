@@ -333,7 +333,14 @@ export default function RankingBoard({
     setSearch("");
     setOpenId(own.id);
     window.setTimeout(() => {
-      document.getElementById(`rb-row-${own.id}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      const row = document.getElementById(`rb-row-${own.id}`);
+      if (!row) return;
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+      // Kurzes, ruhiges Aufleuchten der eigenen Zeile.
+      row.removeAttribute("data-flash");
+      void row.offsetWidth;
+      row.setAttribute("data-flash", "");
     }, 0);
   }
 
@@ -369,7 +376,7 @@ export default function RankingBoard({
         {(onlyRanking || signedIn) && <h1 className="do-sr">Ergebnisse</h1>}
         {signedIn && home && <PersonalPanel home={home} />}
 
-        <section className="rb-results" aria-labelledby="rb-results-title">
+        <section className="rb-results" id="ergebnisse" aria-labelledby="rb-results-title">
           <div className="rb-results-head">
             <div>
               <h2 id="rb-results-title">Gemeinsam erreicht</h2>
@@ -507,7 +514,7 @@ export default function RankingBoard({
           )}
         </section>
 
-        <section className="rb-ranking" aria-labelledby="rb-ranking-title">
+        <section className="rb-ranking" id="ranking" aria-labelledby="rb-ranking-title">
           <div className="rb-section-head">
             <h2 id="rb-ranking-title">Rangliste</h2>
             <span>

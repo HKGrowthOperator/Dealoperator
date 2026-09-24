@@ -5,11 +5,9 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  CircleCheck,
   Clock3,
   Flame,
   LoaderCircle,
-  MessageCircle,
   Undo2,
   Users,
 } from "lucide-react";
@@ -75,78 +73,6 @@ function monthName(month: string) {
   }).format(new Date(`${month}-15T12:00:00Z`));
 }
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
-/** Kompakte Serienanzeige mit Hauptaktion, z. B. für die Übersicht. */
-export function StreakStrip() {
-  const [state, setState] = useState<ClosingState | null>(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const refresh = () =>
-      fetchClosingState(undefined, controller.signal)
-        .then((fresh) => {
-          setState(fresh);
-          setError("");
-        })
-        .catch((e: Error) => {
-          if (!controller.signal.aborted) setError(e.message);
-        });
-    void refresh();
-    window.addEventListener(CLOSING_CHANGED, refresh);
-    return () => {
-      controller.abort();
-      window.removeEventListener(CLOSING_CHANGED, refresh);
-    };
-  }, []);
-
-  const today = state ? todayIn(state.settings.timeZone) : null;
-  const todayClosed = !!state?.closings.some((c) => c.day === today && c.origin === "closing");
-  const hasDraft = !!state?.drafts.some((d) => d.day === today);
-  const risk = state?.summary?.atRisk ?? null;
-  const target = risk && !todayClosed ? `/tagesabschluss?tag=${risk.day}` : "/tagesabschluss";
-  const statusLine = !state
-    ? error || "Dein Stand wird geladen …"
-    : !state.eligibility.participant
-      ? "Für deinen Tagesabschluss fehlt noch ein persönliches Profil."
-      : risk
-        ? `Offen: ${formatShortDay(risk.day)}, rechtzeitig bis ${formatMoment(risk.deadline, state.settings.timeZone)}.`
-        : todayClosed
-          ? "Heute eingereicht. Dein Tag zählt."
-          : hasDraft
-            ? "Entwurf für heute gespeichert. Er zählt erst nach dem Einreichen."
-            : "Zahlen und Reflexion in einem Abschluss. Zählt erst nach dem Einreichen.";
-
-  return (
-    <section className="cm-strip" aria-label="Tagesabschluss und Serie">
-      <div className="cm-strip-main">
-        <span className="cm-strip-icon" aria-hidden="true">
-          {todayClosed ? <CircleCheck size={22} /> : <Flame size={22} />}
-        </span>
-        <div>
-          <strong>Dein Tagesabschluss</strong>
-          <p className={risk ? "warn" : ""}>{statusLine}</p>
-        </div>
-      </div>
-      {state?.summary && (
-        <dl className="cm-strip-stats">
-          <div>
-            <dt>Serie</dt>
-            <dd>{state.summary.streak.current}</dd>
-          </div>
-        </dl>
-      )}
-      <div className="cm-strip-actions">
-        <Link className="btn primary" href={target}>
-          {todayClosed ? "Tagesabschluss ansehen" : "Tagesabschluss"}
-        </Link>
-        <Link className="cm-link" href="/reflexionen">
-          <MessageCircle size={15} aria-hidden="true" /> Reflexionen der anderen
-        </Link>
-      </div>
-    </section>
-  );
-}
 
 export default function CommitmentDashboard({
   initial,

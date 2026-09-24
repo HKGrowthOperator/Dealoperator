@@ -2180,17 +2180,17 @@ li[data-open] .rb-chevron {
   margin-bottom: var(--space-5);
   border-radius: var(--radius-l);
 }
-.ac-kicker {
+.ac-card .ac-kicker {
   font-size: var(--text-label);
   letter-spacing: 0;
   text-transform: none;
 }
-.ac-card[data-active] {
+.ac-card.ac-card[data-active] {
   background: var(--do-blue);
   box-shadow: none;
 }
-.ac-progress,
-.ac-card p {
+.ac-card .ac-progress,
+.ac-card.ac-card p {
   font-size: var(--text-label);
 }
 .md-discord {
@@ -2360,4 +2360,15 @@ li[data-open] .rb-chevron {
 }
 .rf .cm-feed-filters > button {
   grid-column: 1 / -1;
+}
+.rb-list > li[data-flash] {
+  animation: rb-flash 1400ms var(--ease-out);
+}
+@keyframes rb-flash {
+  0% {
+    background-color: oklch(88% 0.08 258);
+  }
+  100% {
+    background-color: var(--do-blue-soft);
+  }
 }
