@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { Database } from "../server/database";
-import { publicRanking } from "../server/operator";
+import { publicRanking, showInRanking } from "../server/operator";
 import {
   closingState,
   requestPause,
@@ -515,4 +515,23 @@ test("an own closing replaces a day filled from the group messages; curated impo
   assert.equal(row.counts.attempts, 40);
   // Werte aus dem übernommenen Stand werden nicht mitgenommen.
   assert.equal(row.counts.legacyMeetings, null);
+});
+
+test("the closing can switch the ranking on, never off; the start page switch does the same", async () => {
+  await member(alice, "Alice");
+  await assert.rejects(showInRanking(db, bob), /Profil/);
+  // Nur „ein“: false nimmt das Schema nicht an.
+  await assert.rejects(submitClosing(db, alice, closing({ publicConsent: false })));
+  await submitClosing(db, alice, closing({ publicConsent: true }));
+  const [p] = await db.query("SELECT public_consent FROM participants WHERE owner='alice'");
+  assert.equal(p.public_consent, true);
+  assert.equal((await publicRanking(db, today(), today())).length, 1);
+  const state = await closingState(db, alice, today().slice(0, 7));
+  assert.equal(state.eligibility.participant?.publicConsent, true);
+
+  await member(bob, "Bob");
+  await submitClosing(db, bob, closing());
+  assert.equal((await publicRanking(db, today(), today())).length, 1);
+  assert.deepEqual(await showInRanking(db, bob), { ok: true, publicConsent: true });
+  assert.equal((await publicRanking(db, today(), today())).length, 2);
 });

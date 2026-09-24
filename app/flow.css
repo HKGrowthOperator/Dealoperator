@@ -625,6 +625,54 @@
   margin: 1px 0 0;
   accent-color: var(--flow-blue);
 }
+/* Rangliste ja/nein: bewusste Wahl mit zwei klaren Optionen. */
+.flow-radios {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.flow-radios legend {
+  padding: 0;
+  margin-bottom: 2px;
+  font-weight: 700;
+}
+.flow-radio {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid var(--flow-line, #d9dee8);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.flow-radio:has(input:checked) {
+  border-color: var(--flow-blue);
+  background: color-mix(in oklab, var(--flow-blue) 7%, white);
+}
+.flow-radios[data-invalid] .flow-radio {
+  border-color: #c0392b;
+}
+.flow-radio input {
+  width: 20px;
+  height: 20px;
+  margin: 1px 0 0;
+  accent-color: var(--flow-blue);
+}
+.flow-radio strong {
+  display: block;
+  font-size: 15px;
+}
+.flow-radio small {
+  display: block;
+  margin-top: 2px;
+  color: var(--flow-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
 .flow .flow-signin {
   margin-top: 12px;
 }

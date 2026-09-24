@@ -16,7 +16,7 @@ import { replaceableImport } from "./closing";
 export type HomeState = {
   team: boolean;
   hasPassword: boolean;
-  participant: { id: string; name: string } | null;
+  participant: { id: string; name: string; publicConsent: boolean } | null;
   /** Laufende Profilübernahme ohne eigenes Profil. */
   request: { kind: string; status: string } | null;
   today: {
@@ -38,7 +38,7 @@ export async function homeState(
 ): Promise<HomeState> {
   const base = { team: isTeam(actor), hasPassword: !!actor.hasPassword };
   const [participant] = await db.query(
-    "SELECT id,name,eligible_since FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
+    "SELECT id,name,eligible_since,public_consent FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
     [actor.userId],
   );
   if (!participant) {
@@ -93,7 +93,7 @@ export async function homeState(
   }
   return {
     ...base,
-    participant: { id, name: String(participant.name) },
+    participant: { id, name: String(participant.name), publicConsent: !!participant.public_consent },
     request: null,
     today: { day: today, status, due: isDueDay(today, settings, pauses) },
     earlier,

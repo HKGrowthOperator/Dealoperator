@@ -490,6 +490,18 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
 // entfallen. Ein vorbereitetes Profil wird ausschließlich über eine Anfrage in
 // server/onboarding.ts und die anschließende Freigabe durch das
 // Deal-Operator-Team mit einem Konto verbunden.
+/**
+ * Ein-Klick-Schalter „In der Rangliste zeigen“ (Startseite). Schaltet nur
+ * ein; ausschalten bleibt im Profil, wo steht, was damit verschwindet.
+ */
+export async function showInRanking(db: Database, actor: Actor) {
+  const [p] = await db.query(
+    "UPDATE participants SET public_consent=true WHERE owner=$1 AND kind='person' RETURNING id",
+    [actor.userId],
+  );
+  if (!p) throw new AppError("Lege zuerst dein Profil an oder übernimm es.");
+  return { ok: true, publicConsent: true };
+}
 export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   const v = z
     .object({

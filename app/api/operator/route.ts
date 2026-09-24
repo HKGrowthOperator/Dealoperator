@@ -11,6 +11,7 @@ import {
   previewImport,
   rateLimit,
   setSearchable,
+  showInRanking,
   updateAccount,
 } from "@/server/operator";
 import { decideRequest, reviewQueue } from "@/server/onboarding";
@@ -72,6 +73,7 @@ export async function POST(request: Request) {
       );
     if (value.action === "account")
       return json(await updateAccount(db, actor, value.value));
+    if (value.action === "showInRanking") return json(await showInRanking(db, actor));
     if (!isTeam(actor))
       throw new AppError(
         "Dieser Bereich ist nur für das Team freigeschaltet.",

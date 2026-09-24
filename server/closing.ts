@@ -192,6 +192,10 @@ export const submitSchema = z
     // die Bestätigung einmal vorliegt (visibilityConfirmed); geprüft wird in
     // submitClosing, weil es dafür das Profil braucht.
     acknowledged: z.boolean().optional(),
+    // „Meine Zahlen in der Rangliste zeigen“ direkt im Tagesabschluss. Nur
+    // einschalten; ausschalten bleibt bewusst im Profil, wo steht, was damit
+    // verschwindet.
+    publicConsent: z.literal(true).optional(),
   })
   .strict();
 
@@ -309,6 +313,8 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
     // Wer sieht was: einmal bestätigen reicht, auch über die API.
     if (!v.acknowledged && !(await visibilityConfirmed(tx, participant)))
       throw new AppError(ACK_MISSING, 400, undefined, "acknowledged");
+    if (v.publicConsent && !e.participant!.publicConsent)
+      await tx.query("UPDATE participants SET public_consent=true WHERE id=$1", [participant]);
     const settings = await loadCommitmentSettings(tx);
     const first = firstClosableDay(e.participant!.eligibleSince, settings);
     if (first && v.day < first)

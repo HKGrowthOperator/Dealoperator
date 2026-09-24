@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Check,
   CircleAlert,
+  EyeOff,
   CircleCheck,
   Clock3,
   LoaderCircle,
@@ -654,6 +655,9 @@ export default function ClosingForm({
   const [conflict, setConflict] = useState(false);
   const [draftStatus, setDraftStatus] = useState<DraftStatus>({ kind: "idle" });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // „Meine Zahlen in der Rangliste zeigen“, wenn das Profil noch auf
+  // „nicht öffentlich“ steht. Geht mit dem Einreichen an den Server.
+  const [shareRanking, setShareRanking] = useState(false);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [showOptional, setShowOptional] = useState(false);
   // Die Tagesauswahl erscheint erst auf Wunsch: meistens geht es um heute.
@@ -948,6 +952,7 @@ export default function ClosingForm({
       },
       // Nur beim ersten Mal nötig; danach kennt der Server die Bestätigung.
       ...(needsAcknowledgement ? { acknowledged: true } : {}),
+      ...(shareRanking ? { publicConsent: true } : {}),
     };
     const hash = JSON.stringify(value);
     const key =
@@ -986,6 +991,7 @@ export default function ClosingForm({
       });
       setAttempted(false);
       setTouched(new Set());
+      setShareRanking(false);
       setDraftStatus({ kind: "idle" });
       announceClosingChange();
       onSubmitted?.(form.day);
@@ -1289,9 +1295,15 @@ export default function ClosingForm({
                 </li>
               )}
               <li>
-                {confirmed.publicConsent
-                  ? "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe."
-                  : "Deine Zahlen stehen in deinem Bereich. Öffentlich erscheinen sie erst mit deiner Zustimmung im Profil."}
+                {confirmed.publicConsent ? (
+                  "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe."
+                ) : (
+                  <>
+                    Deine Zahlen erscheinen noch nicht in der Rangliste. Einschalten kannst du das
+                    auf der Startseite oder unter{" "}
+                    <Link href="/profil?modus=eigen">Profil und Einstellungen</Link>.
+                  </>
+                )}
               </li>
               <li>
                 Deine Reflexion steht unter Reflexionen
@@ -1450,6 +1462,35 @@ export default function ClosingForm({
             )}
           </fieldset>
 
+          {eligibility.participant && !eligibility.participant.publicConsent && (
+            <fieldset className="cm-group cm-ranking">
+              <legend>Deine Zahlen in der Rangliste</legend>
+              <p className="cm-ranking-note">
+                <EyeOff size={18} aria-hidden="true" />
+                <span>
+                  Dein Profil steht auf „nicht öffentlich“. Deine eingereichten Zahlen fehlen
+                  deshalb in der Rangliste und in der gemeinsamen Summe.
+                </span>
+              </p>
+              <label className="cm-check">
+                <input
+                  id={`${uid}-share-ranking`}
+                  type="checkbox"
+                  checked={shareRanking}
+                  disabled={busy}
+                  onChange={(e) => setShareRanking(e.target.checked)}
+                />
+                <span>
+                  Meine Zahlen mit Anzeigenamen in der Rangliste zeigen
+                  <small>
+                    Gilt mit dem Einreichen für alle deine Tage. Ausschalten geht jederzeit im
+                    Profil.
+                  </small>
+                </span>
+              </label>
+            </fieldset>
+          )}
+
           {needsAcknowledgement && (
             <fieldset className="cm-group cm-visibility">
               <legend>Wer sieht deinen Tagesabschluss?</legend>
@@ -1459,9 +1500,9 @@ export default function ClosingForm({
                   Reflexionen.
                 </li>
                 <li>
-                  {eligibility.participant?.publicConsent
-                    ? "Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, weil du der öffentlichen Anzeige zugestimmt hast."
-                    : "Deine Zahlen erscheinen nicht öffentlich, weil du der öffentlichen Anzeige nicht zugestimmt hast."}
+                  {eligibility.participant?.publicConsent || shareRanking
+                    ? "Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, mit deinem Anzeigenamen."
+                    : "Deine Zahlen erscheinen nur in der Rangliste, wenn du das oben einschaltest."}
                 </li>
                 <li>Deinen Wunsch nach Unterstützung sieht nur das Team.</li>
               </ul>

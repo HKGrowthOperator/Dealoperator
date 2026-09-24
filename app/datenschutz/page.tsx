@@ -131,8 +131,10 @@ export default function Page() {
             Anzeigename, Firma und Rolle, die freigegebenen Kennzahlen mit
             Meldedatum sowie in der Dranbleiben-Übersicht die Serie und die
             Zahl aktiver und abgeschlossener Tage. Die
-            Veröffentlichung wird getrennt gewählt und lässt sich jederzeit
-            widerrufen. Rechtsgrundlage ist Art. 6 Abs. 1 lit. a DSGVO.
+            Veröffentlichung wird beim Anlegen des Profils ausdrücklich gewählt,
+            lässt sich auf der Startseite und im Tagesabschluss jederzeit
+            einschalten und im Profil jederzeit widerrufen. Rechtsgrundlage ist
+            Art. 6 Abs. 1 lit. a DSGVO.
           </p>
         </section>
 
