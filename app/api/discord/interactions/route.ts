@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   const owner = await ownerForDiscordUser(database(), userId);
   if (!owner)
     return reply(
-      `Dein Discord-Konto ist noch nicht mit Deal Operator verknüpft. Verknüpfen kannst du es hier: ${site}/tagesabschluss`,
+      `Dein Discord-Konto ist noch nicht mit Deal Operator verknüpft. Verknüpfen kannst du es unter Profil und Einstellungen: ${site}/profil`,
     );
   switch (interaction.data?.name) {
     case "tagesabschluss":

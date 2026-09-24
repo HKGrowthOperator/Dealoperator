@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import {
   Bell,
@@ -703,6 +704,8 @@ export default function PushSetup({
 
 const LATER = "do-push-spaeter";
 const LATER_DAYS = 7;
+/** Nach dem Einreichen „Nein, danke“: dann fragt diese Stelle nicht erneut. */
+const DECLINED = "do-push-abgelehnt";
 
 /**
  * Kurze Karte oben im Tagesabschluss: Erinnerungen mit einem Tipp einschalten.
@@ -713,8 +716,11 @@ const LATER_DAYS = 7;
  */
 export function PushPrompt({
   settings = defaultCommitmentSettings,
+  variant = "card",
 }: {
   settings?: CommitmentSettings;
+  /** after-submit: einmaliges Angebot in der Bestätigung nach dem Einreichen. */
+  variant?: "card" | "after-submit";
 }) {
   const env = useEnvironment();
   const [info, setInfo] = useState<PushInfo | null>(null);
@@ -728,7 +734,8 @@ export function PushPrompt({
     const timer = setTimeout(() => {
       try {
         const at = Number(localStorage.getItem(LATER) || 0);
-        if (alive) setLater(Date.now() - at < LATER_DAYS * 86400_000);
+        const declined = localStorage.getItem(DECLINED) === "1";
+        if (alive) setLater(declined || Date.now() - at < LATER_DAYS * 86400_000);
       } catch {
         if (alive) setLater(false);
       }
@@ -770,7 +777,7 @@ export function PushPrompt({
           text:
             answer === "denied"
               ? "Benachrichtigungen sind für diese Seite blockiert. Du kannst sie in den Einstellungen deines Browsers wieder erlauben."
-              : "Ohne deine Erlaubnis gibt es keine Erinnerungen. Du kannst es unten unter Erinnerungen jederzeit erneut versuchen.",
+              : "Ohne deine Erlaubnis gibt es keine Erinnerungen. Unter Profil und Einstellungen kannst du es jederzeit erneut versuchen.",
         });
         return;
       }
@@ -786,7 +793,7 @@ export function PushPrompt({
         text:
           e instanceof ApiError
             ? e.message
-            : "Das Einschalten hat nicht geklappt. Unten unter Erinnerungen kannst du es noch einmal versuchen.",
+            : "Das Einschalten hat nicht geklappt. Unter Profil und Einstellungen kannst du es noch einmal versuchen.",
       });
     } finally {
       setBusy(false);
@@ -795,7 +802,8 @@ export function PushPrompt({
 
   function postpone() {
     try {
-      localStorage.setItem(LATER, String(Date.now()));
+      if (variant === "after-submit") localStorage.setItem(DECLINED, "1");
+      else localStorage.setItem(LATER, String(Date.now()));
     } catch {
       /* ohne Speicher erscheint die Karte beim nächsten Besuch wieder */
     }
@@ -819,12 +827,16 @@ export function PushPrompt({
     return null;
 
   return (
-    <section className="cm-push-prompt" aria-label="Erinnerungen">
+    <section className={`cm-push-prompt md-push-${variant}`} aria-label="Erinnerungen">
       <span className="cm-push-prompt-icon" aria-hidden="true">
         <Bell size={20} />
       </span>
       <div>
-        <strong>Erinnerung an deinen Tagesabschluss?</strong>
+        <strong>
+          {variant === "after-submit"
+            ? "Soll dich Deal Operator erinnern, wenn ein Abschluss fehlt?"
+            : "Erinnerung an deinen Tagesabschluss?"}
+        </strong>
         <p>
           {ios
             ? "Auf dem iPhone gibt es Erinnerungen in der Web-App vom Home-Bildschirm. So richtest du sie ein:"
@@ -832,9 +844,9 @@ export function PushPrompt({
         </p>
         <div className="cm-push-prompt-actions">
           {ios ? (
-            <a className="btn primary" href="#erinnerungen">
+            <Link className="btn primary" href="/profil?modus=eigen#erinnerungen">
               <SquarePlus size={17} aria-hidden="true" /> Zum Home-Bildschirm
-            </a>
+            </Link>
           ) : (
             <button type="button" className="btn primary" disabled={busy} onClick={() => void enable()}>
               {busy ? (
@@ -846,7 +858,7 @@ export function PushPrompt({
             </button>
           )}
           <button type="button" className="btn secondary" onClick={postpone}>
-            Später
+            {variant === "after-submit" ? "Nein, danke" : "Später"}
           </button>
         </div>
       </div>

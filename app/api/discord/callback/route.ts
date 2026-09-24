@@ -8,7 +8,9 @@ import { DISCORD_STATE_COOKIE, linkDiscord } from "@/server/discord-admin";
 export const dynamic = "force-dynamic";
 
 function back(result: string) {
-  const url = new URL("/tagesabschluss", process.env.APP_URL || "http://localhost:3000");
+  // Die Verknüpfung liegt unter Profil und Einstellungen.
+  const url = new URL("/profil", process.env.APP_URL || "http://localhost:3000");
+  url.searchParams.set("modus", "eigen");
   url.searchParams.set("discord", result);
   return Response.redirect(url.toString(), 303);
 }

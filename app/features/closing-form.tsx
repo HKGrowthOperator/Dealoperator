@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { metricLabels } from "@/lib/kpis";
+import { aggregate, emptyCounts, metricLabels, progress, type Counts } from "@/lib/kpis";
 import {
   deadlineFor,
   isDueDay,
@@ -50,6 +50,14 @@ export const COUNT_KEYS = [
 export type CountKey = (typeof COUNT_KEYS)[number];
 const REQUIRED_COUNTS: CountKey[] = ["attempts", "settingsBooked", "closingsBooked"];
 const OPTIONAL_COUNTS: CountKey[] = ["settingsHeld", "closingsHeld", "dealsWon"];
+const COUNT_LABELS: Record<CountKey, string> = {
+  attempts: "Anwahlen",
+  settingsBooked: "Settings vereinbart",
+  closingsBooked: "Closings vereinbart",
+  settingsHeld: "Settings gehalten",
+  closingsHeld: "Closings gehalten",
+  dealsWon: "Deals gewonnen",
+};
 const COUNT_HINTS: Record<CountKey, string> = {
   attempts: "Jede Anwahl zählt, auch ohne Gespräch.",
   settingsBooked: "Neu vereinbarte Setting-Termine.",
@@ -321,10 +329,13 @@ export function EligibilityChecklist({
   missing,
   next = "/tagesabschluss",
   purpose = "closing",
+  draftKept = false,
 }: {
   missing: MissingReason[];
   next?: string;
   purpose?: "closing" | "feed";
+  /** Ein Entwurf ist möglich und bleibt erhalten, während etwas nachgetragen wird. */
+  draftKept?: boolean;
 }) {
   const needs = new Set(missing);
   const items: {
@@ -338,7 +349,7 @@ export function EligibilityChecklist({
       key: "login",
       done: !needs.has("login"),
       title: "Mit bestätigter E-Mail angemeldet",
-      text: "Du meldest dich über einen Link in deinem Postfach an.",
+      text: "Mit deiner E-Mail-Adresse und deinem Passwort.",
       links: [
         { href: `/anmelden?next=${encodeURIComponent(next)}`, label: "Anmelden" },
       ],
@@ -365,8 +376,13 @@ export function EligibilityChecklist({
       key: "phone",
       done: !needs.has("phone") && !needs.has("login"),
       title: "Telefonnummer hinterlegt",
-      text: "Mit Ländervorwahl, zum Beispiel +49 … Sie ist nur für das Team sichtbar.",
-      links: [{ href: "/profil?modus=eigen", label: "Nummer im Profil ergänzen" }],
+      text: "Mit Ländervorwahl, zum Beispiel +49. Nur das Team sieht sie.",
+      links: [
+        {
+          href: `/profil?modus=eigen&weiter=${encodeURIComponent(next)}#konto`,
+          label: "Nummer ergänzen",
+        },
+      ],
     },
   ];
   return (
@@ -374,8 +390,13 @@ export function EligibilityChecklist({
       <p className="cm-checklist-lead">
         {purpose === "feed"
           ? "Zum Lesen der Reflexionen brauchst du:"
-          : "Für einen eigenen Tagesabschluss fehlt noch:"}
+          : "Vor dem Einreichen fehlt noch:"}
       </p>
+      {draftKept && purpose === "closing" && (
+        <p className="cm-checklist-note">
+          Du kannst schon ausfüllen. Dein Entwurf bleibt gespeichert, und danach geht es hier weiter.
+        </p>
+      )}
       <ol>
         {items.map((item) => (
           <li key={item.key} className={item.done ? "done" : ""}>
@@ -438,7 +459,24 @@ type Confirmation = {
   unchanged: boolean;
   status: DayStatus;
   publicConsent: boolean;
+  /** Aktuelle Abschluss-Serie nach dem Einreichen, falls bekannt. */
+  streak: number | null;
+  /** Neu erreichte Leistungslevel, z. B. „Dialer Level 2“. Nur echte Sprünge. */
+  levelUps: string[];
 };
+
+/** Leistungslevel aus allen eigenen Tagesständen (auch übernommenen). */
+function levelsOf(state: ClosingState) {
+  return progress(
+    aggregate(state.closings.map((c) => ({ ...emptyCounts(), ...c.counts }) as Counts)),
+  );
+}
+function levelUps(before: ClosingState, after: ClosingState) {
+  const old = new Map(levelsOf(before).map((t) => [t.id, t.level]));
+  return levelsOf(after)
+    .filter((t) => t.level > (old.get(t.id) ?? 0))
+    .map((t) => `${t.label} Level ${t.level}`);
+}
 type FieldKey = CountKey | "energy" | "win" | "next" | "acknowledged";
 
 const emptyValues = (): Values => ({
@@ -568,6 +606,7 @@ export default function ClosingForm({
   initial,
   syncUrl = false,
   onSubmitted,
+  afterSubmit,
 }: {
   /** Leistungstag (YYYY-MM-DD), Standard heute. */
   day?: string;
@@ -576,6 +615,8 @@ export default function ClosingForm({
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
   onSubmitted?: (day: string) => void;
+  /** Zusatz in der Bestätigung, z. B. das einmalige Angebot für Erinnerungen. */
+  afterSubmit?: React.ReactNode;
 }) {
   const uid = useId();
   const [state, setState] = useState<ClosingState | null>(initial ?? null);
@@ -915,6 +956,8 @@ export default function ClosingForm({
         unchanged: !!result.unchanged,
         status: fresh ? statusOf(fresh, form.day) : "free",
         publicConsent: !!base.eligibility.participant?.publicConsent,
+        streak: fresh?.summary?.streak.current ?? null,
+        levelUps: fresh ? levelUps(state, fresh) : [],
       });
       setAttempted(false);
       setTouched(new Set());
@@ -951,13 +994,29 @@ export default function ClosingForm({
     if (form.draftAt)
       return {
         tone: "",
-        text: `Dein Entwurf vom ${formatMoment(form.draftAt, tz)} ist geladen. Er ist privat und zählt erst nach dem Einreichen.`,
+        text: `Entwurf vom ${formatMoment(form.draftAt, tz)} geladen. Er ist privat und zählt erst nach dem Einreichen.`,
       };
     return {
       tone: "",
-      text: "Dein Entwurf speichert sich automatisch. Er bleibt privat und zählt erst nach dem Einreichen.",
+      text: "Wird automatisch als privater Entwurf gespeichert. Zählt erst nach dem Einreichen.",
     };
   })();
+
+  // Stand des Tages in einem Wort: eingereicht, Entwurf, unvollständig, offen.
+  const incomplete = attempted && Object.keys(errors).length > 0;
+  const hasDraft =
+    !!form.draftAt || (draftStatus.kind === "saved" && draftStatus.day === form.day);
+  const badge = submitted
+    ? { tone: "done", icon: <CircleCheck size={15} aria-hidden="true" />, text: form.dirty ? "Eingereicht, Änderung offen" : "Eingereicht" }
+    : imported
+      ? { tone: "done", icon: <Lock size={14} aria-hidden="true" />, text: "Übernommen" }
+      : incomplete
+        ? { tone: "warn", icon: <CircleAlert size={15} aria-hidden="true" />, text: "Unvollständig" }
+        : hasDraft
+          ? { tone: "draft", icon: <Check size={15} aria-hidden="true" />, text: "Entwurf gespeichert" }
+          : due
+            ? { tone: "open", icon: null, text: status === "missed" ? "Nachtragen möglich" : "Noch offen" }
+            : { tone: "free", icon: null, text: paused ? "Pause" : "Freiwillig" };
 
   const dayNote = (() => {
     if (imported) return null;
@@ -968,7 +1027,7 @@ export default function ClosingForm({
       return "Kein Calling-Tag: Ein Abschluss ist freiwillig. Er zählt als Bonus, deine Serie bleibt unberührt.";
     if (submitted) return null;
     if (deadline && nowMs < deadline.getTime())
-      return `Calling-Tag. Rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
+      return `Für deine Serie rechtzeitig bis ${formatMoment(deadline.toISOString(), tz)}.`;
     if (deadline)
       return `Rechtzeitig war bis ${formatMoment(deadline.toISOString(), tz)}. Deine Zahlen zählen trotzdem, nur für die Serie zählt der Tag nicht mehr.`;
     return null;
@@ -982,7 +1041,7 @@ export default function ClosingForm({
         <div className={`cm-count ${error ? "invalid" : ""}`} key={k}>
           <label htmlFor={id}>
             <span>
-              {metricLabels[k]}
+              {COUNT_LABELS[k]}
               {required && (
                 <span className="cm-required" aria-hidden="true">
                   {" "}*
@@ -1003,7 +1062,7 @@ export default function ClosingForm({
             aria-required={required}
             aria-invalid={!!error}
             aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
-            placeholder={required ? "Zahl" : "leer"}
+            placeholder={required ? "Zahl" : ""}
             value={form.values.counts[k]}
             disabled={!canDraft || busy}
             onBlur={() => blur(k)}
@@ -1048,11 +1107,12 @@ export default function ClosingForm({
             <span className="cm-optional"> (freiwillig)</span>
           )}
         </label>
-        {/* Auf dem Handy stehen die Beispiele schon im Feld; nur der Hinweis
-            zur Sichtbarkeit bleibt dort stehen. */}
-        <small id={`${id}-hint`} className={key === "help" ? undefined : "cm-hint-extra"}>
-          {hint}
-        </small>
+        {hint && (
+          <small id={`${id}-hint`} className={key === "help" ? "cm-private" : undefined}>
+            {key === "help" && <Lock size={14} aria-hidden="true" />}
+            {hint}
+          </small>
+        )}
         <textarea
           id={id}
           rows={key === "help" ? 2 : 3}
@@ -1060,7 +1120,7 @@ export default function ClosingForm({
           required={required}
           aria-required={required}
           aria-invalid={!!error}
-          aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+          aria-describedby={`${hint ? `${id}-hint` : ""}${error ? ` ${id}-error` : ""}` || undefined}
           placeholder={placeholder}
           value={form.values[key]}
           disabled={!canDraft || busy}
@@ -1084,39 +1144,24 @@ export default function ClosingForm({
 
   const energyError = visible("energy");
   const ackError = visible("acknowledged");
+  const confirmed = confirmation && confirmation.day === form.day ? confirmation : null;
 
   return (
-    <section className="cm-card cm-closing" aria-labelledby={`${uid}-title`}>
-      <header className="cm-closing-head">
+    <section className="cm-card cm-closing md-closing" aria-labelledby={`${uid}-title`}>
+      <header className="md-head">
         <div>
-          <p className="cm-kicker">TAGESABSCHLUSS</p>
-          <h2 id={`${uid}-title`}>
-            {form.day === today ? "Heute, " : ""}
-            {formatLongDay(form.day)}
-          </h2>
+          <p className="md-kicker">{form.day === today ? "Heute" : "Nachtrag"}</p>
+          <h2 id={`${uid}-title`}>{formatLongDay(form.day)}</h2>
         </div>
-        <span className={`cm-day-badge ${submitted ? "done" : due ? "due" : "free"}`}>
-          {submitted ? (
-            <>
-              <CircleCheck size={15} aria-hidden="true" /> Eingereicht
-            </>
-          ) : imported ? (
-            <>
-              <Lock size={14} aria-hidden="true" /> Übernommen
-            </>
-          ) : due ? (
-            status === "missed" ? "Nachtragen möglich" : status === "open" ? "Noch offen" : "Calling-Tag"
-          ) : paused ? (
-            "Pause"
-          ) : (
-            "Freiwillig"
-          )}
+        <span className={`md-badge md-badge-${confirmed ? "done" : badge.tone}`}>
+          {confirmed ? <CircleCheck size={15} aria-hidden="true" /> : badge.icon}
+          {confirmed ? "Eingereicht" : badge.text}
         </span>
       </header>
 
-      <div className="cm-day-picker">
-        <label htmlFor={`${uid}-day`}>Leistungstag</label>
-        <div className="cm-day-row">
+      <div className="md-day">
+        <label htmlFor={`${uid}-day`}>Anderen Tag wählen</label>
+        <div className="md-day-row">
           <input
             id={`${uid}-day`}
             type="date"
@@ -1130,7 +1175,7 @@ export default function ClosingForm({
             }}
           />
           {form.day !== today && (
-            <button type="button" className="btn secondary" onClick={() => selectDay(today)}>
+            <button type="button" className="do-button do-button-secondary" onClick={() => selectDay(today)}>
               Heute
             </button>
           )}
@@ -1147,7 +1192,7 @@ export default function ClosingForm({
         )}
       </div>
 
-      {openEarlier && (
+      {openEarlier && !confirmed && (
         <div className={`cm-alert ${openEarlier.risk ? "warn" : "info"}`}>
           <Clock3 size={18} aria-hidden="true" />
           <div>
@@ -1157,7 +1202,7 @@ export default function ClosingForm({
             </p>
             <button
               type="button"
-              className="btn secondary"
+              className="do-button do-button-secondary"
               onClick={() => selectDay(openEarlier.day)}
             >
               {formatShortDay(openEarlier.day)} abschließen
@@ -1166,50 +1211,57 @@ export default function ClosingForm({
         </div>
       )}
 
-      {confirmation && confirmation.day === form.day && (
-        <div className="cm-confirm" ref={confirmRef} tabIndex={-1} role="status">
+      {confirmed && (
+        <div className="md-confirm" ref={confirmRef} tabIndex={-1} role="status">
+          <span className="md-confirm-mark" aria-hidden="true">
+            <Check size={28} strokeWidth={3} />
+          </span>
           <h3>
-            <CircleCheck size={20} aria-hidden="true" />
-            {confirmation.unchanged
+            {confirmed.unchanged
               ? "Keine Änderung nötig."
-              : `Eingereicht. ${formatLongDay(confirmation.day)} zählt jetzt.`}
+              : `${formatLongDay(confirmed.day)} ist eingereicht.`}
           </h3>
-          {confirmation.unchanged ? (
-            <p>Deine eingereichte Fassung war schon genau so. Es bleibt alles, wie es ist.</p>
+          {confirmed.unchanged ? (
+            <p>Deine eingereichte Fassung war schon genau so.</p>
           ) : (
-            <ul>
-              <li>
-                {confirmation.publicConsent
-                  ? "Deine Zahlen zählen im Ranking und in der Gruppensumme und sind öffentlich sichtbar, weil du der öffentlichen Anzeige zugestimmt hast."
-                  : "Deine Zahlen zählen für deine Serie und stehen in deinem Bereich. Im Ranking und in der Gruppensumme erscheinen sie erst, wenn du der öffentlichen Anzeige zustimmst. Das kannst du in deinem Profil ändern."}
-              </li>
-              {CONFIRM_STATUS[confirmation.status] && (
-                <li>{CONFIRM_STATUS[confirmation.status]}</li>
+            <ul className="md-effects">
+              {CONFIRM_STATUS[confirmed.status] && (
+                <li>
+                  {confirmed.streak !== null &&
+                  (confirmed.status === "called" || confirmed.status === "reflected")
+                    ? `${confirmed.status === "reflected" ? "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen." : "Rechtzeitig eingereicht."} Deine Abschluss-Serie steht bei ${confirmed.streak} ${confirmed.streak === 1 ? "Tag" : "Tagen"}.`
+                    : CONFIRM_STATUS[confirmed.status]}
+                </li>
               )}
               <li>
-                Deine Reflexion erscheint im Austausch unter{" "}
-                <Link className="cm-link" href="/reflexionen">
-                  /reflexionen
-                </Link>
-                {confirmation.publicConsent
-                  ? " mit deinen Zahlen."
-                  : ", ohne deine Zahlen."}
+                {confirmed.publicConsent
+                  ? "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe."
+                  : "Deine Zahlen stehen in deinem Bereich. Öffentlich erscheinen sie erst mit deiner Zustimmung im Profil."}
               </li>
-              <li>Für diesen Tag bekommst du keine Erinnerung mehr.</li>
+              <li>
+                Deine Reflexion steht unter Reflexionen
+                {confirmed.publicConsent ? ", mit deinen Zahlen." : ", ohne deine Zahlen."}
+              </li>
             </ul>
           )}
-          <div className="cm-actions">
-            <Link className="btn primary" href="/reflexionen">
-              Zum Austausch
+          {confirmed.levelUps.length > 0 && (
+            <p className="md-level-up">
+              Neues Leistungslevel: {confirmed.levelUps.join(", ")}.{" "}
+              <Link href="/heute?modus=eigen">Mein Fortschritt</Link>
+            </p>
+          )}
+          <div className="md-confirm-actions">
+            <Link className="do-button do-button-primary" href="/">
+              Zu den Ergebnissen
             </Link>
-            <button
-              type="button"
-              className="btn secondary"
-              onClick={() => setConfirmation(null)}
-            >
+            <Link className="do-button do-button-secondary" href="/reflexionen">
+              Reflexionen lesen
+            </Link>
+            <button type="button" className="do-link md-correct" onClick={() => setConfirmation(null)}>
               Diesen Tag korrigieren
             </button>
           </div>
+          {afterSubmit}
         </div>
       )}
 
@@ -1217,6 +1269,7 @@ export default function ClosingForm({
         <EligibilityChecklist
           missing={eligibility.missing}
           next={`/tagesabschluss?tag=${form.day}`}
+          draftKept={canDraft}
         />
       )}
 
@@ -1235,42 +1288,34 @@ export default function ClosingForm({
             </dl>
           </div>
         </div>
-      ) : canDraft && !(confirmation && confirmation.day === form.day) ? (
+      ) : canDraft && !confirmed ? (
         <form className="cm-form" onSubmit={submit} noValidate>
           {submitted && (
-            <div className="cm-alert info">
+            <p className="md-info">
               <ShieldCheck size={18} aria-hidden="true" />
-              <p>
-                Eingereicht {submitted.submittedAt ? `am ${formatMoment(submitted.submittedAt, tz)}` : ""}.
-                Du kannst den Tag korrigieren. Bis du die neue Fassung vollständig einreichst,
-                gilt die zuletzt eingereichte. Für die Frist zählt deine erste Einreichung.
-              </p>
-            </div>
+              <span>
+                Eingereicht{submitted.submittedAt ? ` am ${formatMoment(submitted.submittedAt, tz)}` : ""}.
+                Änderungen gelten erst, wenn du sie erneut einreichst.
+              </span>
+            </p>
           )}
           {prefilled && (
-            <div className="cm-alert info">
+            <p className="md-info">
               <ShieldCheck size={18} aria-hidden="true" />
-              <p>
-                Für diesen Tag hat das Team deine Zahlen aus den Gruppenmeldungen übernommen
-                ({COUNT_KEYS.filter((k) => typeof prefilled.counts[k] === "number")
-                  .map((k) => `${metricLabels[k]} ${prefilled.counts[k]}`)
-                  .join(", ") || "ohne Zahlen"}
-                ). Sie sind unten vorausgefüllt. Mit deinem Tagesabschluss ersetzt du sie; bis
-                dahin zählt der übernommene Stand im Ranking.
-              </p>
-            </div>
+              <span>
+                Das Team hat deine Zahlen für diesen Tag aus den Gruppenmeldungen übernommen. Sie
+                sind vorausgefüllt; mit deinem Tagesabschluss ersetzt du sie.
+              </span>
+            </p>
           )}
-          {dayNote && <p className="cm-day-note">{dayNote}</p>}
+          {dayNote && <p className="md-day-note">{dayNote}</p>}
 
           <fieldset className="cm-group">
             <legend>
               Deine Zahlen
-              <small>
-                Felder mit <span className="cm-required">*</span> sind Pflicht. 0 ist eine
-                gültige Angabe.
-              </small>
+              <small>0 ist eine gültige Angabe.</small>
             </legend>
-            <div className="cm-counts">{counts(REQUIRED_COUNTS, true)}</div>
+            <div className="cm-counts md-counts">{counts(REQUIRED_COUNTS, true)}</div>
             <button
               type="button"
               className="cm-toggle"
@@ -1278,9 +1323,11 @@ export default function ClosingForm({
               aria-controls={`${uid}-optional`}
               onClick={() => setShowOptional((s) => !s)}
             >
-              {showOptional ? "Weitere Ergebnisse ausblenden" : "Weitere Ergebnisse eintragen (freiwillig)"}
+              {showOptional
+                ? "Weitere Ergebnisse ausblenden"
+                : "Weitere Ergebnisse eintragen (freiwillig)"}
             </button>
-            <div id={`${uid}-optional`} className="cm-counts" hidden={!showOptional}>
+            <div id={`${uid}-optional`} className="cm-counts md-counts" hidden={!showOptional}>
               {counts(OPTIONAL_COUNTS, false)}
             </div>
           </fieldset>
@@ -1288,7 +1335,7 @@ export default function ClosingForm({
           <fieldset className="cm-group">
             <legend>
               Deine Reflexion
-              <small>Kurz und ehrlich reicht. Ein Learning ist auch ein Win.</small>
+              <small>Kurz und ehrlich reicht.</small>
             </legend>
             <div
               className={`cm-energy ${energyError ? "invalid" : ""}`}
@@ -1300,9 +1347,7 @@ export default function ClosingForm({
               <p id={`${uid}-energy-label`} className="cm-label">
                 Deine Energie heute<span className="cm-required" aria-hidden="true"> *</span>
               </p>
-              <small id={`${uid}-energy-hint`}>
-                Wähle bewusst: 1 heißt leer, 10 heißt voller Energie.
-              </small>
+              <small id={`${uid}-energy-hint`}>1 heißt leer, 10 heißt voller Energie.</small>
               <div className="cm-energy-scale">
                 {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                   <label key={n} className={form.values.energy === n ? "chosen" : ""}>
@@ -1330,21 +1375,21 @@ export default function ClosingForm({
             {textField(
               "win",
               "Was lief richtig gut?",
-              "Ein Einstieg, der funktioniert hat, ein Einwand, den du besser verstanden hast.",
+              "",
               true,
               "Zum Beispiel: Der kurze Einstieg über das Projekt hat drei Gespräche geöffnet.",
             )}
             {textField(
               "next",
               "Was willst du beim nächsten Calling-Tag besser machen?",
-              "Ein konkreter Schritt, den du beim nächsten Mal ausprobierst.",
+              "",
               true,
               "Zum Beispiel: Früher nach dem nächsten Termin fragen.",
             )}
             {textField(
               "help",
               "Wobei wünschst du dir Unterstützung?",
-              "Geht nur an das Team, nicht in den Austausch.",
+              "Privat: Das liest nur das Team, nicht die anderen.",
               false,
               "Optional",
             )}
@@ -1353,18 +1398,18 @@ export default function ClosingForm({
           {needsAcknowledgement && (
             <fieldset className="cm-group cm-visibility">
               <legend>Wer sieht deinen Tagesabschluss?</legend>
-              <p>
-                Mit dem Einreichen zählt dein Tag für deine Serie. Deine Zahlen gehen
-                in Ranking und Gruppensumme ein, wenn du der öffentlichen Anzeige
-                zugestimmt hast. Deine Reflexion erscheint im Austausch unter
-                /reflexionen. Lesen können alle Angemeldeten mit bestätigter E-Mail,
-                hinterlegter Telefonnummer und eigenem Profil.
-              </p>
-              <p className="cm-muted">
-                {eligibility.participant?.publicConsent
-                  ? "Du hast der öffentlichen Anzeige deiner Zahlen zugestimmt."
-                  : "Du hast der öffentlichen Anzeige deiner Zahlen nicht zugestimmt. Deine Zahlen erscheinen deshalb nicht öffentlich und nicht auf deiner Karte im Austausch."}
-              </p>
+              <ul className="md-visibility">
+                <li>
+                  Deine Reflexion lesen alle Angemeldeten mit eigenem Profil und Telefonnummer unter
+                  Reflexionen.
+                </li>
+                <li>
+                  {eligibility.participant?.publicConsent
+                    ? "Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, weil du der öffentlichen Anzeige zugestimmt hast."
+                    : "Deine Zahlen erscheinen nicht öffentlich, weil du der öffentlichen Anzeige nicht zugestimmt hast."}
+                </li>
+                <li>Deinen Wunsch nach Unterstützung sieht nur das Team.</li>
+              </ul>
               <label className={`cm-check ${ackError ? "invalid" : ""}`}>
                 <input
                   id={`${uid}-acknowledged`}
@@ -1380,7 +1425,7 @@ export default function ClosingForm({
                   }}
                 />
                 <span>
-                  Ich habe gelesen, wer meinen Tagesabschluss sieht.
+                  Verstanden. Diese Frage kommt nur einmal.
                   <span className="cm-required" aria-hidden="true"> *</span>
                 </span>
               </label>
@@ -1392,24 +1437,10 @@ export default function ClosingForm({
             </fieldset>
           )}
 
-          {draftLine && (
-            <p className={`cm-draft-line ${draftLine.tone}`} aria-live="polite">
-              {draftStatus.kind === "saving" || draftStatus.kind === "pending" ? (
-                <LoaderCircle className="spin" size={15} aria-hidden="true" />
-              ) : draftLine.tone === "ok" ? (
-                <Check size={15} aria-hidden="true" />
-              ) : null}
-              {draftLine.text}
-            </p>
-          )}
-
-          {attempted && Object.keys(errors).length > 0 && (
+          {incomplete && (
             <p className="cm-alert error" role="alert">
               <CircleAlert size={18} aria-hidden="true" />
-              <span>
-                Noch nicht vollständig: Bitte ergänze die markierten Felder. Erst dann zählt
-                dein Tag.
-              </span>
+              <span>Noch nicht vollständig. Bitte ergänze die markierten Felder.</span>
             </p>
           )}
           {serverError && (
@@ -1422,7 +1453,7 @@ export default function ClosingForm({
             <div className="cm-actions">
               <button
                 type="button"
-                className="btn secondary"
+                className="do-button do-button-secondary"
                 disabled={busy}
                 onClick={() => void reloadLatest(false)}
               >
@@ -1430,7 +1461,7 @@ export default function ClosingForm({
               </button>
               <button
                 type="button"
-                className="btn secondary"
+                className="do-button do-button-secondary"
                 disabled={busy}
                 onClick={() => void reloadLatest(true)}
               >
@@ -1439,17 +1470,25 @@ export default function ClosingForm({
             </div>
           )}
 
-          {!canSubmit && (
-            <p className="cm-muted">
-              Einreichen ist möglich, sobald die Punkte oben erledigt sind. Dein Entwurf
-              bleibt bis dahin gespeichert.
-            </p>
-          )}
-
-          <div className="cm-submit-row">
+          <div className="md-submit">
+            {draftLine && (
+              <p className={`cm-draft-line ${draftLine.tone}`} aria-live="polite">
+                {draftStatus.kind === "saving" || draftStatus.kind === "pending" ? (
+                  <LoaderCircle className="spin" size={15} aria-hidden="true" />
+                ) : draftLine.tone === "ok" ? (
+                  <Check size={15} aria-hidden="true" />
+                ) : null}
+                {draftLine.text}
+              </p>
+            )}
+            {!canSubmit && (
+              <p className="cm-muted">
+                Einreichen geht, sobald oben alles erledigt ist. Dein Entwurf bleibt gespeichert.
+              </p>
+            )}
             <button
               type="submit"
-              className="btn primary"
+              className="do-button do-button-primary md-submit-button"
               disabled={busy || !canSubmit || conflict}
             >
               {busy ? (
@@ -1465,7 +1504,7 @@ export default function ClosingForm({
                   <span>Entwurf wirklich verwerfen?</span>
                   <button
                     type="button"
-                    className="btn secondary"
+                    className="do-button do-button-secondary"
                     disabled={busy}
                     onClick={() => void discardDraft()}
                   >
@@ -1473,7 +1512,7 @@ export default function ClosingForm({
                   </button>
                   <button
                     type="button"
-                    className="btn secondary"
+                    className="do-button do-button-quiet"
                     onClick={() => setConfirmDiscard(false)}
                   >
                     Behalten
@@ -1491,10 +1530,6 @@ export default function ClosingForm({
                 </button>
               ))}
           </div>
-          <p className="cm-muted cm-small">
-            Zählt erst nach dem Einreichen. Ein Entwurf erscheint nirgends: nicht im
-            Ranking, nicht in der Serie, nicht im Austausch.
-          </p>
         </form>
       ) : null}
     </section>

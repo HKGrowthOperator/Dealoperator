@@ -1,8 +1,18 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+
+/** Rückweg nach dem Ergänzen, z. B. zum begonnenen Tagesabschluss. */
+function returnTarget(value: string | null) {
+  if (!value || !/^\/(tagesabschluss|reflexionen)(\?[a-zA-Z0-9=&_-]*)?$/.test(value)) return null;
+  return value;
+}
+
 export default function AccountSettings({ demo }: { demo: boolean }) {
+  const router = useRouter();
+  const back = returnTarget(useSearchParams().get("weiter"));
   const [value, setValue] = useState({
     name: demo ? "Alex · Beispiel" : "",
     company: "",
@@ -40,13 +50,19 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
     return () => c.abort();
   }, [demo]);
   return (
-    <section className="card padded operator-account">
-      <h2>Konto & öffentliche Sichtbarkeit</h2>
+    <section className="card padded operator-account" id="konto">
+      <h2>Konto und Sichtbarkeit</h2>
       <p className="hint">
-        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Für deinen
-        eigenen Tagesabschluss und das Lesen der Reflexionen brauchst du eine
-        Telefonnummer mit Ländervorwahl. Sie ist nur für das Team sichtbar.
+        {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}. Für den
+        Tagesabschluss und die Reflexionen brauchst du eine Telefonnummer mit
+        Ländervorwahl. Nur das Team sieht sie.
       </p>
+      {back && (
+        <p className="account-return" role="status">
+          Ergänze deine Telefonnummer und speichere. Danach geht es mit deinem
+          Entwurf weiter.
+        </p>
+      )}
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -80,8 +96,11 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
               toast.success(
                 demo
                   ? "Beispieleinstellungen aktualisiert."
-                  : "Einstellungen gespeichert.",
+                  : back
+                    ? "Gespeichert. Es geht weiter, wo du warst."
+                    : "Einstellungen gespeichert.",
               );
+              if (back && !demo && value.phone.trim()) router.push(back);
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -124,6 +143,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
                 type="tel"
                 maxLength={40}
                 autoComplete="tel"
+                autoFocus={!!back && !value.phone}
                 value={value.phone}
                 onChange={(e) => setValue({ ...value, phone: e.target.value })}
               />
@@ -155,7 +175,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
             </p>
           </div>
           <button className="btn primary" disabled={busy}>
-            Einstellungen speichern
+            {back ? "Speichern und weiter" : "Einstellungen speichern"}
           </button>
         </form>
       )}
