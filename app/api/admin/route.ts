@@ -26,6 +26,7 @@ import { discordStatus, discordInventory } from "@/server/discord-admin";
 import { runDiscordRooms } from "@/server/discord-sessions";
 import { designateRole, setTeamRole, teamList } from "@/server/roles";
 import { resendConfirmationByTeam } from "@/server/onboarding";
+import { mergeParticipants, mergePreview } from "@/server/merge";
 import { resendSignupForTeam } from "@/server/email-auth";
 import { authReady } from "@/server/auth";
 
@@ -105,6 +106,10 @@ export async function POST(request: Request) {
         return json(await commitWins(db, actor, v));
       case "resolveCase":
         return json(await resolveReviewCase(db, actor, v));
+      case "mergePreview":
+        return json(await mergePreview(db, actor, v));
+      case "mergeParticipants":
+        return json(await mergeParticipants(db, actor, v));
       case "discordRooms":
         if (!actor.admin) throw new AppError("Nur für Admins.", 403);
         return json(await runDiscordRooms(db));

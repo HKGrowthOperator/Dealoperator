@@ -8,6 +8,7 @@ import {
   FileInput,
   Headphones,
   Inbox,
+  Merge,
   RefreshCw,
   ShieldCheck,
   SlidersHorizontal,
@@ -41,6 +42,7 @@ import { RulesPanel } from "./admin-rules";
 import { DiscordPanel, NotificationsPanel } from "./admin-status";
 import { TeamPanel } from "./admin-team";
 import ResendConfirmation from "./resend-confirmation";
+import { MergePanel } from "./admin-merge";
 
 // Drei Gruppen: was heute zu entscheiden ist, Zahlen einspielen, Einstellungen.
 const GROUPS = [
@@ -56,6 +58,7 @@ const TABS = [
   { id: "uebernahmen", group: "heute", label: "Übernahmen", icon: ShieldCheck, adminOnly: false },
   { id: "faelle", group: "heute", label: "Prüffälle", icon: UserSearch, adminOnly: false },
   { id: "pausen", group: "heute", label: "Pausen", icon: CirclePause, adminOnly: false },
+  { id: "zusammenfuehren", group: "heute", label: "Profile zusammenführen", icon: Merge, adminOnly: true },
   { id: "wins", group: "import", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
   { id: "csv", group: "import", label: "CSV-Import", icon: FileInput, adminOnly: true },
   { id: "events", group: "einstellungen", label: "Akquise Days", icon: Sparkles, adminOnly: true },
@@ -287,6 +290,9 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
                   onGo={go}
                 />
               )}
+              {tab === "zusammenfuehren" && (
+                <MergePanel participants={loaded.participants} onChanged={reload} />
+              )}
               {tab === "wins" && <WinsImport onCommitted={reload} />}
               {tab === "faelle" && (
                 <ReviewCases
@@ -338,6 +344,7 @@ const KIND: Record<string, string> = {
   help: "Unterstützung",
   pause: "Pause",
   review: "Teamprüfung",
+  merge: "Zusammenführung",
 };
 function stateInfo(item: InboxItem): {
   label: string;

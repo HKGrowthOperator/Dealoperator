@@ -3937,3 +3937,84 @@ li[data-medal="gold"] .rb-bar i {
   color: var(--do-blue);
   font-weight: 650;
 }
+
+/* Verwaltung: Profile zusammenführen */
+.adm-merge-pick {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.adm-merge-swap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.adm-merge-preview {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--do-line);
+}
+.adm-merge-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+.adm-merge-side {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface-2);
+  font-size: var(--text-label);
+}
+.adm-merge-side dt {
+  margin-bottom: 4px;
+  color: var(--do-ink-3);
+  font-weight: 700;
+}
+.adm-merge-side dd {
+  margin: 2px 0 0;
+  color: var(--do-ink-2);
+}
+.adm-merge-side dd:first-of-type {
+  color: var(--do-ink);
+  font-size: var(--text-body);
+}
+.adm-merge-days {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-label);
+}
+.adm-merge-days li {
+  display: grid;
+  grid-template-columns: 8ch minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  background: var(--do-surface-2);
+}
+.adm-merge-days li[data-action="replace"] {
+  background: var(--do-blue-soft);
+}
+.adm-merge-days li[data-action="drop"] {
+  background: var(--do-amber-soft);
+}
+.adm-merge-question {
+  flex: 1 1 100%;
+  font-weight: 650;
+}
+@media (max-width: 699px) {
+  .adm-merge-pick,
+  .adm-merge-sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .adm-merge-swap {
+    justify-self: start;
+  }
+}

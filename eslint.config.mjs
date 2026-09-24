@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
       "tests/sessions.test.ts",
       "tests/home.test.ts",
       "tests/role-designations.test.ts",
+      "tests/merge.test.ts",
     ],
     rules: { "@typescript-eslint/no-explicit-any": "off" },
   },
