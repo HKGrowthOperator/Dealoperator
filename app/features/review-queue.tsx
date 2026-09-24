@@ -9,6 +9,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { formatPhone } from "@/lib/phone";
+import ResendConfirmation from "./resend-confirmation";
 
 type Request = {
   id: string;
@@ -23,6 +24,8 @@ type Request = {
   internal_note: string;
   applicant_message: string;
   applicant_answer: string | null;
+  /** Letzte belegte Bestätigungsmail (Übergabe an Supabase). */
+  last_mail_at: string | null;
   owner: string | null;
   created_at: string;
   decided_at: string | null;
@@ -279,7 +282,7 @@ export default function ReviewQueue({
 
             <dl className="review-facts">
               <div>
-                <dt>Bestätigte E-Mail</dt>
+                <dt>{r.status === "awaiting_email" ? "E-Mail (noch nicht bestätigt)" : "Bestätigte E-Mail"}</dt>
                 <dd>{r.email}</dd>
               </div>
               <div>
@@ -343,6 +346,10 @@ export default function ReviewQueue({
               <p className="review-note">
                 <strong>Interne Notiz:</strong> {r.internal_note}
               </p>
+            )}
+
+            {r.status === "awaiting_email" && (
+              <ResendConfirmation id={r.id} lastMailAt={r.last_mail_at} onSent={load} />
             )}
 
             {decidable &&

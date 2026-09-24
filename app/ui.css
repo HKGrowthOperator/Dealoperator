@@ -2893,3 +2893,36 @@ li[data-open] .rb-chevron {
   font: inherit;
   font-size: var(--text-body);
 }
+
+/* Verwaltung: Bestätigungsmail einer Registrierung neu anfordern */
+.do-resend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  flex-basis: 100%;
+  margin-top: var(--space-2);
+}
+.do-resend .btn {
+  min-height: 44px;
+}
+.do-resend-meta {
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--do-ink-3);
+}
+.do-resend-done:empty {
+  display: none;
+}
+.do-resend-done,
+.do-resend .form-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-label);
+  line-height: 1.45;
+  color: var(--do-ink-2);
+  max-width: 65ch;
+}
+.do-resend .form-error {
+  color: var(--do-red);
+}

@@ -38,6 +38,7 @@ import { ReviewCases, WinsImport } from "./admin-wins";
 import { RulesPanel } from "./admin-rules";
 import { DiscordPanel, NotificationsPanel } from "./admin-status";
 import { TeamPanel } from "./admin-team";
+import ResendConfirmation from "./resend-confirmation";
 
 // adminOnly: Einstellungen, Diagnose, Kontaktliste und Rollen. Moderatoren
 // sehen diese Reiter nicht; der Server lehnt die Aktionen zusätzlich ab.
@@ -493,7 +494,7 @@ function InboxPanel({
               {unconfirmed.count === 1
                 ? "Registrierung wartet"
                 : "Registrierungen warten"}{" "}
-              auf E-Mail-Bestätigung. Noch kein Handlungsbedarf.
+              auf E-Mail-Bestätigung.
             </span>
           </summary>
           {unconfirmed.recent.length > 0 && (
@@ -507,6 +508,7 @@ function InboxPanel({
                       : "neu dabei"}{" "}
                     · seit {formatDateTime(entry.since)}
                   </span>
+                  <ResendConfirmation id={entry.id} lastMailAt={entry.lastMail} onSent={onChanged} />
                 </li>
               ))}
             </ul>
@@ -514,6 +516,8 @@ function InboxPanel({
           <p className="adm-hint">
             Ohne bestätigte E-Mail entsteht kein Inbox-Eintrag und keine
             Meldung ans Team, weil die Adresse vertippt oder fremd sein kann.
+            Kam die Mail nicht an, schickt „Mail erneut senden“ eine neue an
+            dieselbe Adresse.
             Gezählt werden die letzten 14 Tage
             {unconfirmed.recent.length < unconfirmed.count
               ? `, gezeigt die neuesten ${unconfirmed.recent.length}`

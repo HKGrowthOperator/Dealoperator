@@ -114,7 +114,14 @@ export type DiscordStatus = {
 /** Registrierungen mit noch unbestätigter E-Mail. Keine Inbox-Einträge. */
 export type Unconfirmed = {
   count: number;
-  recent: { id: string; kind: "new" | "claim"; name: string; since: string }[];
+  recent: {
+    id: string;
+    kind: "new" | "claim";
+    name: string;
+    since: string;
+    /** Letzte belegte Bestätigungsmail. */
+    lastMail: string | null;
+  }[];
 };
 export type TeamMember = {
   owner: string;
