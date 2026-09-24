@@ -60,6 +60,8 @@ export type RecordDay = {
 export type Member = Profile & {
   id: string;
   color?: string;
+  /** Discord-Profil zum Anschreiben, nur wenn gezeigt und verknüpft. */
+  discord?: string;
   latest?: RecordDay;
 };
 export type Session = {

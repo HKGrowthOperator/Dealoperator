@@ -73,13 +73,14 @@ export default async function Page({
   // hier (nicht mehr im Tagesabschluss).
   let settings: CommitmentSettings | undefined;
   let link: { available: boolean; link: { name: string; since: string } | null } | null = null;
-  if (view === "profil" && databaseReady()) {
+  if ((view === "profil" || view === "partner") && databaseReady()) {
     const db = database();
     try {
-      settings = await loadCommitmentSettings(db);
+      if (view === "profil") settings = await loadCommitmentSettings(db);
     } catch {
       settings = undefined;
     }
+    // Call-Partner zeigt, ob man über Discord anschreibbar ist.
     try {
       link = {
         available: discordMissing("link").length === 0,

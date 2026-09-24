@@ -279,11 +279,13 @@ button.do-link {
   gap: var(--space-1);
 }
 .do-nav-link {
+  --nav-pad: 14px;
   position: relative;
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  padding: 0 14px;
+  padding: 0 var(--nav-pad);
+  white-space: nowrap;
   border-radius: var(--radius-s);
   color: var(--do-ink-2);
   font-size: var(--text-body);
@@ -301,12 +303,22 @@ button.do-link {
 .do-nav-link[aria-current="page"]::after {
   content: "";
   position: absolute;
-  right: 14px;
+  right: var(--nav-pad);
   bottom: -11px;
-  left: 14px;
+  left: var(--nav-pad);
   height: 3px;
   border-radius: 3px 3px 0 0;
   background: var(--do-blue);
+}
+/* Schmale Desktops: fünf Reiter (mit Verwaltung) passen in eine Zeile. */
+@media (max-width: 1023px) {
+  .do-nav {
+    gap: 0;
+  }
+  .do-nav-link {
+    --nav-pad: 9px;
+    font-size: var(--text-label);
+  }
 }
 .do-header-actions {
   display: flex;
@@ -601,12 +613,6 @@ button.do-link {
   }
 }
 /* Passen die Einträge nicht in eine Zeile, stehen sie zwei mal zwei. */
-@media (max-width: 439px) {
-  .do-area-nav[data-area="exchange"] {
-    grid-auto-flow: row;
-    grid-template-columns: 1fr 1fr;
-  }
-}
 @media (max-width: 349px) {
   .do-area-nav[data-area="mine"] {
     grid-auto-flow: row;
@@ -842,6 +848,21 @@ button.do-link {
   margin: 2px 0 0;
   color: var(--do-ink-2);
   font-size: var(--text-label);
+}
+.rb-me-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-3);
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--do-line);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.rb-me-more .do-link {
+  gap: var(--space-2);
 }
 @media (max-width: 599px) {
   .rb-me {
@@ -3336,4 +3357,130 @@ li[data-open] .rb-chevron {
     min-height: 52px;
     aspect-ratio: auto;
   }
+}
+
+/* Call-Partner: eigene Sichtbarkeit, wer wann sucht, Kontakt über Discord. */
+.ca-listing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--do-blue-line);
+  border-radius: var(--radius-l);
+  background: var(--do-blue-soft);
+}
+.ca-listing > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ca-listing h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 800;
+}
+.ca-listing p {
+  max-width: 60ch;
+  margin: var(--space-1) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.55;
+}
+.ca-visible {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.ca-visible svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--do-green);
+}
+.ca-visible a {
+  color: var(--do-blue);
+  font-weight: 700;
+}
+.member-when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--do-ink);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.member-when svg {
+  flex: none;
+  color: var(--do-ink-3);
+}
+.member-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+@media (max-width: 599px) {
+  .ca-listing {
+    padding: var(--space-4);
+  }
+  .ca-listing .btn {
+    flex: 1 1 100%;
+  }
+}
+
+.ca-main .inbox-empty {
+  display: grid;
+  gap: var(--space-1);
+}
+.ca-main .inbox-empty h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+}
+.ca-main .inbox-empty p {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+
+/* Call-Partner-Karten: gleichmäßige Abstände, lesbarer Text. */
+.ca-main .member-card {
+  gap: 0;
+  border-color: var(--do-line);
+  border-radius: var(--radius-l);
+  background: var(--do-surface);
+}
+.ca-main .member-card h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+}
+.ca-main .member-card .member-role {
+  color: var(--do-ink-3);
+  font-size: var(--text-label);
+}
+.ca-main .member-card > p:not(.member-when) {
+  min-height: 0;
+  margin: var(--space-3) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.55;
+}
+.ca-main .member-card > .member-when {
+  min-height: 0;
+  margin: var(--space-3) 0 0;
+  color: var(--do-ink);
+  line-height: 1.4;
+}
+.ca-main .member-card .member-tags {
+  margin: var(--space-2) 0 0;
+}
+.ca-main .member-card .member-actions {
+  padding-top: var(--space-4);
+}
+.ca-main .inbox-empty {
+  margin-bottom: var(--space-4);
 }

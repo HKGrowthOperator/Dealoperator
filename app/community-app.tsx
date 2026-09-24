@@ -33,6 +33,7 @@ import {
   Bookmark,
   CalendarDays,
   Check,
+  CircleCheck,
   Clock3,
   Copy,
   Headphones,
@@ -846,8 +847,9 @@ export default function CommunityApp({
             Mein Profil bei den Call-Partnern anzeigen
             <small>
               Andere Angemeldete sehen Name, Rolle, Zielgruppe, Call-Zeit,
-              Wochenziel, Call-Tage und Beschreibung. E-Mail und
-              Telefonnummer bleiben privat.
+              Wochenziel, Call-Tage und Beschreibung, bei verknüpftem Discord
+              auch einen Link zum Anschreiben. E-Mail und Telefonnummer
+              bleiben privat.
             </small>
           </span>
         </label>
@@ -894,12 +896,13 @@ export default function CommunityApp({
       </form>
     );
   }
-  const exchangeView = ["partner", "sessions", "wissen"].includes(initialView);
+  const exchangeView = ["sessions", "wissen"].includes(initialView);
   return (
     <div className="operator-site">
       <OperatorHeader discordUrl={discordUrl} />
       <main id="inhalt" className="do-page ca-main">
-        <AreaNav area={exchangeView ? "exchange" : "mine"} />
+        {/* Call-Partner ist ein eigener Reiter ohne Unterbereiche. */}
+        {initialView !== "partner" && <AreaNav area={exchangeView ? "exchange" : "mine"} />}
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
@@ -1113,20 +1116,64 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Call-Partner"
-                    text="Zum Üben, für ehrliches Feedback oder einen zusätzlichen Block, ergänzend zum gemeinsamen Callen."
+                    text="Wer wann einen Call-Partner sucht: zum Üben, für ehrliches Feedback oder einen zusätzlichen Block. Verabredet wird sich im Discord."
                   >
-                    <button
-                      className="btn secondary"
-                      onClick={() => {
-                        setProfile(data.profile);
-                        setModal("profile");
-                      }}
-                    >
-                      <UserRound size={17} aria-hidden="true" />
-                      Mein Call-Profil
-                    </button>
+                    {/* Solange das Profil nicht gezeigt wird, führt die Karte
+                        darunter dorthin; kein zweiter Knopf. */}
+                    {data.profile.listed && (
+                      <button
+                        className="btn secondary"
+                        onClick={() => {
+                          setProfile(data.profile);
+                          setModal("profile");
+                        }}
+                      >
+                        <UserRound size={17} aria-hidden="true" />
+                        Mein Call-Profil
+                      </button>
+                    )}
                   </PageHeading>
-                  <DiscordNudge context="buddy" url={discordUrl} />
+                  {data.profile.listed ? (
+                    <p className="ca-visible">
+                      <CircleCheck size={18} aria-hidden="true" />
+                      <span>
+                        Du bist als Call-Partner sichtbar.{" "}
+                        {discordLink?.link ? (
+                          "Andere können dich über Discord anschreiben."
+                        ) : !discordLink?.available ? null : (
+                          <>
+                            Damit dich andere über Discord anschreiben können,{" "}
+                            <Link href="/profil?modus=eigen#discord">
+                              verknüpfe Discord im Profil
+                            </Link>
+                            .
+                          </>
+                        )}
+                      </span>
+                    </p>
+                  ) : (
+                    <section className="ca-listing" aria-labelledby="ca-listing-title">
+                      <div>
+                        <h2 id="ca-listing-title">Zeig dich als Call-Partner</h2>
+                        <p>
+                          Andere finden dich hier erst, wenn du dein Call-Profil
+                          zeigst: wann du callst, für wen und was du suchst. Ist
+                          dein Discord verknüpft, können sie dich dort direkt
+                          anschreiben. E-Mail und Telefonnummer bleiben privat.
+                        </p>
+                      </div>
+                      <button
+                        className="btn primary"
+                        onClick={() => {
+                          setProfile({ ...data.profile, listed: true });
+                          setModal("profile");
+                        }}
+                      >
+                        <UserRound size={17} aria-hidden="true" />
+                        Call-Profil zeigen
+                      </button>
+                    </section>
+                  )}
                   <div className="filter-row">
                     <label className="search-input">
                       <Search size={18} aria-hidden="true" />
@@ -1182,19 +1229,44 @@ export default function CommunityApp({
                               </small>
                             </div>
                           )}
-                          <div className="member-tags">
-                            <Tag>{m.niche}</Tag>
-                            <Tag>
-                              <Clock3 size={12} />
-                              {m.time}
-                            </Tag>
+                          <p className="member-when">
+                            <Clock3 size={15} aria-hidden="true" />
+                            <span>
+                              {m.days.length
+                                ? m.days
+                                    .slice()
+                                    .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+                                    .map((d) => dayNames[d])
+                                    .join(", ")
+                                : "Tage offen"}
+                              {m.time ? ` · ${m.time}` : ""}
+                            </span>
+                          </p>
+                          {m.niche && (
+                            <div className="member-tags">
+                              <Tag>{m.niche}</Tag>
+                            </div>
+                          )}
+                          <div className="member-actions">
+                            {m.discord && (
+                              <a
+                                className="btn primary full"
+                                href={m.discord}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <MessageCircle size={17} aria-hidden="true" />
+                                Auf Discord schreiben
+                                <span className="do-sr">(öffnet Discord)</span>
+                              </a>
+                            )}
+                            <button
+                              className="btn secondary full"
+                              onClick={() => setMember(m)}
+                            >
+                              Profil ansehen
+                            </button>
                           </div>
-                          <button
-                            className="btn secondary full"
-                            onClick={() => setMember(m)}
-                          >
-                            Profil kennenlernen
-                          </button>
                         </article>
                       ))}
                   </div>
@@ -1214,19 +1286,19 @@ export default function CommunityApp({
                       text={
                         data.members.length
                           ? "Probiere ein anderes Thema oder eine andere Call-Zeit."
-                          : "Noch hat niemand sein Call-Profil freigegeben. Gib deins frei, dann finden dich andere."
+                          : data.profile.listed
+                            ? "Sobald weitere Caller ihr Call-Profil zeigen, stehen sie hier."
+                            : "Noch hat niemand sein Call-Profil gezeigt. Mit deinem machst du den Anfang."
                       }
                     />
                   )}
-                  {/* Anfragen und Gespräche erst, wenn es welche gibt. */}
-                  {data.buddies.length > 0 && (
-                    <BuddyInbox
-                      data={data}
-                      mutate={mutate}
-                      demo={demo}
-                      saving={saving}
-                    />
-                  )}
+                  <BuddyInbox
+                    data={data}
+                    mutate={mutate}
+                    demo={demo}
+                    saving={saving}
+                  />
+                  <DiscordNudge context="buddy" url={discordUrl} />
                   <div className="bottom-note">
                     <ShieldCheck size={17} />
                     Deine Kontaktdaten bleiben bei dir. Ein Kontakt zu einem
@@ -1903,7 +1975,7 @@ export default function CommunityApp({
                   </small>
                   <div>
                     <span>
-                      <strong>{member.latest.attempts}</strong>Versuche
+                      <strong>{member.latest.attempts}</strong>Anwahlen
                     </span>
                     <span>
                       <strong>{member.latest.meetings}</strong>Termine
@@ -1924,12 +1996,24 @@ export default function CommunityApp({
                   </strong>
                 </span>
               </div>
+              {member.discord && (
+                <a
+                  className="btn primary full"
+                  href={member.discord}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageCircle size={17} aria-hidden="true" />
+                  Auf Discord schreiben
+                  <span className="do-sr">(öffnet Discord)</span>
+                </a>
+              )}
               <button
-                className="btn primary full"
+                className={`btn ${member.discord ? "secondary" : "primary"} full`}
                 onClick={() => setModal("buddy")}
               >
-                <MessageCircle size={17} />
-                Call-Partner anfragen
+                <Send size={17} aria-hidden="true" />
+                {member.discord ? "Hier anfragen" : "Call-Partner anfragen"}
               </button>
               <p className="privacy-note">
                 <ShieldCheck size={16} />

@@ -159,8 +159,11 @@ export default function Page() {
             sie anbietet). Freiwillig kannst du dein Discord-Konto verknüpfen
             (gespeichert werden Discord-ID und Discord-Name); dann bekommst
             du im Discord die Ränge „Aktiver Caller“ und, im Team,
-            „Moderator“. Tagesabschlüsse, Reflexionen, Zahlen und Kontaktdaten
-            werden <strong>nicht</strong> an Discord übertragen.
+            „Moderator“. Zeigst du zusätzlich dein Call-Profil bei den
+            Call-Partnern, sehen angemeldete Mitglieder dort einen Link zu
+            deinem Discord-Profil, um dich anzuschreiben. Tagesabschlüsse,
+            Reflexionen, Zahlen und Kontaktdaten werden <strong>nicht</strong>{" "}
+            an Discord übertragen.
           </p>
         </section>
 

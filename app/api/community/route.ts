@@ -121,6 +121,22 @@ export async function GET() {
       [user.userId],
     );
     const stored = profile ? JSON.parse(profile.data) : emptyProfile;
+    // Kontakt über Discord nur für Personen, die ihr Call-Profil zeigen und
+    // ihr Discord-Konto selbst verknüpft haben. Kein Discord-Name, nur der Link.
+    const listedIds = crew.results
+      .map((r: any) => r.id as string)
+      .filter((id: string) => id !== user.userId);
+    const discordLinks = listedIds.length
+      ? await database.query(
+          "SELECT owner,discord_user_id FROM discord_links WHERE owner = ANY($1::text[])",
+          [listedIds],
+        )
+      : [];
+    const discordFor = (owner: string) => {
+      const link = discordLinks.find((l) => l.owner === owner);
+      const id = link ? String(link.discord_user_id) : "";
+      return /^\d{5,25}$/.test(id) ? `https://discord.com/users/${id}` : undefined;
+    };
     return json({
       ...workflows,
       // Treffpunkt für Sessions und Call-Partner ist Discord.
@@ -135,9 +151,16 @@ export async function GET() {
       records: records.results.map((r: any) => JSON.parse(r.data)),
       members: crew.results
         .filter((r: any) => r.id !== user.userId)
-        .map((r: any) => ({
+        // Ein unvollständiges Profil fehlt in der Liste, statt sie für alle
+        // zu blockieren.
+        .flatMap((r: any) => {
+          const parsed = profileSchema.safeParse(JSON.parse(r.data));
+          return parsed.success ? [{ row: r, profile: parsed.data }] : [];
+        })
+        .map(({ row: r, profile: p }: { row: any; profile: z.infer<typeof profileSchema> }) => ({
           id: r.id,
-          ...profileSchema.parse(JSON.parse(r.data)),
+          ...p,
+          discord: discordFor(r.id),
           latest: (() => {
             const record = shared.results.find((x: any) => x.owner === r.id);
             if (!record) return undefined;

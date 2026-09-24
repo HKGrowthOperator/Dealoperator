@@ -108,7 +108,7 @@ export default function DiscordLink({
 
   if (hidden) return null;
   return (
-    <section className="cm-card cm-discord" aria-labelledby={`${uid}-title`}>
+    <section id="discord" className="cm-card cm-discord" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
           <h2 id={`${uid}-title`}>Discord-Konto verknüpfen</h2>

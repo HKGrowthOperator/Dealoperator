@@ -48,12 +48,23 @@ export default function BuddyInbox({
           : "Anfrage abgelehnt.",
       );
   }
+  // Noch keine Anfragen: nur kurz erklären, wo sie später stehen.
+  if (data.buddies.length === 0)
+    return (
+      <section className="card workflow-section inbox-empty">
+        <h2>Anfragen und Nachrichten</h2>
+        <p>
+          Noch keine. Schickst du über „Profil ansehen“ eine Anfrage oder
+          bekommst eine, steht sie hier.
+        </p>
+      </section>
+    );
   return (
     <section className="card workflow-section">
       <div className="workflow-heading">
         <div>
           <h2>
-            Call-Partner & Nachrichten{" "}
+            Anfragen und Nachrichten{" "}
             {incoming > 0 && (
               <span className="count-badge">{incoming} neu</span>
             )}
