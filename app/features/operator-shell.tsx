@@ -78,6 +78,13 @@ export function OperatorHeader({
   const path = usePathname() || "/";
   const area = areaOf(path);
   const viewer = useViewer(initial);
+  // Kein Banner „Zum Startbildschirm hinzufügen“: Deal Operator bittet nie
+  // darum, die Website zu installieren.
+  useEffect(() => {
+    const quiet = (event: Event) => event.preventDefault();
+    window.addEventListener("beforeinstallprompt", quiet);
+    return () => window.removeEventListener("beforeinstallprompt", quiet);
+  }, []);
   const signedIn = !!viewer?.signedIn;
   return (
     <>
@@ -167,7 +174,7 @@ export function OperatorFooter({
           <Link href="/">Ergebnisse</Link>
           <Link href="/tagesabschluss">Mein Tag</Link>
           <Link href="/reflexionen">Reflexionen</Link>
-          <Link href="/#so-funktionierts">So funktioniert’s</Link>
+          <Link href="/so-funktionierts">So funktioniert’s</Link>
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">
             Discord
           </a>

@@ -11,7 +11,8 @@ import type { CommitmentSettings } from "@/lib/commitment";
 export const dynamic = "force-dynamic";
 // Frühere Pfade bleiben erreichbar. Der Browser übernimmt ein #Ziel der alten
 // Adresse selbst, solange die Weiterleitung kein eigenes #Ziel setzt.
-const renamedViews = new Map<string, View>([
+const renamedViews = new Map<string, string>([
+  // So funktioniert’s ist eine eigene, öffentliche Seite (app/so-funktionierts).
   ["community", "so-funktionierts"],
   ["crew", "partner"],
 ]);

@@ -9,7 +9,6 @@ export const views = [
   "sessions",
   "wissen",
   "profil",
-  "so-funktionierts",
 ] as const;
 export type View = (typeof views)[number];
 export const labels: Record<View, string> = {
@@ -20,7 +19,6 @@ export const labels: Record<View, string> = {
   sessions: "Sessions & Roleplay",
   wissen: "Wissen & Feedback",
   profil: "Mein Profil",
-  "so-funktionierts": "So funktioniert’s",
 };
 export function dateKey(d = new Date()) {
   return new Intl.DateTimeFormat("sv-SE", {

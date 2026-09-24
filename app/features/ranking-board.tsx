@@ -704,7 +704,7 @@ export default function RankingBoard({
             <div>
               <h2 id="rb-claim-title">Stehst du schon in der Rangliste?</h2>
               <p>
-                Such deinen Namen, tipp ihn an und wähle „Das sind meine Zahlen“. Nach kurzer Prüfung
+                Such deinen Namen, tipp ihn an und wähle „Das sind meine Zahlen“. Nach der Prüfung
                 durch das Team gehört dein Profil mit allen bisherigen Tagen dir.
               </p>
             </div>
@@ -749,7 +749,8 @@ export default function RankingBoard({
               ))}
             </ol>
             <p className="rb-how-foot">
-              Kostenfrei. Erinnerungen am Abend gibt es, wenn du sie auf deinem Gerät einschaltest.
+              Kostenfrei. Mehr zu Serie, Level und wer was sieht:{" "}
+              <Link href="/so-funktionierts">So funktioniert’s im Detail</Link>.
             </p>
           </section>
         )}

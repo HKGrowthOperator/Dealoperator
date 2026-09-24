@@ -850,9 +850,7 @@ export default function CommunityApp({
     <div className="operator-site">
       <OperatorHeader discordUrl={discordUrl} />
       <main id="inhalt" className="do-page ca-main">
-        {initialView !== "so-funktionierts" && (
-          <AreaNav area={exchangeView ? "exchange" : "mine"} />
-        )}
+        <AreaNav area={exchangeView ? "exchange" : "mine"} />
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
@@ -1500,129 +1498,6 @@ export default function CommunityApp({
                   </div>
                 </>
               )}
-              {initialView === "so-funktionierts" && (
-                <>
-                  <PageHeading
-                    title="So funktioniert’s"
-                    text="Deal Operator begleitet das gemeinsame Callen: Zahlen festhalten, kurz reflektieren, dranbleiben."
-                  />
-                  <div className="community-manifest">
-                    <span className="manifest-number">01—06</span>
-                    <h2>
-                      Sechs Bereiche.
-                      <br />
-                      Nutze, was dir hilft.
-                    </h2>
-                    <p>
-                      Ziele setzen, callen, reflektieren und einander helfen.
-                      Ein schlechter Tag gehört dazu. Am meisten bringt dir
-                      Deal Operator, wenn du deine Zahlen regelmäßig einträgst.
-                    </p>
-                  </div>
-                  <div className="principle-grid">
-                    {[
-                      [
-                        "Zahlen & Fortschritt",
-                        "Tracke deine eigenen Anwahlen, Termine und Deals.",
-                      ],
-                      [
-                        "Tägliche Reflexion",
-                        "Teile Learnings und deinen nächsten Schritt.",
-                      ],
-                      [
-                        "Call-Partner",
-                        "Finde Call-Partner mit ähnlichem Rhythmus.",
-                      ],
-                      [
-                        "Sessions & Roleplay",
-                        "Übungstermine und zusätzliche Blöcke mit deinen Call-Partnern.",
-                      ],
-                      [
-                        "Wissen & Feedback",
-                        "Tausche Erfahrungen, Fragen und konkrete Tipps aus.",
-                      ],
-                      [
-                        "Austausch",
-                        "Lies die Reflexionen der anderen und nimm Learnings für deinen nächsten Calling-Tag mit.",
-                      ],
-                    ].map(([title, text], i) => (
-                      <div className="card padded" key={title}>
-                        <span className="principle-index">0{i + 1}</span>
-                        <h3>{title}</h3>
-                        <p>{text}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <section className="card padded">
-                    <h2>Gut zu wissen</h2>
-                    <div className="rules">
-                      <p>
-                        <Check />
-                        An den Calling-Tagen (standardmäßig Montag bis Freitag)
-                        zählt ein Tagesabschluss für deine Serie. Andere Tage
-                        sind freiwillig.
-                      </p>
-                      <p>
-                        <Check />
-                        Urlaub, Krankheit und Pausen sind okay. Melde eine Pause
-                        im Tagesabschluss. Sobald das Team sie bestätigt, zählen
-                        diese Tage nicht, und deine Serie wartet so lange.
-                      </p>
-                      <p>
-                        <Check />
-                        Konkrete Tipps helfen am meisten. Ein Nein ist okay,
-                        vertrauliche Kundendaten bleiben draußen.
-                      </p>
-                      <p>
-                        <Check />
-                        Fehlen mehrere Abschlüsse, fragt das Team kurz nach, ob
-                        alles passt. Nachtragen geht jederzeit. Eine Pause
-                        meldest du ab heute, für zurückliegende Tage sprich das
-                        Team an.
-                      </p>
-                    </div>
-                  </section>
-                  <section className="channels" id="discord">
-                    <h2>Zahlen hier, Calls im Discord.</h2>
-                    <p>
-                      Auf der Website stehen deine Zahlen und Reflexionen. Im
-                      Discord trefft ihr euch zu Sessions und Roleplay, sucht
-                      Call-Partner und seht, wer durchzieht.
-                    </p>
-                    <div className="channel-grid">
-                      <div className="card padded">
-                        <MessageCircle size={25} />
-                        <h3>Reflexionen</h3>
-                        <p>
-                          Lies die eingereichten Tagesabschlüsse der anderen
-                          und nimm Learnings für deinen nächsten Calling-Tag
-                          mit.
-                        </p>
-                        <Link className="text-link" href="/reflexionen">
-                          Reflexionen ansehen
-                        </Link>
-                      </div>
-                      <div className="card padded">
-                        <MessageCircle size={25} />
-                        <h3>Discord</h3>
-                        <p>
-                          Sessions und Roleplay in eigenen Räumen, Call-Partner
-                          finden und euch gegenseitig pushen. Aktive Caller
-                          tragen dort ihren Rang.
-                        </p>
-                        <a
-                          className="text-link"
-                          href={discordUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Discord öffnen
-                        </a>
-                      </div>
-                    </div>
-                  </section>
-                </>
-              )}
             </>
           )}
       </main>
@@ -1931,7 +1806,7 @@ export default function CommunityApp({
               </p>
               <Link
                 className="btn primary"
-                href={href("so-funktionierts")}
+                href="/so-funktionierts"
                 onClick={() => setModal(null)}
               >
                 So funktioniert’s
