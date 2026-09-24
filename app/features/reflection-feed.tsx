@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, LoaderCircle, RefreshCw } from "lucide-react";
+import { CircleAlert, ExternalLink, LoaderCircle, MessageCircle, RefreshCw } from "lucide-react";
 import { shortMetricLabels } from "@/lib/kpis";
 import {
   ApiError,
@@ -17,8 +17,8 @@ import "../commitment.css";
 
 /*
  * Austausch der Reflexionen. Nur echte, vollständig eingereichte
- * Tagesabschlüsse. Keine Antwortbox und keine Beiträge im Discord: der ist
- * für Sessions, Roleplay und die Ränge da.
+ * Tagesabschlüsse. Keine Antwortbox hier: Antworten ist eine klar
+ * gekennzeichnete Discord-Aktion an jeder Karte.
  */
 
 export type ReflectionCard = {
@@ -121,6 +121,19 @@ function Card({ card }: { card: ReflectionCard }) {
         {/* Der Unterstützungswunsch geht nur an das Team, nie in den Austausch. */}
       </div>
 
+      <footer className="rf-reply">
+        <a href={card.reply.url} target="_blank" rel="noopener noreferrer">
+          <MessageCircle size={16} aria-hidden="true" />
+          Auf Discord antworten
+          <ExternalLink size={14} aria-hidden="true" />
+        </a>
+        <span>
+          {card.reply.kind === "post"
+            ? "Öffnet den Beitrag in Discord."
+            : "Öffnet Discord. Schreib dort im Austausch."}
+        </span>
+      </footer>
+
     </article>
   );
 }
@@ -188,7 +201,7 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
   if (feed && !feed.allowed)
     return (
       <section className="cm-card cm-feed-locked">
-        <h2>Die Reflexionen sind nur mit vollständigem Konto lesbar.</h2>
+        <h2>Zum Lesen fehlt noch ein Schritt.</h2>
         <EligibilityChecklist
           missing={feed.missing ?? []}
           next="/reflexionen"
@@ -206,40 +219,42 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
       <h2 id={`${uid}-title`} className="cm-sr">
         Beiträge
       </h2>
-      <div className="cm-card cm-feed-filters" role="search">
-        <label>
-          Tag
-          <input
-            type="date"
-            max={today}
-            value={filter.tag}
-            onChange={(e) => change({ ...filter, tag: e.target.value })}
-          />
-        </label>
-        <label>
-          Person
-          <select
-            value={filter.person}
-            onChange={(e) => change({ ...filter, person: e.target.value })}
-          >
-            <option value="">Alle Personen</option>
-            {(feed?.people ?? []).map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {filtered && (
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => change({ tag: "", person: "" })}
-          >
-            Filter zurücksetzen
-          </button>
-        )}
-      </div>
+      {(filtered || cards.length > 0) && (
+        <div className="cm-card cm-feed-filters" role="search">
+          <label>
+            Tag
+            <input
+              type="date"
+              max={today}
+              value={filter.tag}
+              onChange={(e) => change({ ...filter, tag: e.target.value })}
+            />
+          </label>
+          <label>
+            Person
+            <select
+              value={filter.person}
+              onChange={(e) => change({ ...filter, person: e.target.value })}
+            >
+              <option value="">Alle Personen</option>
+              {(feed?.people ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {filtered && (
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => change({ tag: "", person: "" })}
+            >
+              Filter zurücksetzen
+            </button>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="cm-alert error" role="alert">

@@ -670,9 +670,8 @@ export default function OnboardingStart({
               Willkommen bei Deal Operator.
             </h1>
             <p className="flow-lead">
-              Kostenfrei. Dein Werkzeug für Calling-Tage: Zahlen festhalten,
-              Fortschritt sehen, dranbleiben. Als Ergänzung zu deinem Austausch
-              bei akquise.de.
+              Kostenfrei. Halte deine Calling-Tage fest und sieh, was alle
+              zusammen schaffen.
             </p>
             {message && (
               <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
@@ -694,7 +693,10 @@ export default function OnboardingStart({
                 <Search aria-hidden="true" />
                 <span>
                   <strong>Meine Zahlen sind schon hier</strong>
-                  <small>Finde dein Profil und führe deine Zahlen weiter.</small>
+                  <small>
+                    Du stehst schon in der Rangliste? Übernimm dein Profil mit allen
+                    bisherigen Tagen.
+                  </small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
@@ -702,7 +704,7 @@ export default function OnboardingStart({
                 <UserPlus aria-hidden="true" />
                 <span>
                   <strong>Ich starte neu</strong>
-                  <small>Lege dein Profil an und trage deinen ersten Tag ein.</small>
+                  <small>Neues Profil anlegen und den ersten Tag eintragen.</small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
@@ -758,7 +760,9 @@ export default function OnboardingStart({
               Finde dein Profil.
             </h1>
             <p className="flow-lead">
-              Such nach dem Namen, unter dem deine Zahlen im Ranking stehen.
+              Such nach dem Namen, unter dem deine Zahlen in der Rangliste stehen.
+              Mit der Übernahme gehört das Profil mit allen bisherigen Tagen zu
+              deinem Konto. Es entsteht kein zweites Profil.
             </p>
             {message && (
               <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>

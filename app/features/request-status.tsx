@@ -29,11 +29,12 @@ export type OwnRequest = {
   createdAt: string;
 };
 
-/** Stand der Anfrage in drei Schritten. */
+/** Stand der Anfrage: Konto, Anfrage, Prüfung, Ergebnis. */
 function steps(status: string, assign: boolean) {
   const decided = ["approved", "rejected", "superseded"].includes(status);
   return [
-    { label: "E-Mail bestätigt", state: "done" },
+    { label: "Konto bestätigt", state: "done" },
+    { label: assign ? "Zuordnung angefragt" : "Übernahme angefragt", state: "done" },
     {
       label: status === "info_needed" ? "Rückfrage an dich" : "Prüfung durch das Team",
       state: decided ? "done" : "current",
@@ -44,9 +45,7 @@ function steps(status: string, assign: boolean) {
           ? "Nicht freigegeben"
           : status === "superseded"
             ? "Anderweitig zugeordnet"
-            : assign
-              ? "Zuordnung und Freigabe"
-              : "Freigabe",
+            : "Freigegeben",
       state: decided ? "done" : "open",
     },
   ] as const;
@@ -121,8 +120,8 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
             <Link className="btn primary full" href="/tagesabschluss">
               Tagesabschluss eintragen
             </Link>
-            <Link className="flow-link" href="/heute?modus=eigen">
-              Zu meinen Zahlen
+            <Link className="flow-link" href="/">
+              Zu den Ergebnissen
             </Link>
           </div>
         </div>
