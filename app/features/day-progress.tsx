@@ -37,9 +37,15 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
       <div>
         <span className="md-progress-label">Abschluss-Serie</span>
         <strong>
-          {streak.current} {streak.current === 1 ? "Tag" : "Tage"}
+          {streak.current > 0
+            ? `${streak.current} ${streak.current === 1 ? "Tag" : "Tage"}`
+            : "Noch keine"}
         </strong>
-        <small>Bestwert {streak.best}</small>
+        <small>
+          {streak.current > 0
+            ? `Bestwert ${streak.best}`
+            : "Startet mit dem nächsten rechtzeitigen Abschluss"}
+        </small>
       </div>
       <div>
         <span className="md-progress-label">Leistungslevel</span>

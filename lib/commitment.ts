@@ -47,6 +47,9 @@ export const defaultCommitmentSettings: CommitmentSettings = {
 /** Genehmigte Pause, beide Tage einschließlich. */
 export type Pause = { from: string; to: string };
 
+/** Übernommene Zahlen eines Tages (Import), ohne eigenen Abschluss. */
+export type ImportedDay = { day: string; attempts: number | null };
+
 /** Ein vollständig eingereichter Tagesabschluss. Entwürfe zählen nie. */
 export type Closing = {
   day: string;
@@ -221,6 +224,11 @@ export type DayStatus =
   | "reflected"
   /** Nach der Frist abgeschlossen. Zahlen zählen, die Serie nicht. */
   | "late"
+  /**
+   * Frist verstrichen, kein eigener Abschluss, aber Zahlen aus der Gruppe
+   * übernommen. Die Zahlen zählen, die Serie nicht; kein fehlender Tag.
+   */
+  | "imported"
   /** Frist verstrichen, kein Abschluss. */
   | "missed";
 
@@ -235,7 +243,7 @@ export type DayState = {
 export type CommitmentSummary = {
   /** Die eine Serie: fristgerechte Tagesabschlüsse mit Reflexion in Folge. */
   streak: { current: number; best: number };
-  /** Tage mit abgeschlossenen Anwahlen (> 0) im betrachteten Zeitraum. */
+  /** Tage mit Anwahlen (> 0) im Zeitraum, eigene und übernommene. */
   activeDays: number;
   /** Tage mit vollständigem Abschluss im betrachteten Zeitraum. */
   closedDays: number;
@@ -267,6 +275,7 @@ function calledOnTime(closing: Closing, deadline: Date) {
  */
 export function summarize({
   closings,
+  imported = [],
   pauses = [],
   trackingStart,
   from,
@@ -275,6 +284,8 @@ export function summarize({
   settings = defaultCommitmentSettings,
 }: {
   closings: Closing[];
+  /** Übernommene Tage (Import aus der Gruppe) ohne eigenen Abschluss. */
+  imported?: ImportedDay[];
   pauses?: Pause[];
   trackingStart: string | null;
   from: string;
@@ -283,6 +294,7 @@ export function summarize({
   settings?: CommitmentSettings;
 }): CommitmentSummary {
   const byDay = new Map(closings.map((c) => [c.day, c]));
+  const importedByDay = new Map(imported.map((d) => [d.day, d]));
   const today = localDay(now, settings.timeZone);
   const days: DayState[] = [];
 
@@ -321,12 +333,16 @@ export function summarize({
             ? "called"
             : "reflected"
           : "late";
-    else status = now < deadline! ? "open" : "missed";
+    else if (now < deadline!) status = "open";
+    else status = importedByDay.has(day) ? "imported" : "missed";
+    const fromGroup = status === "imported" ? importedByDay.get(day) : undefined;
+    const groupCalls = (fromGroup?.attempts ?? 0) > 0;
 
     if (closing && status !== "before-start" && status !== "future") {
       closedDays += day >= from ? 1 : 0;
       if (hasCalls(closing) && day >= from) activeDays++;
     }
+    if (groupCalls && day >= from) activeDays++;
 
     // Die Serie läuft nur über Pflicht-Tage. Freie Tage, Pausen, offene Tage
     // und Bonus-Tage verändern sie nicht. Ob Anwahlen dabei waren, spielt für
@@ -348,12 +364,17 @@ export function summarize({
       streakRun = 0;
       noCallRun++;
       missingOpen++;
+    } else if (status === "imported") {
+      // Wie verspätet: Zahlen zählen, die Serie ist gerissen. Kein fehlender
+      // Tag, und Anwahlen aus der Gruppe beenden die Inaktivität.
+      streakRun = 0;
+      noCallRun = groupCalls ? 0 : noCallRun + 1;
     }
     // Inaktiv: mehr als die Schwelle an Pflicht-Tagen ohne Calls. Das ist ein
     // Hinweis für das Team, die Serie bleibt davon unberührt.
     if (noCallRun > settings.inactivityAfterDays) inactive = true;
     streakBest = Math.max(streakBest, streakRun);
-    if (status === "called" || (status === "late" && hasCalls(closing)))
+    if (status === "called" || (status === "late" && hasCalls(closing)) || groupCalls)
       inactive = false;
 
     // Der früheste offene Tag hat die nächste Frist und ist damit der
@@ -367,7 +388,7 @@ export function summarize({
         status,
         due,
         deadline: deadline ? deadline.toISOString() : null,
-        attempts: closing?.attempts ?? null,
+        attempts: closing?.attempts ?? fromGroup?.attempts ?? null,
       });
   }
 

@@ -1,6 +1,7 @@
 import type { Database } from "./database";
 import { database, databaseReady } from "./database";
 import { berlinDate } from "../lib/kpis";
+import { formatDay } from "../lib/ranking-history";
 import {
   deadlineFor,
   isDueDay,
@@ -11,7 +12,7 @@ import {
 } from "../lib/commitment";
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
 import { dispatch, enqueue, teamEvent, type Recheck } from "./notify";
-import { markEligibleMembers, toClosings, ownClosings } from "./closing";
+import { markEligibleMembers, toClosings, toImported, ownClosings } from "./closing";
 import { runDiscordRooms } from "./discord-sessions";
 import { isTeamMember } from "./roles";
 
@@ -118,6 +119,7 @@ export async function planTeamReviews(
     if (!start || start > today) continue;
     const s = summarize({
       closings,
+      imported: toImported(rows),
       pauses,
       trackingStart: start,
       from: start,
@@ -141,7 +143,7 @@ export async function planTeamReviews(
         ref: m.id,
         state: "open",
         title: `Teamprüfung: ${m.name}`,
-        body: `${s.missingOpen} offene fehlende Tagesabschlüsse seit ${start}. Kein automatischer Ausschluss — bitte persönlich nachfragen oder eine Pause eintragen.`,
+        body: `${s.missingOpen} fehlende Tagesabschlüsse seit dem ${formatDay(start)}.`,
         alert: false,
       });
       flagged++;
@@ -193,7 +195,7 @@ async function schemaReady(db: Database) {
   );
   if (!row?.ok && !schemaWarned) {
     schemaWarned = true;
-    console.error("Scheduler: Migration 0003 fehlt noch — Erinnerungen pausiert.");
+    console.error("Scheduler: Migration 0003 fehlt noch, Erinnerungen pausiert.");
   }
   return !!row?.ok;
 }

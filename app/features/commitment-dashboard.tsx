@@ -6,10 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  Flame,
   LoaderCircle,
   Undo2,
-  Users,
 } from "lucide-react";
 import type { DayStatus } from "@/lib/commitment";
 import {
@@ -36,6 +34,7 @@ const STATUS: Record<DayStatus, { label: string; legend: string }> = {
   called: { label: "Gecallt", legend: "Rechtzeitig mit Anwahlen" },
   reflected: { label: "Reflektiert", legend: "Rechtzeitig, ohne Anwahlen" },
   late: { label: "Später", legend: "Später eingereicht: Zahlen zählen, Serie nicht" },
+  imported: { label: "Übernommen", legend: "Zahlen aus der Gruppe, ohne Reflexion" },
   missed: { label: "Ohne Abschluss", legend: "Nachtragen geht jederzeit" },
   open: { label: "Offen", legend: "Noch rechtzeitig möglich" },
   bonus: { label: "Bonus", legend: "Freiwillig am freien Tag" },
@@ -49,6 +48,7 @@ const LEGEND: DayStatus[] = [
   "reflected",
   "open",
   "late",
+  "imported",
   "missed",
   "bonus",
   "free",
@@ -248,47 +248,52 @@ export default function CommitmentDashboard({
   return (
     <section className="cm-card cm-dashboard" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
-        <div>
-          <h2 id={`${uid}-title`}>Abschluss-Serie</h2>
-        </div>
-        <p className="cm-muted">
-          Calling-Tage sind {workdays}. Rechtzeitig ist ein Abschluss bis{" "}
-          {settings.deadlineHour}:00 Uhr am nächsten Calling-Tag, für Freitag also bis
-          Montagvormittag. Wochenenden zählen nicht.
-        </p>
+        <h2 id={`${uid}-title`}>Abschluss-Serie</h2>
       </header>
+      <details className="cm-rules-note">
+        <summary>So zählt die Serie</summary>
+        <p>
+          Calling-Tage sind {workdays}. Rechtzeitig ist ein Abschluss mit Reflexion bis{" "}
+          {settings.deadlineHour}:00 Uhr am nächsten Calling-Tag, für Freitag also bis
+          Montagvormittag. Auch ein Tag mit 0 Anwahlen hält die Serie am Laufen.
+          Wochenenden und bestätigte Pausen zählen nicht. Übernommene Zahlen aus der
+          Gruppe zählen in Rangliste und Summen, für die Serie braucht es den eigenen
+          Abschluss.
+        </p>
+      </details>
 
       <dl className="cm-stats">
-        <div className="accent">
-          <dt>Abschluss-Serie</dt>
+        <div>
+          <dt>Serie</dt>
           <dd>
             <strong>{summary.streak.current}</strong>
-            <span>Bestwert {summary.streak.best}</span>
+            <span>
+              {summary.streak.current === 1 ? "Tag" : "Tage"}, Bestwert {summary.streak.best}
+            </span>
           </dd>
           <p>
-            Rechtzeitige Tagesabschlüsse mit Reflexion in Folge. Auch ein Tag
-            mit 0 Anwahlen hält sie am Laufen.
+            {summary.streak.current > 0
+              ? "Rechtzeitige Abschlüsse in Folge."
+              : "Startet mit deinem nächsten rechtzeitigen Abschluss."}
           </p>
         </div>
         <div>
-          <dt>Aktive Tage</dt>
+          <dt>Tage mit Anwahlen</dt>
           <dd>
             <strong>{summary.activeDays}</strong>
-            <span>mit Anwahlen</span>
           </dd>
           <p>
             {data.trackingStart
-              ? `Seit deinem Start am ${formatFullDay(data.trackingStart)}.`
+              ? `Seit ${formatFullDay(data.trackingStart)}, eigene und übernommene.`
               : "Ab deinem ersten Tagesabschluss."}
           </p>
         </div>
         <div>
-          <dt>Abgeschlossene Tage</dt>
+          <dt>Abschlüsse</dt>
           <dd>
             <strong>{summary.closedDays}</strong>
-            <span>eingereicht</span>
           </dd>
-          <p>Jeder vollständig eingereichte Tag, auch am Wochenende.</p>
+          <p>Eigene Tagesabschlüsse, auch am Wochenende.</p>
         </div>
       </dl>
 
@@ -300,37 +305,21 @@ export default function CommitmentDashboard({
               Dein Abschluss für {formatShortDay(summary.atRisk.day)} ist noch offen. Bis{" "}
               {formatMoment(summary.atRisk.deadline, tz)} zählt er noch für deine Serie.
             </p>
-            <Link className="btn primary" href={`/tagesabschluss?tag=${summary.atRisk.day}`}>
+            <Link className="do-button do-button-primary" href={`/tagesabschluss?tag=${summary.atRisk.day}`}>
               {formatShortDay(summary.atRisk.day)} abschließen
             </Link>
           </div>
         </div>
       )}
-      {summary.needsTeamReview ? (
-        <div className="cm-alert info">
-          <Users size={18} aria-hidden="true" />
-          <p>
-            Noch offen: {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Das Team
-            fragt kurz nach, ob alles passt. Nachtragen geht jederzeit. Eine Pause meldest du
-            ab heute, für zurückliegende Tage sprich das Team an.
-          </p>
-        </div>
-      ) : summary.missingOpen > 0 ? (
-        <p className="cm-muted">
-          Noch offen: {plural(summary.missingOpen, "Abschluss", "Abschlüsse")}. Nachgetragen
-          zählen die Zahlen, die Serie beginnt mit dem nächsten rechtzeitig
-          abgeschlossenen Tag neu.
+      {(summary.missingOpen > 0 || summary.inactive) && (
+        <p className="cm-note">
+          {summary.missingOpen > 0
+            ? `${plural(summary.missingOpen, "Calling-Tag", "Calling-Tage")} ohne Abschluss. Nachgetragen zählen die Zahlen.`
+            : "Zuletzt gab es ein paar Calling-Tage ohne Anwahlen."}{" "}
+          {summary.inactive
+            ? "Ein kurzer Calling-Block reicht zum Wiedereinstieg; brauchst du Abstand, melde eine Pause."
+            : ""}
         </p>
-      ) : null}
-      {summary.inactive && (
-        <div className="cm-alert info">
-          <Flame size={18} aria-hidden="true" />
-          <p>
-            Zuletzt gab es mehr als {settings.inactivityAfterDays} Calling-Tage ohne dokumentierte
-            Anwahlen. Das passiert. Ein kurzer Calling-Block reicht, um wieder einzusteigen. Wenn du
-            gerade Abstand brauchst, melde unten eine Pause.
-          </p>
-        </div>
       )}
 
       <div className="cm-calendar" aria-busy={loading}>
@@ -390,7 +379,7 @@ export default function CommitmentDashboard({
           })}
         </ol>
         <ul className="cm-legend" aria-label="Legende">
-          {LEGEND.map((s) => (
+          {LEGEND.filter((s) => days.some((d) => d.status === s)).map((s) => (
             <li key={s}>
               <span className={`cm-swatch s-${s}`} aria-hidden="true" />
               <span>
@@ -407,24 +396,25 @@ export default function CommitmentDashboard({
           </p>
         )}
         {catchUp.length > 0 && (
-          <div className="cm-catchup">
-            <h4>Noch offen in diesem Monat</h4>
+          <details className="cm-catchup" open={catchUp.length <= 2 || undefined}>
+            <summary>
+              Noch offen in diesem Monat: {plural(catchUp.length, "Tag", "Tage")}
+            </summary>
             <ul>
               {catchUp.map((d) => (
                 <li key={d.day}>
-                  <span>
-                    {formatShortDay(d.day)} ·{" "}
-                    {d.status === "open" && d.deadline
-                      ? `rechtzeitig bis ${formatMoment(d.deadline, tz)}`
-                      : "Nachtragen zählt für die Zahlen"}
-                  </span>
-                  <Link className="btn secondary" href={`/tagesabschluss?tag=${d.day}`}>
-                    {d.status === "open" ? "Abschließen" : "Nachtragen"}
+                  <Link href={`/tagesabschluss?tag=${d.day}`}>
+                    <span>{formatShortDay(d.day)}</span>
+                    <span className="cm-catchup-hint">
+                      {d.status === "open" && d.deadline
+                        ? `Abschließen, rechtzeitig bis ${formatMoment(d.deadline, tz)}`
+                        : "Nachtragen"}
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
-          </div>
+          </details>
         )}
       </div>
 

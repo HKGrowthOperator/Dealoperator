@@ -339,15 +339,7 @@
   display: grid;
   gap: 24px;
 }
-.cm-day-note {
-  padding: 10px 14px;
-  border-left: 3px solid var(--cm-blue);
-  background: #f4f8ff;
-  border-radius: 0 10px 10px 0;
-  color: var(--cm-text);
-  font-size: 14px;
-  line-height: 1.6;
-}
+
 .cm-group {
   display: grid;
   gap: 14px;
@@ -792,9 +784,9 @@
 /* ---- Serien, Kalender, Pausen ----------------------------------------- */
 .cm-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin: 0;
+  margin: 14px 0 0;
 }
 .cm-stats > div {
   min-width: 0;
@@ -834,19 +826,66 @@
   line-height: 1.5;
   hyphens: auto;
 }
-.cm-stats > div.accent {
-  border-color: transparent;
-  background: linear-gradient(150deg, #0755f5, #0639bd);
-}
-.cm-stats > div.accent :is(dt, dd strong, dd span, p) {
-  color: #fff;
-}
-.cm-stats > div.accent :is(dt, dd span, p) {
-  color: #dbe8ff;
-}
 .cm-dashboard > .cm-alert,
-.cm-dashboard > .cm-muted {
+.cm-dashboard > .cm-muted,
+.cm-dashboard > .cm-note {
   margin-top: 14px;
+}
+/* Ein ruhiger Satz statt mehrerer Hinweiskästen. */
+.cm-note {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f3f6fa;
+  color: var(--cm-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+/* Regeln und Nachtragen: eingeklappt, mit sichtbarem Pfeil. */
+.cm-rules-note,
+.cm-catchup {
+  margin-top: 10px;
+}
+.cm-rules-note > summary,
+.cm-catchup > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--cm-ink);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.cm-rules-note > summary {
+  color: var(--cm-blue);
+  font-size: 14px;
+}
+.cm-rules-note > summary::-webkit-details-marker,
+.cm-catchup > summary::-webkit-details-marker {
+  display: none;
+}
+.cm-rules-note > summary::before,
+.cm-catchup > summary::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 160ms var(--ease-out, ease-out);
+}
+.cm-rules-note[open] > summary::before,
+.cm-catchup[open] > summary::before {
+  transform: rotate(45deg);
+}
+.cm-rules-note > p {
+  max-width: 70ch;
+  margin: 0 0 4px;
+  color: var(--cm-muted);
+  font-size: 14px;
+  line-height: 1.55;
 }
 .cm-calendar {
   margin-top: 22px;
@@ -971,17 +1010,14 @@
   height: 4px;
 }
 :is(.cm-day, .cm-swatch).s-missed {
-  background:
-    linear-gradient(
-      135deg,
-      transparent calc(50% - 1px),
-      #e2a18c calc(50% - 1px),
-      #e2a18c calc(50% + 1px),
-      transparent calc(50% + 1px)
-    ),
-    #fdebe5;
-  border-color: #efbfae;
-  color: #8f3a22;
+  background: #f6f1eb;
+  border-color: #e3d5c6;
+  color: #7a5536;
+}
+:is(.cm-day, .cm-swatch).s-imported {
+  background: #eaf0f8;
+  border-color: #c7d5ea;
+  color: #34527d;
 }
 :is(.cm-day, .cm-swatch).s-bonus {
   background: #dff6fe;
@@ -1030,29 +1066,34 @@
   margin-top: 12px;
 }
 .cm-catchup {
-  margin-top: 16px;
-}
-.cm-catchup h4 {
-  color: var(--cm-ink);
-  font-size: 15px;
-  font-weight: 700;
+  border-top: 1px solid var(--cm-line);
 }
 .cm-catchup ul {
-  margin: 6px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
-.cm-catchup li {
+.cm-catchup li a {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
-  padding: 10px 0;
+  gap: 4px 12px;
+  min-height: 44px;
+  padding: 6px 0;
   border-top: 1px solid var(--cm-line);
   color: var(--cm-text);
-  font-size: 14px;
+  font-size: 15px;
   font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.cm-catchup-hint {
+  color: var(--cm-blue);
+  font-size: 14px;
+  font-weight: 700;
+}
+.cm-catchup li a:hover .cm-catchup-hint {
+  text-decoration: underline;
 }
 .cm-pauses {
   display: grid;
@@ -1632,7 +1673,7 @@
   }
   .cm-count label small,
   .cm-field > small.cm-hint-extra,
-  .cm-stats > div:not(.accent) > p,
+  .cm-stats > div > p,
   .cm-legend-text {
     display: none;
   }
@@ -1645,9 +1686,11 @@
     font-size: 14px;
     line-height: 1.5;
   }
-  /* Serie als breite Karte, darunter zwei Zahlen nebeneinander. */
-  .cm-stats > div.accent {
-    grid-column: 1 / -1;
+  .cm-stats > div {
+    padding: 12px;
+  }
+  .cm-stats dd strong {
+    font-size: 26px;
   }
   .cm-stats dt,
   .cm-stats dd span {
@@ -1706,9 +1749,6 @@
   }
   .cm-strip-actions {
     grid-column: 1 / -1;
-  }
-  .cm-stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   /* Nebeneinander: Jeder Kasten belegt drei gemeinsame Zeilen (Beschriftung,
      Eingabe, Fehlermeldung). Die längste Beschriftung bestimmt die erste

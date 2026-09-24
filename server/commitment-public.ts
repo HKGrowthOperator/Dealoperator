@@ -2,7 +2,7 @@ import type { Database } from "./database";
 import { berlinDate } from "../lib/kpis";
 import { summarize } from "../lib/commitment";
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
-import { ownClosings, toClosings } from "./closing";
+import { ownClosings, toClosings, toImported } from "./closing";
 import { activeCallerForParticipant } from "./active-caller";
 
 /**
@@ -32,10 +32,12 @@ export async function commitmentRanking(
       approvedPauses(db, p.id),
     ]);
     const closings = toClosings(closingRows);
+    const imported = toImported(closingRows);
     const start = trackingStart(p.eligible_since, settings, closings.map((c) => c.day));
     if (!start) continue;
     const overall = summarize({
       closings,
+      imported,
       pauses,
       trackingStart: start,
       from: start < today ? start : today,
@@ -45,6 +47,7 @@ export async function commitmentRanking(
     });
     const range = summarize({
       closings,
+      imported,
       pauses,
       trackingStart: start,
       from,
@@ -102,6 +105,7 @@ export async function discordStreakText(db: Database, owner: string, now = new D
   if (!start || start > today) return "Deine Serie beginnt mit deinem ersten Tagesabschluss.";
   const s = summarize({
     closings,
+    imported: toImported(rows),
     pauses,
     trackingStart: start,
     from: start < today ? start : today,

@@ -161,6 +161,44 @@ test("a missed due day breaks the streak; the best streak is kept", () => {
   assert.equal(s.missingOpen, 1);
 });
 
+test("numbers taken over from the group count as days with calls, never as missing", () => {
+  const s = summarize({
+    closings: [closing(MO, 50, at(MO, 19))],
+    // Dienstag und Mittwoch nur aus der Gruppe übernommen, Donnerstag gar nicht.
+    imported: [
+      { day: DI, attempts: 45 },
+      { day: MI, attempts: 0 },
+    ],
+    trackingStart: MO,
+    from: MO,
+    to: FR,
+    now: at(FR, 22),
+  });
+  assert.deepEqual(
+    s.days.map((d) => d.status),
+    ["called", "imported", "imported", "missed", "open"],
+  );
+  assert.equal(s.days[1].attempts, 45);
+  // Anwahlen aus der Gruppe zählen als Tag mit Anwahlen, die Serie nicht.
+  assert.equal(s.activeDays, 2);
+  assert.equal(s.closedDays, 1);
+  assert.equal(s.streak.current, 0);
+  assert.equal(s.streak.best, 1);
+  // Nur Donnerstag fehlt wirklich.
+  assert.equal(s.missingOpen, 1);
+  assert.equal(s.needsTeamReview, false);
+  // Solange die Frist läuft, bleibt ein übernommener Tag offen.
+  const early = summarize({
+    closings: [],
+    imported: [{ day: MO, attempts: 30 }],
+    trackingStart: MO,
+    from: MO,
+    to: MO,
+    now: at(MO, 20),
+  });
+  assert.equal(early.days[0].status, "open");
+});
+
 test("the weekend neither breaks nor extends a streak; a weekend closing is a bonus day", () => {
   const s = summarize({
     closings: [

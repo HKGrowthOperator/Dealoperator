@@ -12,7 +12,7 @@ import {
   numberSchema,
   type Counts,
 } from "../lib/kpis";
-import { summarize, type Closing } from "../lib/commitment";
+import { summarize, type Closing, type ImportedDay } from "../lib/commitment";
 import { teamEvent } from "./notify";
 import {
   approvedPauses,
@@ -440,6 +440,16 @@ export async function ownClosings(db: Database, participant: string) {
   }));
 }
 
+/** Übernommene Tage (Import aus der Gruppe) ohne eigenen Abschluss. */
+export function toImported(rows: Awaited<ReturnType<typeof ownClosings>>): ImportedDay[] {
+  return rows
+    .filter((r) => r.origin === "import")
+    .map((r) => ({
+      day: r.day,
+      attempts: typeof r.counts?.attempts === "number" ? r.counts.attempts : null,
+    }));
+}
+
 export function toClosings(rows: Awaited<ReturnType<typeof ownClosings>>): Closing[] {
   return rows
     .filter((r) => r.origin === "closing" && r.firstSubmittedAt)
@@ -502,8 +512,10 @@ export async function closingState(
   );
   // Serien, Status und Frist immer bis heute; der Kalender für den Monat.
   const today = berlinDate(now);
+  const imported = toImported(rows);
   const summary = summarize({
     closings,
+    imported,
     pauses,
     trackingStart: start,
     from: start && start < today ? start : today,
@@ -513,6 +525,7 @@ export async function closingState(
   });
   const calendar = summarize({
     closings,
+    imported,
     pauses,
     trackingStart: start,
     from,
