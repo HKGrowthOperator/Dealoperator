@@ -3462,7 +3462,7 @@ li[data-open] .rb-chevron {
   color: var(--do-ink-3);
   font-size: var(--text-label);
 }
-.ca-main .member-card > p:not(.member-when) {
+.ca-main .member-card > p:not(.member-when):not(.member-discord) {
   min-height: 0;
   margin: var(--space-3) 0 0;
   color: var(--do-ink-2);
@@ -3483,4 +3483,19 @@ li[data-open] .rb-chevron {
 }
 .ca-main .inbox-empty {
   margin-bottom: var(--space-4);
+}
+
+.ca-main .member-card[data-own] {
+  border-color: var(--do-blue-line);
+}
+.ca-main .member-card > .member-discord {
+  min-height: 0;
+  margin: var(--space-2) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.45;
+}
+.ca-main .member-discord strong {
+  color: var(--do-ink);
+  overflow-wrap: anywhere;
 }

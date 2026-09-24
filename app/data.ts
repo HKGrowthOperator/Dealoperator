@@ -42,6 +42,8 @@ export type Profile = {
   goal: number;
   days: number[];
   listed: boolean;
+  /** Freiwillig selbst angegebener Discord-Name, damit andere einen finden. */
+  discordName?: string;
 };
 export type RecordDay = {
   date: string;
@@ -124,6 +126,7 @@ export const emptyProfile: Profile = {
   goal: 200,
   days: [1, 2, 3, 4, 5],
   listed: false,
+  discordName: "",
 };
 export const demoProfile: Profile = {
   ...emptyProfile,

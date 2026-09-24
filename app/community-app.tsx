@@ -813,6 +813,21 @@ export default function CommunityApp({
               }
             />
           </label>
+          <label>
+            Dein Discord-Name (freiwillig)
+            <input
+              maxLength={40}
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="zum Beispiel max_muster"
+              value={profile.discordName ?? ""}
+              onChange={(e) =>
+                setProfile({ ...profile, discordName: e.target.value.trim() })
+              }
+            />
+            <small>So finden dich andere im Discord und schreiben dich an.</small>
+          </label>
         </div>
         <fieldset>
           <legend>Deine geplanten Call-Tage (nur zur Planung)</legend>
@@ -847,12 +862,20 @@ export default function CommunityApp({
             Mein Profil bei den Call-Partnern anzeigen
             <small>
               Andere Angemeldete sehen Name, Rolle, Zielgruppe, Call-Zeit,
-              Wochenziel, Call-Tage und Beschreibung, bei verknüpftem Discord
-              auch einen Link zum Anschreiben. E-Mail und Telefonnummer
-              bleiben privat.
+              Wochenziel, Call-Tage, Beschreibung und deinen Discord-Namen.
+              E-Mail und Telefonnummer bleiben privat.
             </small>
           </span>
         </label>
+        {data.profile.listed && profile.listed && (
+          <p className="ca-visible">
+            <CircleCheck size={18} aria-hidden="true" />
+            <span>
+              Du bist bei den Call-Partnern sichtbar.{" "}
+              <Link href="/partner?modus=eigen">So sehen dich andere</Link>
+            </span>
+          </p>
+        )}
       </>
     );
   }
@@ -894,6 +917,114 @@ export default function CommunityApp({
           {saving ? "Wird gespeichert …" : "Speichern"}
         </button>
       </form>
+    );
+  }
+  /** Kontakt über Discord: verknüpftes Profil oder selbst angegebener Name. */
+  function discordContact(m: Member) {
+    if (m.discord)
+      return (
+        <a
+          className="btn primary full"
+          href={m.discord}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <MessageCircle size={17} aria-hidden="true" />
+          Auf Discord schreiben
+          <span className="do-sr">(öffnet Discord)</span>
+        </a>
+      );
+    if (!m.discordName) return null;
+    return (
+      <button
+        className="btn primary full"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(m.discordName!);
+            toast.success(
+              `„${m.discordName}“ kopiert. Im Discord bei den Direktnachrichten einfügen und anschreiben.`,
+            );
+          } catch {
+            toast.info(`Discord-Name: ${m.discordName}`);
+          }
+        }}
+      >
+        <Copy size={17} aria-hidden="true" />
+        Discord-Namen kopieren
+      </button>
+    );
+  }
+  function memberCard(m: Member, own = false) {
+    return (
+      <article className="card member-card" key={m.id} data-own={own || undefined}>
+        <div className="member-top">
+          <Avatar name={m.name} color={m.color} />
+          <Tag tone="green">{own ? "Das bist du" : "Sucht Call-Partner"}</Tag>
+        </div>
+        <h2>{m.name}</h2>
+        <span className="member-role">{m.role}</span>
+        {m.bio && <p>{m.bio}</p>}
+        {m.latest && (
+          <div className="member-stats">
+            <span>
+              <strong>{m.latest.attempts}</strong>Anwahlen
+            </span>
+            <span>
+              <strong>{m.latest.meetings}</strong>Termine
+            </span>
+            <small>Freiwillig geteilt · {prettyDate(m.latest.date)}</small>
+          </div>
+        )}
+        <p className="member-when">
+          <Clock3 size={15} aria-hidden="true" />
+          <span>
+            {m.days.length
+              ? m.days
+                  .slice()
+                  .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
+                  .map((d) => dayNames[d])
+                  .join(", ")
+              : "Tage offen"}
+            {m.time ? ` · ${m.time}` : ""}
+          </span>
+        </p>
+        {m.niche && (
+          <div className="member-tags">
+            <Tag>{m.niche}</Tag>
+          </div>
+        )}
+        {(m.discordName || (own && discordLink?.link)) && (
+          <p className="member-discord">
+            Discord: <strong>{m.discordName || discordLink?.link?.name}</strong>
+          </p>
+        )}
+        {own && !m.discordName && !discordLink?.link && (
+          <p className="member-discord">
+            Ohne Discord-Namen können dich andere nur hier anfragen.
+          </p>
+        )}
+        <div className="member-actions">
+          {own ? (
+            <button
+              className="btn secondary full"
+              onClick={() => {
+                setProfile(data.profile);
+                setModal("profile");
+              }}
+            >
+              <UserRound size={17} aria-hidden="true" />
+              Bearbeiten
+            </button>
+          ) : (
+            <>
+              {discordContact(m)}
+              <button className="btn secondary full" onClick={() => setMember(m)}>
+                Profil ansehen
+              </button>
+            </>
+          )}
+        </div>
+      </article>
     );
   }
   const exchangeView = ["sessions", "wissen"].includes(initialView);
@@ -1137,14 +1268,15 @@ export default function CommunityApp({
                     <p className="ca-visible">
                       <CircleCheck size={18} aria-hidden="true" />
                       <span>
-                        Du bist als Call-Partner sichtbar.{" "}
-                        {discordLink?.link ? (
+                        Du bist als Call-Partner sichtbar, deine Karte steht
+                        unten als erste.{" "}
+                        {discordLink?.link || data.profile.discordName ? (
                           "Andere können dich über Discord anschreiben."
-                        ) : !discordLink?.available ? null : (
+                        ) : (
                           <>
-                            Damit dich andere über Discord anschreiben können,{" "}
-                            <Link href="/profil?modus=eigen#discord">
-                              verknüpfe Discord im Profil
+                            Damit dich andere im Discord finden,{" "}
+                            <Link href="/profil?modus=eigen">
+                              trag deinen Discord-Namen im Profil ein
                             </Link>
                             .
                           </>
@@ -1199,6 +1331,8 @@ export default function CommunityApp({
                     />
                   </div>
                   <div className="member-grid">
+                    {data.profile.listed &&
+                      memberCard({ id: "self", ...data.profile }, true)}
                     {data.members
                       .filter(
                         (m) =>
@@ -1207,68 +1341,7 @@ export default function CommunityApp({
                             .toLowerCase()
                             .includes(search.toLowerCase()),
                       )
-                      .map((m) => (
-                        <article className="card member-card" key={m.id}>
-                          <div className="member-top">
-                            <Avatar name={m.name} color={m.color} />
-                            <Tag tone="green">Sucht Call-Partner</Tag>
-                          </div>
-                          <h2>{m.name}</h2>
-                          <span className="member-role">{m.role}</span>
-                          <p>{m.bio}</p>
-                          {m.latest && (
-                            <div className="member-stats">
-                              <span>
-                                <strong>{m.latest.attempts}</strong>Anwahlen
-                              </span>
-                              <span>
-                                <strong>{m.latest.meetings}</strong>Termine
-                              </span>
-                              <small>
-                                Freiwillig geteilt · {prettyDate(m.latest.date)}
-                              </small>
-                            </div>
-                          )}
-                          <p className="member-when">
-                            <Clock3 size={15} aria-hidden="true" />
-                            <span>
-                              {m.days.length
-                                ? m.days
-                                    .slice()
-                                    .sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7))
-                                    .map((d) => dayNames[d])
-                                    .join(", ")
-                                : "Tage offen"}
-                              {m.time ? ` · ${m.time}` : ""}
-                            </span>
-                          </p>
-                          {m.niche && (
-                            <div className="member-tags">
-                              <Tag>{m.niche}</Tag>
-                            </div>
-                          )}
-                          <div className="member-actions">
-                            {m.discord && (
-                              <a
-                                className="btn primary full"
-                                href={m.discord}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                <MessageCircle size={17} aria-hidden="true" />
-                                Auf Discord schreiben
-                                <span className="do-sr">(öffnet Discord)</span>
-                              </a>
-                            )}
-                            <button
-                              className="btn secondary full"
-                              onClick={() => setMember(m)}
-                            >
-                              Profil ansehen
-                            </button>
-                          </div>
-                        </article>
-                      ))}
+                      .map((m) => memberCard(m))}
                   </div>
                   {!data.members.filter(
                     (m) =>
@@ -1281,7 +1354,9 @@ export default function CommunityApp({
                       title={
                         data.members.length
                           ? "Noch kein passender Treffer."
-                          : "Noch keine Call-Partner sichtbar."
+                          : data.profile.listed
+                            ? "Noch keine weiteren Call-Partner."
+                            : "Noch keine Call-Partner sichtbar."
                       }
                       text={
                         data.members.length
@@ -1996,24 +2071,18 @@ export default function CommunityApp({
                   </strong>
                 </span>
               </div>
-              {member.discord && (
-                <a
-                  className="btn primary full"
-                  href={member.discord}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MessageCircle size={17} aria-hidden="true" />
-                  Auf Discord schreiben
-                  <span className="do-sr">(öffnet Discord)</span>
-                </a>
+              {member.discordName && (
+                <p className="member-discord">
+                  Discord: <strong>{member.discordName}</strong>
+                </p>
               )}
+              {discordContact(member)}
               <button
-                className={`btn ${member.discord ? "secondary" : "primary"} full`}
+                className={`btn ${member.discord || member.discordName ? "secondary" : "primary"} full`}
                 onClick={() => setModal("buddy")}
               >
                 <Send size={17} aria-hidden="true" />
-                {member.discord ? "Hier anfragen" : "Call-Partner anfragen"}
+                {member.discord || member.discordName ? "Hier anfragen" : "Call-Partner anfragen"}
               </button>
               <p className="privacy-note">
                 <ShieldCheck size={16} />

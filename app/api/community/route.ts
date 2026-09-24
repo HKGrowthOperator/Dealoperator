@@ -23,6 +23,13 @@ const profileSchema = z.object({
   goal: z.number().int().min(1).max(5000),
   days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
   listed: z.boolean(),
+  // Discord-Benutzername (neu: 2 bis 32 Zeichen aus a-z, 0-9, _ und .;
+  // ältere Namen mit #1234). Freiwillig, nur für Angemeldete sichtbar.
+  discordName: s
+    .max(40)
+    .regex(/^(|[A-Za-z0-9_.]{2,32}(#\d{4})?)$/, "Bitte gib deinen Discord-Namen ohne Leerzeichen an, zum Beispiel max_muster.")
+    .optional()
+    .default(""),
   // Ein früher gespeicherter „bevorzugter Kanal“ wird beim Lesen und Speichern
   // verworfen: Treffpunkt für Call-Partner und Sessions ist Discord.
 });
