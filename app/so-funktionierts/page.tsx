@@ -331,7 +331,7 @@ function Cta({ signedIn }: { signedIn: boolean }) {
   return signedIn ? (
     <div className="hw-cta">
       <Link className="do-button do-button-primary" href="/tagesabschluss">
-        Tag abschließen
+        Zahlen eintragen
       </Link>
       <Link className="do-button do-button-secondary" href="/">
         Zu den Ergebnissen

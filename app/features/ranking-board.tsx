@@ -12,8 +12,10 @@ import {
   CircleCheck,
   CircleDashed,
   Clock3,
+  ExternalLink,
   EyeOff,
   Handshake,
+  Headphones,
   Link2,
   Medal,
   NotebookPen,
@@ -134,7 +136,7 @@ const steps = [
     text: "Du callst wie gewohnt, an Calling-Tagen von Montag bis Freitag.",
   },
   {
-    title: "Tag abschließen",
+    title: "Zahlen eintragen",
     text: "Anwahlen, Settings und Closings eintragen, dazu zwei kurze Fragen: Was lief gut, was machst du beim nächsten Mal besser?",
   },
   {
@@ -395,6 +397,7 @@ export default function RankingBoard({
         )}
         {(onlyRanking || signedIn) && <h1 className="do-sr">Ergebnisse</h1>}
         {signedIn && home && <PersonalPanel home={home} />}
+        {signedIn && home?.participant && <DiscordPanel url={discord} />}
 
         <section className="rb-results" id="ergebnisse" aria-labelledby="rb-results-title">
           <div className="rb-results-head">
@@ -841,7 +844,7 @@ function PersonalPanel({ home }: { home: HomeState }) {
         ? "Zahlen und zwei kurze Fragen, dann zählt dein Tag."
         : "Ein Abschluss ist freiwillig und zählt als Bonus.",
       href: "/tagesabschluss",
-      action: "Tag abschließen",
+      action: "Zahlen eintragen",
     };
   })();
   const Icon = state.icon;
@@ -874,6 +877,30 @@ function PersonalPanel({ home }: { home: HomeState }) {
     </section>
   );
 }
+/** Discord ist für Calls da. In einem Satz, was dort passiert, und ein Knopf. */
+function DiscordPanel({ url }: { url: string }) {
+  return (
+    <section className="rb-discord" aria-labelledby="rb-discord-title">
+      <span className="rb-discord-icon" aria-hidden="true">
+        <Headphones size={22} />
+      </span>
+      <div className="rb-me-text">
+        <p className="rb-me-kicker">Discord</p>
+        <h2 id="rb-discord-title">Calls, Sessions und Roleplays laufen im Discord.</h2>
+        <p>
+          Dort trefft ihr euch zum Üben, findet Call-Partner und pusht euch gegenseitig. Zahlen
+          und Reflexionen bleiben hier.
+        </p>
+      </div>
+      <a className="do-button do-button-secondary" href={url} target="_blank" rel="noopener noreferrer">
+        Discord öffnen
+        <ExternalLink size={16} aria-hidden="true" />
+        <span className="do-sr">(neues Fenster)</span>
+      </a>
+    </section>
+  );
+}
+
 /**
  * Das Profil steht auf „nicht öffentlich“: eingereichte Zahlen fehlen in
  * Rangliste und Summe, ohne dass die Person es merkt. Ein Klick schaltet die

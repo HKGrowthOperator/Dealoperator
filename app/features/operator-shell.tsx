@@ -1,20 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  ChartColumn,
-  ClipboardCheck,
-  LogIn,
-  MessagesSquare,
-  UsersRound,
-} from "lucide-react";
+import { ExternalLink, PencilLine } from "lucide-react";
 import OperatorWordmark from "./operator-wordmark";
 import AccountMenu from "./account-menu";
 import { keepInstallPrompt } from "./install-app";
 import { DISCORD_INVITE } from "@/lib/discord";
 
-/** Anmeldestand für Kopf und Tableiste. */
+/** Anmeldestand für Kopf und Reiterleiste. */
 export type Viewer = {
   signedIn: boolean;
   hasPassword: boolean;
@@ -22,7 +16,7 @@ export type Viewer = {
   role?: "admin" | "moderator" | null;
 };
 
-// Ein Abruf je Seitenaufruf, geteilt von Kopf, Tableiste und Kontomenü.
+// Ein Abruf je Seitenaufruf, geteilt von Kopf, Reiterleiste und Kontomenü.
 let pending: Promise<Viewer | null> | null = null;
 export function loadViewer(): Promise<Viewer | null> {
   pending ??= fetch("/api/auth", { cache: "no-store" })
@@ -70,21 +64,22 @@ function areaOf(path: string): Area {
 }
 
 const MAIN = [
-  { area: "results", href: "/", label: "Ergebnisse", icon: ChartColumn },
-  { area: "day", href: "/tagesabschluss", label: "Mein Tag", icon: ClipboardCheck },
-  { area: "exchange", href: "/reflexionen", label: "Reflexionen", icon: MessagesSquare },
-  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner", icon: UsersRound },
+  { area: "results", href: "/", label: "Ergebnisse" },
+  { area: "day", href: "/tagesabschluss", label: "Mein Tag" },
+  { area: "exchange", href: "/reflexionen", label: "Reflexionen" },
+  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner" },
 ] as const;
 
 /**
- * Ein Kopf für alle Seiten: Logo zur Startseite, drei Bereiche, Konto.
- * Auf dem Handy stehen die Bereiche unten in einer festen Leiste; oben
- * bleiben nur Logo und Konto.
+ * Ein Kopf für alle Seiten: Logo zur Startseite, die Bereiche, Discord,
+ * „Zahlen eintragen“ und das Konto. Am Handy stehen die Bereiche als
+ * Reiterleiste direkt unter dem Kopf; unten gibt es keine feste Leiste mehr,
+ * weil dort niemand hinsieht.
  */
 export function OperatorHeader({
   viewer: initial,
 }: {
-  /** Discord steht nur noch dort, wo es passt; der Parameter bleibt kompatibel. */
+  /** Discord steht im Kopf und auf der Startseite; der Parameter bleibt kompatibel. */
   discordUrl?: string;
   /** Bereits bekannter Anmeldestand (vermeidet ein kurzes Umspringen). */
   viewer?: Viewer | null;
@@ -99,6 +94,50 @@ export function OperatorHeader({
     return () => window.removeEventListener("beforeinstallprompt", keepInstallPrompt);
   }, []);
   const signedIn = !!viewer?.signedIn;
+  const onClosing = path.startsWith("/tagesabschluss");
+  // Die Reiterleiste am Handy schiebt sich seitlich; der aktuelle Bereich
+  // soll beim Öffnen sichtbar sein, nicht hinter dem Rand.
+  const strip = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const current = strip.current?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (current && strip.current && strip.current.scrollWidth > strip.current.clientWidth)
+      current.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [area]);
+  // Abgemeldet entfällt „Mein Tag“; „Anmelden“ steht rechts im Kopf.
+  const areas = MAIN.filter((item) => !(viewer && !signedIn && item.area === "day"));
+  const links = (
+    <>
+      {areas.map((item) => (
+        <Link
+          key={item.area}
+          href={item.href}
+          className="do-nav-link"
+          aria-current={area === item.area ? "page" : undefined}
+        >
+          {item.label}
+        </Link>
+      ))}
+      {viewer?.team && (
+        <Link
+          href="/verwaltung"
+          className="do-nav-link"
+          aria-current={area === "admin" ? "page" : undefined}
+        >
+          Verwaltung
+        </Link>
+      )}
+      <a
+        className="do-nav-link do-nav-discord"
+        href={DISCORD_INVITE}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Discord
+        <ExternalLink size={14} aria-hidden="true" />
+        <span className="do-sr">(neues Fenster)</span>
+      </a>
+    </>
+  );
   return (
     <>
       <a className="do-skip" href="#inhalt">
@@ -110,30 +149,9 @@ export function OperatorHeader({
             <OperatorWordmark />
           </Link>
           <nav className="do-nav" aria-label="Hauptnavigation">
-            {MAIN.map((item) => (
-              <Link
-                key={item.area}
-                href={item.href}
-                className="do-nav-link"
-                aria-current={area === item.area ? "page" : undefined}
-              >
-                {item.label}
-              </Link>
-            ))}
-            {viewer?.team && (
-              <Link
-                href="/verwaltung"
-                className="do-nav-link"
-                aria-current={area === "admin" ? "page" : undefined}
-              >
-                Verwaltung
-              </Link>
-            )}
+            {links}
           </nav>
           <div className="do-header-actions">
-            {/* Jeder Einstieg nur einmal: Auf der Startseite steht
-                „Kostenfrei starten“ im Kopfbereich der Seite, am Handy
-                „Anmelden“ in der Tableiste. */}
             {viewer && !signedIn && (
               <>
                 {path !== "/" && (
@@ -141,38 +159,26 @@ export function OperatorHeader({
                     Kostenfrei starten
                   </Link>
                 )}
-                <Link className="do-button do-button-secondary do-hide-mobile" href="/anmelden">
+                <Link className="do-button do-button-secondary" href="/anmelden">
                   Anmelden
                 </Link>
               </>
+            )}
+            {/* Die Hauptsache auf jeder Seite; auf dem Tagesabschluss selbst nicht doppelt. */}
+            {signedIn && !onClosing && (
+              <Link className="do-button do-button-primary do-header-cta" href="/tagesabschluss">
+                <PencilLine size={17} aria-hidden="true" />
+                <span className="do-cta-long">Zahlen eintragen</span>
+                <span className="do-cta-short">Eintragen</span>
+              </Link>
             )}
             {signedIn && <AccountMenu viewer={viewer} />}
           </div>
         </div>
       </header>
-      {/* Vier Reiter: angemeldet die vier Bereiche (Profil liegt im
-          Kontomenü oben rechts und unter „Mein Tag“), abgemeldet statt
-          „Mein Tag“ der Weg zur Anmeldung. */}
-      <nav className="do-tabbar" aria-label="Bereiche">
-        {MAIN.filter((item) => !(viewer && !signedIn && item.area === "day")).map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.area}
-              href={item.href}
-              aria-current={area === item.area ? "page" : undefined}
-            >
-              <Icon size={22} aria-hidden="true" />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
-        {viewer && !signedIn && (
-          <Link href="/anmelden">
-            <LogIn size={22} aria-hidden="true" />
-            <span>Anmelden</span>
-          </Link>
-        )}
+      {/* Handy: dieselben Bereiche als Reiterleiste unter dem Kopf. */}
+      <nav className="do-topnav" aria-label="Bereiche" ref={strip}>
+        {links}
       </nav>
     </>
   );
