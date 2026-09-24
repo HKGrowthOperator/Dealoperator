@@ -143,12 +143,16 @@ test("post-login targets prevent external redirects and authentication loops", (
     "/%2f%2fevil.invalid",
     "/\\evil.invalid",
   ])
-    assert.equal(safeNext(input), "/heute?modus=eigen");
+    assert.equal(safeNext(input), "/");
   assert.equal(
     safeNext("/profil-uebernehmen?profil=abc-123"),
     "/profil-uebernehmen?profil=abc-123",
   );
   assert.equal(safeNext("/zahlen?modus=eigen"), "/zahlen?modus=eigen");
+  // Ohne Ziel zur gemeinsamen Startseite, ausdrückliche Ziele bleiben.
+  assert.equal(safeNext(null), "/");
+  assert.equal(safeNext("/tagesabschluss?tag=2026-09-22"), "/tagesabschluss?tag=2026-09-22");
+  assert.equal(safeNext("/reflexionen"), "/reflexionen");
 });
 
 test("phone numbers are normalised to E.164 and require a country code", () => {

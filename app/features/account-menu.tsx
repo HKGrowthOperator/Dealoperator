@@ -2,30 +2,16 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { CircleUserRound } from "lucide-react";
-
-type Me = { signedIn: boolean; hasPassword: boolean } | null;
+import type { Viewer } from "./operator-shell";
 
 /**
- * Kontosymbol im Kopf. Abgemeldet: Anmelden oder Registrieren. Angemeldet:
- * eigener Bereich, Passwort, Abmelden. Der Stand kommt vom Server
- * (/api/auth), die Seite selbst bleibt dadurch für alle gleich.
+ * Kontomenü im Kopf (nur angemeldet). Führt in den eigenen Bereich:
+ * Mein Tag, Fortschritt, eigene Zahlen, Profil und Einstellungen.
  */
-export default function AccountMenu() {
+export default function AccountMenu({ viewer }: { viewer: Viewer }) {
   const id = useId();
-  const [me, setMe] = useState<Me>(null);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/auth", { cache: "no-store", signal: controller.signal })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data) setMe({ signedIn: !!data.signedIn, hasPassword: !!data.hasPassword });
-      })
-      .catch(() => undefined);
-    return () => controller.abort();
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -53,43 +39,46 @@ export default function AccountMenu() {
     if (r.ok) window.location.href = "/";
   }
 
+  const close = () => setOpen(false);
   return (
-    <div className="op-account" ref={root}>
+    <div className="do-account" ref={root}>
       <button
         type="button"
-        className="op-account-button"
-        aria-label={me?.signedIn ? "Dein Konto" : "Anmelden oder registrieren"}
+        className="do-account-button"
+        aria-label="Mein Bereich"
         aria-expanded={open}
         aria-controls={`${id}-menu`}
         onClick={() => setOpen((v) => !v)}
       >
         <CircleUserRound size={24} aria-hidden="true" />
-        {me?.signedIn && <span className="op-account-dot" aria-hidden="true" />}
+        <span className="do-account-dot" aria-hidden="true" />
       </button>
       {open && (
-        <div className="op-account-menu" id={`${id}-menu`}>
-          {me?.signedIn ? (
-            <>
-              <Link href="/heute?modus=eigen" onClick={() => setOpen(false)}>
-                Mein Bereich
-              </Link>
-              <Link href="/passwort" onClick={() => setOpen(false)}>
-                {me.hasPassword ? "Passwort ändern" : "Passwort festlegen"}
-              </Link>
-              <button type="button" onClick={() => void signOut()}>
-                Abmelden
-              </button>
-            </>
-          ) : (
-            <>
-              <Link href="/anmelden" onClick={() => setOpen(false)}>
-                Anmelden
-              </Link>
-              <Link href="/starten" onClick={() => setOpen(false)}>
-                Registrieren
-              </Link>
-            </>
+        <div className="do-account-menu" id={`${id}-menu`}>
+          <p className="do-account-title">Mein Bereich</p>
+          <Link href="/tagesabschluss" onClick={close}>
+            Mein Tag
+          </Link>
+          <Link href="/heute?modus=eigen" onClick={close}>
+            Mein Fortschritt
+          </Link>
+          <Link href="/zahlen?modus=eigen" onClick={close}>
+            Meine Zahlen
+          </Link>
+          <Link href="/profil?modus=eigen" onClick={close}>
+            Profil und Einstellungen
+          </Link>
+          <Link href="/passwort" onClick={close}>
+            {viewer.hasPassword ? "Passwort ändern" : "Passwort festlegen"}
+          </Link>
+          {viewer.team && (
+            <Link href="/verwaltung" onClick={close}>
+              Verwaltung
+            </Link>
           )}
+          <button type="button" onClick={() => void signOut()}>
+            Abmelden
+          </button>
         </div>
       )}
     </div>

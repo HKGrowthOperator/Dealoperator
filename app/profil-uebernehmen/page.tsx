@@ -86,8 +86,8 @@ export default async function Page({
               Jedes Konto gehört zu genau einem Profil. Eine zweite Übernahme
               ist deshalb nicht möglich.
             </p>
-            <Link className="btn primary full" href="/heute?modus=eigen">
-              Zu meinen Zahlen
+            <Link className="btn primary full" href="/tagesabschluss">
+              Zu meinem Tag
             </Link>
           </section>
         ) : (

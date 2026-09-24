@@ -43,7 +43,7 @@ export default function MemberOnboarding({
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
   const heading = useStepHeading(done ? "done" : "form");
-  const later = next.startsWith("/tagesabschluss") ? "/heute?modus=eigen" : next;
+  const later = next.startsWith("/tagesabschluss") ? "/" : next;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

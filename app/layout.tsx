@@ -3,9 +3,9 @@ import "./globals.css";
 import "./operator-brand.css";
 import "./operator-glass.css";
 import "./ranking.css";
-import PageMotion from "./features/page-motion";
+import "./ui.css";
 export const metadata: Metadata = {
-  title: "Deal Operator — Gemeinsam dranbleiben.",
+  title: "Deal Operator: Gemeinsam dranbleiben.",
   description:
     "Deal Operator ist ein Werkzeug fürs gemeinsame Callen: jeden Calling-Tag Zahlen und Learnings festhalten, Fortschritt sehen und dranbleiben.",
   icons: { icon: "/favicon.svg" },
@@ -26,7 +26,6 @@ export default function RootLayout({
     <html lang="de">
       <body>
         {children}
-        <PageMotion />
       </body>
     </html>
   );

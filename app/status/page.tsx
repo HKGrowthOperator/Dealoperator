@@ -16,10 +16,10 @@ export const dynamic = "force-dynamic";
  */
 export default async function Page() {
   const actor = await getCurrentUser();
-  if (!actor) redirect("/anmelden?next=%2Fheute%3Fmodus%3Deigen");
+  if (!actor) redirect("/anmelden?next=%2Fstatus");
   const db = database();
   const state = await ownState(db, actor);
-  if (state.participant) redirect("/heute?modus=eigen");
+  if (state.participant) redirect("/tagesabschluss");
   const request = await requestForActor(db, actor);
   if (!request) redirect("/start");
   return (
