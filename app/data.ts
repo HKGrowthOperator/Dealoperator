@@ -110,10 +110,12 @@ export type AppData = WorkflowData & {
   viewerTeam?: boolean;
   /** Rang „Aktiver Caller“ (lib/active-caller.ts). */
   activeCaller?: ActiveCaller;
+  /** Eigenes Profil in der Rangliste vorhanden: Name und Rolle kommen von dort. */
+  ownProfile?: boolean;
 };
 export const emptyProfile: Profile = {
   name: "",
-  role: "Sales",
+  role: "",
   niche: "B2B-Dienstleistungen",
   time: "Vormittags",
   bio: "",

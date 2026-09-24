@@ -114,6 +114,13 @@ export async function GET() {
       teamRecipients(database),
     ]);
     const active = await activeCallerFor(database, user.userId);
+    // Name und Rolle gibt es nur einmal: aus dem eigenen Profil in der
+    // Rangliste. Das Call-Profil ergänzt nur Zielgruppe, Zeit und Tage.
+    const [own] = await database.query(
+      "SELECT name,role FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
+      [user.userId],
+    );
+    const stored = profile ? JSON.parse(profile.data) : emptyProfile;
     return json({
       ...workflows,
       // Treffpunkt für Sessions und Call-Partner ist Discord.
@@ -121,7 +128,10 @@ export async function GET() {
       viewerTeam: isTeam(user),
       // Rang „Aktiver Caller“: schaltet Sessions & Roleplay frei.
       activeCaller: active,
-      profile: profile ? JSON.parse(profile.data) : emptyProfile,
+      profile: own
+        ? { ...stored, name: own.name as string, role: (own.role as string) || "" }
+        : stored,
+      ownProfile: !!own,
       records: records.results.map((r: any) => JSON.parse(r.data)),
       members: crew.results
         .filter((r: any) => r.id !== user.userId)
@@ -201,13 +211,16 @@ export async function POST(request: Request) {
     if (body.action === "profile") {
       const value = profileSchema.parse(body.value);
       await database.transaction(async (tx) => {
+        // Name und Rolle ändert nur „Konto und Sichtbarkeit“; hier werden sie
+        // aus dem eigenen Profil übernommen, nie umgekehrt.
+        const [own] = await tx.query(
+          "SELECT name,role FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
+          [id],
+        );
+        const data = own ? { ...value, name: own.name, role: own.role || "" } : value;
         await tx.query(
           "INSERT INTO profiles (id,data) VALUES ($1,$2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
-          [id, JSON.stringify(value)],
-        );
-        await tx.query(
-          "UPDATE participants SET name=$2,role=$3 WHERE owner=$1",
-          [id, value.name, value.role],
+          [id, JSON.stringify(data)],
         );
       });
     } else if (body.action === "record" || body.action === "deleteRecord")

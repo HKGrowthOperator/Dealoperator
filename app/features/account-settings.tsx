@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -11,7 +11,23 @@ function returnTarget(value: string | null) {
   return value;
 }
 
-export default function AccountSettings({ demo }: { demo: boolean }) {
+/**
+ * Ein Profil, ein Speichern: Name, Firma, Rolle und Nummer gelten für die
+ * Rangliste und für Call-Partner. `extra` sind die Call-Partner-Angaben
+ * (Zielgruppe, Zeit, Tage); `onSaved` speichert sie im selben Schritt.
+ */
+export default function AccountSettings({
+  demo,
+  extra,
+  onSaved,
+  standalone,
+}: {
+  demo: boolean;
+  extra?: ReactNode;
+  onSaved?: (identity: { name: string; role: string }) => Promise<boolean>;
+  /** Ohne eigenes Profil: stattdessen gezeigt (z. B. das Call-Profil allein). */
+  standalone?: ReactNode;
+}) {
   const router = useRouter();
   const uid = useId();
   const back = returnTarget(useSearchParams().get("weiter"));
@@ -56,7 +72,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
   }, [demo]);
   return (
     <section className="card padded operator-account" id="konto">
-      <h2>Konto und Sichtbarkeit</h2>
+      <h2>Dein Profil</h2>
       <p className="hint">
         {demo ? "Beispielkonto" : `${email} · E-Mail bestätigt`}
       </p>
@@ -71,14 +87,17 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
         </p>
       )}
       {!exists ? (
-        <p>
-          Stehen deine Zahlen schon im Ranking?{" "}
-          <Link className="text-link" href="/profil-uebernehmen">
-            Übernahme anfragen
-          </Link>
-          . Sonst speicherst du nach dem Ausfüllen deines Profils deinen ersten
-          Tagesabschluss.
-        </p>
+        <>
+          <p>
+            Stehen deine Zahlen schon in der Rangliste?{" "}
+            <Link className="text-link" href="/profil-uebernehmen">
+              Übernahme anfragen
+            </Link>
+            . Sonst speicherst du nach dem Ausfüllen deines Profils deinen ersten
+            Tagesabschluss.
+          </p>
+          {standalone}
+        </>
       ) : (
         <form
           className="checkin-form"
@@ -95,12 +114,15 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
                 const d = await r.json();
                 if (!r.ok) throw Error(d.error);
               }
+              // Call-Partner-Angaben im selben Schritt; Name und Rolle von oben.
+              if (onSaved && !(await onSaved({ name: value.name.trim(), role: value.role.trim() })))
+                return;
               toast.success(
                 demo
                   ? "Beispieleinstellungen aktualisiert."
                   : back
                     ? "Gespeichert. Es geht weiter, wo du warst."
-                    : "Einstellungen gespeichert.",
+                    : "Dein Profil ist gespeichert.",
               );
               if (back && !demo && value.phone.trim()) router.push(back);
             } catch (e) {
@@ -112,7 +134,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
         >
           <div className="checkin-fields">
             <label>
-              Anzeigename im Ranking
+              Anzeigename in der Rangliste
               <input
                 required
                 minLength={2}
@@ -175,7 +197,7 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
               }
             />
             <span>
-              Mein Profil und meine gemeldeten Zahlen im öffentlichen Ranking
+              Mein Profil und meine gemeldeten Zahlen in der öffentlichen Rangliste
               anzeigen. Sichtbar: Anzeigename, Firma, Rolle und Kennzahlen.
               Ich kann das jederzeit hier zurücknehmen.
             </span>
@@ -188,22 +210,42 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
               <br />
               {value.publicConsent
                 ? "Profil und gemeldete Zahlen sind im offenen Internet sichtbar."
-                : "Dein Profil und deine Zahlen erscheinen nicht im öffentlichen Ranking."}
+                : "Dein Profil und deine Zahlen erscheinen nicht in der öffentlichen Rangliste."}
             </p>
           </div>
+          {extra && (
+            <fieldset className="account-extra">
+              <legend>Für Call-Partner</legend>
+              {extra}
+            </fieldset>
+          )}
           <button className="btn primary" disabled={busy}>
-            {back ? "Speichern und weiter" : "Einstellungen speichern"}
+            {back ? "Speichern und weiter" : "Speichern"}
           </button>
         </form>
       )}
-      {!demo && (
+    </section>
+  );
+}
+
+/** Passwort und Abmelden: ruhig am Ende, getrennt vom Speichern. */
+export function AccountAccess() {
+  const [error, setError] = useState("");
+  return (
+    <section className="card padded account-access" aria-labelledby="account-access-title">
+      <h2 id="account-access-title">Anmeldung</h2>
+      {error && (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="account-access-actions">
         <Link className="btn secondary" href="/passwort">
           Passwort festlegen oder ändern
         </Link>
-      )}
-      {!demo && (
         <button
-          className="btn secondary"
+          type="button"
+          className="do-link"
           onClick={async () => {
             const r = await fetch("/api/auth", {
               method: "POST",
@@ -213,15 +255,12 @@ export default function AccountSettings({ demo }: { demo: boolean }) {
             // A full navigation discards all private in-memory state after sign-out.
             // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             if (r.ok) window.location.href = "/";
-            else
-              setError(
-                "Abmelden gerade nicht möglich. Bitte erneut versuchen.",
-              );
+            else setError("Abmelden gerade nicht möglich. Bitte erneut versuchen.");
           }}
         >
           Abmelden
         </button>
-      )}
+      </div>
     </section>
   );
 }
