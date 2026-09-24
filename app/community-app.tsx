@@ -12,7 +12,7 @@ import {
 } from "@/lib/kpis";
 import CommitmentDashboard from "./features/commitment-dashboard";
 import RankProgress from "./features/rank-progress";
-import AccountSettings from "./features/account-settings";
+import AccountSettings, { AccountAccess } from "./features/account-settings";
 import PushSetup from "./features/push-setup";
 import DiscordLink from "./features/discord-link";
 import type { CommitmentSettings } from "@/lib/commitment";
@@ -44,6 +44,7 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
+  UserRound,
   Users,
   LoaderCircle,
   LogIn,
@@ -161,12 +162,14 @@ function FieldSelect({
   options,
   label,
   placeholder,
+  optionLabel = (o) => o,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   label: string;
   placeholder?: string;
+  optionLabel?: (option: string) => string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
@@ -176,7 +179,7 @@ function FieldSelect({
       <SelectContent>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
-            {o}
+            {optionLabel(o)}
           </SelectItem>
         ))}
       </SelectContent>
@@ -205,25 +208,39 @@ function Empty({
     </div>
   );
 }
+/** Der Session-Typ „Reflexion“ heißt in der Oberfläche „Rückblick“ (sonst
+ *  verwechselbar mit dem Bereich Reflexionen); gespeichert bleibt der Wert. */
+function sessionKindLabel(kind: string) {
+  return kind === "Reflexion" ? "Rückblick" : kind;
+}
 function MiniChart({
   records,
   days = 7,
+  start,
   onSelect,
 }: {
   records: RecordDay[];
   days?: number;
+  /** Erster Tag (z. B. Montag dieser Woche); ohne Angabe die letzten Tage. */
+  start?: string;
   onSelect?: (date: string) => void;
 }) {
   const series = Array.from({ length: days }, (_, i) => {
-    const date = offset(i - days + 1);
+    const date = start
+      ? dateKey(new Date(Date.parse(`${start}T12:00:00Z`) + i * 86_400_000))
+      : offset(i - days + 1);
     return { date, record: records.find((r) => r.date === date) };
   });
+  const today = dateKey();
   const max = Math.max(60, ...series.map((x) => x.record?.attempts || 0));
   return (
     <div
       className="chart"
       role="group"
-      aria-label={`Anrufversuche der letzten ${days} Tage: ${series.map((x) => `${prettyDate(x.date)}: ${x.record?.attempts ?? "kein Eintrag"}`).join(", ")}`}
+      aria-label={`Anwahlen je Tag: ${series
+        .filter((x) => x.date <= today)
+        .map((x) => `${prettyDate(x.date)}: ${x.record?.attempts ?? "kein Eintrag"}`)
+        .join(", ")}`}
     >
       <div className="chart-scale">
         <span>{max}</span>
@@ -236,11 +253,14 @@ function MiniChart({
             type="button"
             className="chart-col"
             key={date}
+            disabled={date > today}
+            data-missing={record?.attempts == null ? "" : undefined}
+            data-today={date === today ? "" : undefined}
             aria-label={`Tagesabschluss für ${prettyDate(date)} öffnen`}
             onClick={() => onSelect?.(date)}
           >
             <div className="bar-space">
-              <span className="bar-value">{record?.attempts ?? "–"}</span>
+              <span className="bar-value">{date > today ? "" : (record?.attempts ?? "–")}</span>
               <span
                 className={`bar ${date === dateKey() ? "today" : ""}`}
                 style={{
@@ -553,6 +573,17 @@ export default function CommunityApp({
         : "/tagesabschluss",
     );
   }
+  /** Call-Partner-Angaben mit Name und Rolle aus dem eigenen Profil. */
+  async function saveCallProfile(identity: { name: string; role: string }) {
+    if (profile.days.length === 0) {
+      toast.error("Wähle mindestens einen Call-Tag.");
+      return false;
+    }
+    const next = { ...profile, ...identity };
+    const ok = await mutate("profile", next, (d) => ({ ...d, profile: next }));
+    if (ok) setProfile(next);
+    return ok;
+  }
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     if (profile.days.length === 0) {
@@ -614,7 +645,7 @@ export default function CommunityApp({
         },
     ),
   );
-  const metricTotal = (k: Metric) => (totals[k] === null ? "—" : totals[k]!);
+  const metricTotal = (k: Metric) => (totals[k] === null ? "–" : totals[k]!);
   function downloadCalendar(s: Session) {
     const start = new Date(s.startsAt || `${s.date}T${s.time}`);
     const end = new Date(start.getTime() + s.minutes * 60000);
@@ -673,7 +704,7 @@ export default function CommunityApp({
         }}
       >
         <label>
-          Dein Ziel: Anrufversuche pro Woche
+          Dein Ziel: Anwahlen pro Woche
           <input
             type="number"
             min={1}
@@ -731,29 +762,11 @@ export default function CommunityApp({
       </form>
     );
   }
-  function profileForm() {
+  /** Angaben nur für Call-Partner; Name und Rolle stehen im Profil. */
+  function callFields() {
     return (
-      <form onSubmit={saveProfile} className="form-stack">
+      <>
         <div className="form-grid">
-          <label>
-            Dein Anzeigename
-            <input
-              required
-              minLength={2}
-              maxLength={60}
-              value={profile.name}
-              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-              placeholder="Wie möchtest du genannt werden?"
-            />
-          </label>
-          <label>
-            Deine Rolle
-            <input
-              maxLength={80}
-              value={profile.role}
-              onChange={(e) => setProfile({ ...profile, role: e.target.value })}
-            />
-          </label>
           <label>
             Dein Markt / deine Zielgruppe
             <input
@@ -787,7 +800,7 @@ export default function CommunityApp({
         </label>
         <div className="form-grid">
           <label>
-            Anrufversuche pro Woche
+            Wochenziel (Anwahlen)
             <input
               type="number"
               min={1}
@@ -838,9 +851,45 @@ export default function CommunityApp({
             </small>
           </span>
         </label>
+      </>
+    );
+  }
+  /** Eigenständiges Call-Profil (Dialog bei Call-Partner, Konten ohne Profil). */
+  function profileForm() {
+    return (
+      <form onSubmit={saveProfile} className="form-stack">
+        {data.ownProfile ? (
+          <p className="hint">
+            Du erscheinst als <strong>{profile.name}</strong>
+            {profile.role ? ` · ${profile.role}` : ""}. Name und Rolle änderst du
+            unter <Link href="/profil?modus=eigen">Profil</Link>.
+          </p>
+        ) : (
+          <div className="form-grid">
+            <label>
+              Dein Anzeigename
+              <input
+                required
+                minLength={2}
+                maxLength={60}
+                value={profile.name}
+                onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+              />
+            </label>
+            <label>
+              Deine Rolle
+              <input
+                maxLength={80}
+                value={profile.role}
+                onChange={(e) => setProfile({ ...profile, role: e.target.value })}
+              />
+            </label>
+          </div>
+        )}
+        {callFields()}
         <button className="btn primary" disabled={saving}>
           <Check size={18} />
-          {saving ? "Wird gespeichert …" : "Profil & Wochenziel speichern"}
+          {saving ? "Wird gespeichert …" : "Speichern"}
         </button>
       </form>
     );
@@ -878,7 +927,7 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Mein Fortschritt"
-                    text="Deine Woche, deine Abschluss-Serie, aktive Calling-Tage und Leistungslevel."
+                    text="Deine Woche, deine Abschluss-Serie und deine Level."
                   />
                   <section className="ca-section" aria-labelledby="ca-week">
                     <div className="ca-section-head">
@@ -909,8 +958,9 @@ export default function CommunityApp({
                       </div>
                     </dl>
                     <div className="ca-chart">
-                      <p className="ca-chart-title">Anwahlen der letzten 7 Tage</p>
+                      <p className="ca-chart-title">Anwahlen je Tag</p>
                       <MiniChart
+                        start={dateKey(weekStart)}
                         onSelect={(date) => openClosing(date)}
                         records={data.records}
                       />
@@ -963,7 +1013,7 @@ export default function CommunityApp({
                       <div>
                         <h2>Deine Tage</h2>
                       </div>
-                      <Tag>{data.records.length} Einträge</Tag>
+                      <Tag>{data.records.length} {data.records.length === 1 ? "Eintrag" : "Einträge"}</Tag>
                     </div>
                     {data.records.length ? (
                       <ul className="checkin-cards">
@@ -998,7 +1048,7 @@ export default function CommunityApp({
                                   {metrics.map((k) => (
                                     <div key={k}>
                                       <dt>{shortMetricLabels[k]}</dt>
-                                      <dd>{c[k] ?? "—"}</dd>
+                                      <dd>{c[k] ?? "–"}</dd>
                                     </div>
                                   ))}
                                 </dl>
@@ -1072,21 +1122,22 @@ export default function CommunityApp({
                         setModal("profile");
                       }}
                     >
-                      <Plus size={17} />
-                      Mein Profil
+                      <UserRound size={17} aria-hidden="true" />
+                      Mein Call-Profil
                     </button>
                   </PageHeading>
                   <DiscordNudge context="buddy" url={discordUrl} />
                   <div className="filter-row">
-                    <div className="search-input">
-                      <Search size={18} />
+                    <label className="search-input">
+                      <Search size={18} aria-hidden="true" />
                       <input
+                        type="search"
                         aria-label="Call-Partner durchsuchen"
                         placeholder="Name, Zielgruppe oder Thema suchen …"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
-                    </div>
+                    </label>
                     <FieldSelect
                       label="Call-Zeit filtern"
                       value={filter}
@@ -1121,7 +1172,7 @@ export default function CommunityApp({
                           {m.latest && (
                             <div className="member-stats">
                               <span>
-                                <strong>{m.latest.attempts}</strong>Versuche
+                                <strong>{m.latest.attempts}</strong>Anwahlen
                               </span>
                               <span>
                                 <strong>{m.latest.meetings}</strong>Termine
@@ -1163,16 +1214,19 @@ export default function CommunityApp({
                       text={
                         data.members.length
                           ? "Probiere ein anderes Thema oder eine andere Call-Zeit."
-                          : "Erstelle dein Profil und gib es für andere angemeldete Nutzer frei. In der privaten Vorschau gibt es noch keine weiteren Profile."
+                          : "Noch hat niemand sein Call-Profil freigegeben. Gib deins frei, dann finden dich andere."
                       }
                     />
                   )}
-                  <BuddyInbox
-                    data={data}
-                    mutate={mutate}
-                    demo={demo}
-                    saving={saving}
-                  />
+                  {/* Anfragen und Gespräche erst, wenn es welche gibt. */}
+                  {data.buddies.length > 0 && (
+                    <BuddyInbox
+                      data={data}
+                      mutate={mutate}
+                      demo={demo}
+                      saving={saving}
+                    />
+                  )}
                   <div className="bottom-note">
                     <ShieldCheck size={17} />
                     Deine Kontaktdaten bleiben bei dir. Ein Kontakt zu einem
@@ -1187,15 +1241,10 @@ export default function CommunityApp({
                     title="Sessions und Roleplay"
                     text="Übungstermine und zusätzliche Call-Blöcke. Getroffen wird sich im Discord: Jede Session bekommt dort ihren eigenen Raum."
                   >
-                    {sessionsOpen ? (
+                    {sessionsOpen && (
                       <button className="btn primary" onClick={openNewSession}>
                         <Plus size={18} />
                         Session anlegen
-                      </button>
-                    ) : (
-                      <button className="btn secondary" onClick={openNewSession}>
-                        <Lock size={17} />
-                        Anlegen als aktiver Caller
                       </button>
                     )}
                   </PageHeading>
@@ -1206,20 +1255,22 @@ export default function CommunityApp({
                     />
                   )}
                   <Tabs value={sessionFilter} onValueChange={setSessionFilter}>
-                    <TabsList>
-                      {[
-                        "Alle",
-                        "Meine Sessions",
-                        "Call-Block",
-                        "Roleplay",
-                        "Reflexion",
-                        "Vergangene",
-                      ].map((v) => (
-                        <TabsTrigger value={v} key={v}>
-                          {v === "Alle" ? "Alle Sessions" : v}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                    {data.sessions.length > 0 && (
+                      <TabsList>
+                        {[
+                          "Alle",
+                          "Meine Sessions",
+                          "Call-Block",
+                          "Roleplay",
+                          "Reflexion",
+                          "Vergangene",
+                        ].map((v) => (
+                          <TabsTrigger value={v} key={v}>
+                            {v === "Alle" ? "Alle Sessions" : sessionKindLabel(v)}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    )}
                     <div className="session-list">
                       {data.sessions
                         .filter((s) => matchesSession(s))
@@ -1245,7 +1296,7 @@ export default function CommunityApp({
                                 <Tag
                                   tone={s.kind === "Call-Block" ? "green" : ""}
                                 >
-                                  {s.kind}
+                                  {sessionKindLabel(s.kind)}
                                 </Tag>
                                 {s.cancelled ? (
                                   <Tag>Abgesagt</Tag>
@@ -1292,16 +1343,18 @@ export default function CommunityApp({
                   {!data.sessions.filter((s) => matchesSession(s)).length && (
                     <Empty
                       icon={CalendarDays}
-                      title="Noch keine zusätzlichen Termine."
-                      text="Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an. Den Raum im Discord legen wir dafür an."
+                      title={data.sessions.length ? "Keine Sessions in dieser Auswahl." : "Noch keine Sessions."}
+                      text={
+                        sessionsOpen
+                          ? "Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an. Den Raum im Discord legen wir dafür an."
+                          : "Sessions legst du als aktiver Caller an. Wie du das wirst, steht oben."
+                      }
                     >
-                      <button
-                        className={sessionsOpen ? "btn primary" : "btn secondary"}
-                        onClick={openNewSession}
-                      >
-                        {!sessionsOpen && <Lock size={16} />}
-                        Erste Session anlegen
-                      </button>
+                      {sessionsOpen && !data.sessions.length && (
+                        <button className="btn primary" onClick={openNewSession}>
+                          Erste Session anlegen
+                        </button>
+                      )}
                     </Empty>
                   )}
                   <div className="session-principles">
@@ -1323,7 +1376,7 @@ export default function CommunityApp({
                     </div>
                     <div>
                       <Sparkles size={23} />
-                      <h3>Reflexion</h3>
+                      <h3>Rückblick</h3>
                       <p>
                         Kurzer Rückblick mit deinem Call-Partner: Was lief gut,
                         was probiert ihr als Nächstes?
@@ -1361,15 +1414,16 @@ export default function CommunityApp({
                   ) : (
                     <>
                       <div className="filter-row">
-                        <div className="search-input">
-                          <Search size={18} />
+                        <label className="search-input">
+                          <Search size={18} aria-hidden="true" />
                           <input
+                            type="search"
                             aria-label="Wissen durchsuchen"
                             placeholder="Suche nach Einstieg, Einwänden, Fokus …"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                           />
-                        </div>
+                        </label>
                         <button
                           className={`btn secondary ${filter === "saved" ? "chosen" : ""}`}
                           onClick={() =>
@@ -1481,20 +1535,24 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Profil und Einstellungen"
-                    text="Wie du im Ranking erscheinst, deine Erinnerungen und die Verknüpfung mit Discord."
+                    text="Wie du in der Rangliste und bei Call-Partnern erscheinst, und deine Erinnerungen."
                   />
                   <div className="ca-settings">
-                    <AccountSettings key={demo ? "demo" : "own"} demo={demo} />
-                    <section className="card padded" aria-labelledby="ca-profile-title">
-                      <h2 id="ca-profile-title">Call-Profil</h2>
-                      <p className="hint">
-                        Für die Suche nach Call-Partnern. Deine E-Mail und
-                        Telefonnummer bleiben privat.
-                      </p>
-                      {profileForm()}
-                    </section>
+                    <AccountSettings
+                      key={demo ? "demo" : "own"}
+                      demo={demo}
+                      extra={<div className="form-stack">{callFields()}</div>}
+                      onSaved={saveCallProfile}
+                      standalone={
+                        <div className="account-extra">
+                          <h3>Für Call-Partner</h3>
+                          {profileForm()}
+                        </div>
+                      }
+                    />
                     <PushSetup settings={settings} />
                     <DiscordLink initial={discordLink} result={discordResult} />
+                    {!demo && <AccountAccess />}
                   </div>
                 </>
               )}
@@ -1644,6 +1702,7 @@ export default function CommunityApp({
                   value={newSession.kind}
                   onChange={(v) => setNewSession({ ...newSession, kind: v })}
                   options={["Call-Block", "Roleplay", "Reflexion"]}
+                  optionLabel={sessionKindLabel}
                 />
               </label>
               <div className="form-grid">
@@ -1856,7 +1915,7 @@ export default function CommunityApp({
               <p>{member.bio}</p>
               <div className="profile-facts">
                 <span>
-                  Mein Wochenziel<strong>{member.goal} Anrufversuche</strong>
+                  Mein Wochenziel<strong>{member.goal} Anwahlen</strong>
                 </span>
                 <span>
                   Meine Tage

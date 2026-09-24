@@ -32,7 +32,7 @@ export default function AreaNav({ area }: { area: keyof typeof AREAS }) {
   const path = usePathname() || "";
   const { label, items } = AREAS[area];
   return (
-    <nav className="do-area-nav" aria-label={label}>
+    <nav className="do-area-nav" data-area={area} aria-label={label}>
       {items.map((item) => (
         <Link
           key={item.path}

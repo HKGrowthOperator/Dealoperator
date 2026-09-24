@@ -55,42 +55,43 @@ export default function ExchangeBoard({
   return (
     <section className="exchange-board">
       <div className="workflow-heading">
-        <div>
-          <span className="eyebrow">AUS DEM CALL-ALLTAG</span>
-          <h2>Learnings, Fragen & ehrliches Feedback.</h2>
-          <p>
-            Dein Gesprächseinstieg. Ein schwieriger Einwand. Ein kleiner
-            Fortschritt. Bring es in den Austausch.
-          </p>
-        </div>
-        <button
-          className="btn primary"
-          onClick={() => (data.profile.name ? setWriting(true) : onProfile())}
-        >
-          <Plus size={18} />
-          Beitrag teilen
-        </button>
+        <p>
+          Dein Gesprächseinstieg, ein schwieriger Einwand, ein kleiner
+          Fortschritt: Bring es in den Austausch.
+        </p>
+        {data.posts.length > 0 && (
+          <button
+            className="btn primary"
+            onClick={() => (data.profile.name ? setWriting(true) : onProfile())}
+          >
+            <Plus size={18} />
+            Beitrag teilen
+          </button>
+        )}
       </div>
-      <div className="board-controls">
-        <Tabs value={filter} onValueChange={setFilter}>
-          <TabsList>
-            {["Alle", "Learning", "Frage", "Feedback", "Mindset"].map((t) => (
-              <TabsTrigger key={t} value={t}>
-                {t}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <div className="search-input">
-          <Search size={18} />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Beiträge durchsuchen"
-            placeholder="Beiträge durchsuchen …"
-          />
+      {data.posts.length > 0 && (
+        <div className="board-controls">
+          <Tabs value={filter} onValueChange={setFilter}>
+            <TabsList>
+              {["Alle", "Learning", "Frage", "Feedback", "Mindset"].map((t) => (
+                <TabsTrigger key={t} value={t}>
+                  {t}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <label className="search-input">
+            <Search size={18} aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Beiträge durchsuchen"
+              placeholder="Beiträge durchsuchen …"
+            />
+          </label>
         </div>
-      </div>
+      )}
       <div className="discussion-list">
         {rows.map((p) => (
           <article className="card discussion-card" key={p.id}>
@@ -141,12 +142,17 @@ export default function ExchangeBoard({
               ? "Ändere den Filter oder deinen Suchbegriff."
               : "Teile die erste Frage oder eine Erfahrung aus deinen heutigen Calls."}
           </p>
-          <button
-            className="btn secondary"
-            onClick={() => (data.profile.name ? setWriting(true) : onProfile())}
-          >
-            Ersten Beitrag schreiben
-          </button>
+          {!data.posts.length && (
+            <button
+              className="btn primary"
+              onClick={() =>
+                data.profile.name ? setWriting(true) : onProfile()
+              }
+            >
+              <Plus size={18} />
+              Ersten Beitrag schreiben
+            </button>
+          )}
         </div>
       )}
       <Dialog open={writing} onOpenChange={setWriting}>

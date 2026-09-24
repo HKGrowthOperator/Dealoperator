@@ -52,7 +52,6 @@ export default function BuddyInbox({
     <section className="card workflow-section">
       <div className="workflow-heading">
         <div>
-          <span className="eyebrow">DEINE VERBINDUNGEN</span>
           <h2>
             Call-Partner & Nachrichten{" "}
             {incoming > 0 && (
@@ -63,7 +62,6 @@ export default function BuddyInbox({
             Anfragen beantworten und abstimmen, wann ihr übt oder euch Feedback gebt.
           </p>
         </div>
-        <MessageCircle size={25} />
       </div>
       <Tabs value={filter} onValueChange={setFilter}>
         <TabsList>
@@ -162,12 +160,16 @@ export default function BuddyInbox({
         <div className="compact-empty">
           <Users size={25} />
           <h3>
-            {filter === "Buddys"
-              ? "Weitere Call-Partner findest du im Bereich Call-Partner."
-              : "Hier bist du auf dem aktuellen Stand."}
+            {filter === "Anfragen"
+              ? "Keine offenen Anfragen."
+              : filter === "Buddys"
+                ? "Noch mit niemandem verbunden."
+                : "Noch keine Anfragen und Verbindungen."}
           </h3>
           <p>
-            Neue Anfragen und eure Verbindungen findest du an dieser Stelle.
+            {filter === "Anfragen"
+              ? "Schickt dir jemand eine Anfrage, erscheint sie hier."
+              : "Oben findest du Call-Partner. Nach einer angenommenen Anfrage schreibt ihr euch hier."}
           </p>
         </div>
       )}
