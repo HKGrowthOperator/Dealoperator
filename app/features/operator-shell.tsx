@@ -4,10 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   ChartColumn,
-  CircleUserRound,
   ClipboardCheck,
   LogIn,
   MessagesSquare,
+  UsersRound,
 } from "lucide-react";
 import OperatorWordmark from "./operator-wordmark";
 import AccountMenu from "./account-menu";
@@ -46,14 +46,15 @@ function useViewer(initial?: Viewer | null) {
 /**
  * Bereiche der Seite. Ergebnisse ist die gemeinsame Startseite; „Mein Tag“
  * umfasst Tagesabschluss, Fortschritt und eigene Zahlen; der Austausch hängt
- * an den Reflexionen.
+ * an den Reflexionen; Call-Partner ist ein eigener Reiter.
  */
-type Area = "results" | "day" | "exchange" | "profile" | "admin" | "";
+type Area = "results" | "day" | "exchange" | "partner" | "profile" | "admin" | "";
 function areaOf(path: string): Area {
   if (path === "/" || path.startsWith("/ranking")) return "results";
   if (/^\/verwaltung(\/|$)/.test(path)) return "admin";
   if (/^\/(tagesabschluss|heute|zahlen|reflexion)(\/|$)/.test(path)) return "day";
-  if (/^\/(reflexionen|partner|sessions|wissen)(\/|$)/.test(path)) return "exchange";
+  if (/^\/partner(\/|$)/.test(path)) return "partner";
+  if (/^\/(reflexionen|sessions|wissen)(\/|$)/.test(path)) return "exchange";
   if (/^\/(profil|passwort)(\/|$)/.test(path)) return "profile";
   return "";
 }
@@ -62,6 +63,7 @@ const MAIN = [
   { area: "results", href: "/", label: "Ergebnisse", icon: ChartColumn },
   { area: "day", href: "/tagesabschluss", label: "Mein Tag", icon: ClipboardCheck },
   { area: "exchange", href: "/reflexionen", label: "Reflexionen", icon: MessagesSquare },
+  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner", icon: UsersRound },
 ] as const;
 
 /**
@@ -138,8 +140,11 @@ export function OperatorHeader({
           </div>
         </div>
       </header>
+      {/* Vier Reiter: angemeldet die vier Bereiche (Profil liegt im
+          Kontomenü oben rechts und unter „Mein Tag“), abgemeldet statt
+          „Mein Tag“ der Weg zur Anmeldung. */}
       <nav className="do-tabbar" aria-label="Bereiche">
-        {MAIN.map((item) => {
+        {MAIN.filter((item) => !(viewer && !signedIn && item.area === "day")).map((item) => {
           const Icon = item.icon;
           return (
             <Link
@@ -152,18 +157,10 @@ export function OperatorHeader({
             </Link>
           );
         })}
-        {viewer && !signedIn ? (
+        {viewer && !signedIn && (
           <Link href="/anmelden">
             <LogIn size={22} aria-hidden="true" />
             <span>Anmelden</span>
-          </Link>
-        ) : (
-          <Link
-            href="/profil?modus=eigen"
-            aria-current={area === "profile" ? "page" : undefined}
-          >
-            <CircleUserRound size={22} aria-hidden="true" />
-            <span>Profil</span>
           </Link>
         )}
       </nav>
@@ -189,6 +186,7 @@ export function OperatorFooter({
           <Link href="/">Ergebnisse</Link>
           <Link href="/tagesabschluss">Mein Tag</Link>
           <Link href="/reflexionen">Reflexionen</Link>
+          <Link href="/partner?modus=eigen">Call-Partner</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">
             Discord
