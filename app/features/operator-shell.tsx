@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import OperatorWordmark from "./operator-wordmark";
 import AccountMenu from "./account-menu";
+import { keepInstallPrompt } from "./install-app";
 import { DISCORD_INVITE } from "@/lib/discord";
 
 /** Anmeldestand für Kopf und Tableiste. */
@@ -78,12 +79,11 @@ export function OperatorHeader({
   const path = usePathname() || "/";
   const area = areaOf(path);
   const viewer = useViewer(initial);
-  // Kein Banner „Zum Startbildschirm hinzufügen“: Deal Operator bittet nie
-  // darum, die Website zu installieren.
+  // Kein Banner „Zum Startbildschirm hinzufügen“: Installieren steht nur in
+  // den Benachrichtigungs-Einstellungen, dort wird das Angebot verwendet.
   useEffect(() => {
-    const quiet = (event: Event) => event.preventDefault();
-    window.addEventListener("beforeinstallprompt", quiet);
-    return () => window.removeEventListener("beforeinstallprompt", quiet);
+    window.addEventListener("beforeinstallprompt", keepInstallPrompt);
+    return () => window.removeEventListener("beforeinstallprompt", keepInstallPrompt);
   }, []);
   const signedIn = !!viewer?.signedIn;
   return (

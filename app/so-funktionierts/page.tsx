@@ -287,8 +287,8 @@ export default async function Page() {
               <p>
                 Nur wenn du sie auf deinem Gerät einschaltest: um {clock(settings.eveningReminder)},
                 falls dein Abschluss an einem Calling-Tag noch fehlt, und um{" "}
-                {clock(settings.streakWarning)} am nächsten Calling-Tag vor Fristende. Ruhezeiten
-                und Geräte stellst du unter Profil und Einstellungen ein.
+                {clock(settings.streakWarning)} am nächsten Calling-Tag vor Fristende. Geräte stellst
+                du unter Profil und Einstellungen ein.
               </p>
             </details>
             <details>

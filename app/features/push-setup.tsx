@@ -6,13 +6,13 @@ import {
   CircleAlert,
   CircleCheck,
   LoaderCircle,
-  Moon,
   Send,
   Smartphone,
   Trash2,
 } from "lucide-react";
 import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commitment";
 import { ApiError, getJson, postJson } from "./closing-form";
+import InstallApp from "./install-app";
 import "../commitment.css";
 
 /*
@@ -28,8 +28,6 @@ type Prefs = {
   teamAlerts: boolean;
   teamEmail: boolean;
   email: string | null;
-  quietStart: number | null;
-  quietEnd: number | null;
   devices: Device[];
 };
 type PushInfo = { publicKey: string; admin: boolean; prefs: Prefs };
@@ -95,19 +93,6 @@ function sameKey(a: ArrayBuffer | null, b: Uint8Array) {
   const x = new Uint8Array(a);
   return x.length === b.length && x.every((v, i) => v === b[i]);
 }
-const toClock = (minutes: number | null, fallback: string) =>
-  minutes === null
-    ? fallback
-    : `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-const toMinutes = (clock: string) => {
-  const m = /^(\d{2}):(\d{2})$/.exec(clock);
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-};
-const quietFrom = (prefs: Prefs) => ({
-  on: prefs.quietStart !== null,
-  start: toClock(prefs.quietStart, "22:00"),
-  end: toClock(prefs.quietEnd, "07:00"),
-});
 const dateOf = (iso: string) =>
   new Intl.DateTimeFormat("de-DE", {
     day: "2-digit",
@@ -160,14 +145,12 @@ export default function PushSetup({
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
-  const [quiet, setQuiet] = useState<{ on: boolean; start: string; end: string } | null>(null);
   const [keyMismatch, setKeyMismatch] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await getJson<PushInfo>("/api/push");
       setInfo(data);
-      setQuiet(quietFrom(data.prefs));
       setLoadError("");
     } catch (e) {
       setLoadError((e as Error).message);
@@ -179,7 +162,6 @@ export default function PushSetup({
       .then((data) => {
         if (!alive) return;
         setInfo(data);
-        setQuiet(quietFrom(data.prefs));
       })
       .catch((e: Error) => alive && setLoadError(e.message));
     return () => {
@@ -321,8 +303,6 @@ export default function PushSetup({
         action: "prefs",
         value: {
           reminders: next.reminders,
-          quietStart: next.quietStart,
-          quietEnd: next.quietEnd,
           ...(info.admin ? { teamAlerts: next.teamAlerts, teamEmail: next.teamEmail } : {}),
         },
       });
@@ -342,8 +322,8 @@ export default function PushSetup({
     if (env.kind === "ios-browser")
       return {
         tone: "info",
-        title: "In diesem Browser gibt es keine Push-Erinnerungen",
-        text: "Deal Operator funktioniert auch ganz ohne. Deinen Tagesabschluss findest du jederzeit unter Mein Tag.",
+        title: "Auf iPhone und iPad gibt es Push nur über den Home-Bildschirm",
+        text: "Wie das geht, steht weiter unten. Deal Operator funktioniert auch ganz ohne Push.",
       };
     if (env.kind === "ios-old")
       return {
@@ -419,8 +399,8 @@ export default function PushSetup({
           noch für deine laufende Serie zählt.
         </li>
         <li>
-          <BellOff size={16} aria-hidden="true" /> Nie an freien Tagen, nie in deiner Ruhezeit oder
-          einer bestätigten Pause, nie nach eingereichtem Abschluss.
+          <BellOff size={16} aria-hidden="true" /> Nie an freien Tagen, nie in einer bestätigten
+          Pause, nie nach eingereichtem Abschluss.
         </li>
       </ul>
 
@@ -519,65 +499,7 @@ export default function PushSetup({
             </label>
           </div>
 
-          {quiet && (
-            <form
-              className="cm-pref cm-quiet"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const start = quiet.on ? toMinutes(quiet.start) : null;
-                const end = quiet.on ? toMinutes(quiet.end) : null;
-                if (quiet.on && (start === null || end === null)) {
-                  setMessage({ tone: "error", text: "Bitte Beginn und Ende der Ruhezeit angeben." });
-                  return;
-                }
-                void savePrefs(
-                  { quietStart: start, quietEnd: end },
-                  quiet.on
-                    ? `Ruhezeit gespeichert: ${quiet.start} bis ${quiet.end} Uhr.`
-                    : "Ruhezeit ausgeschaltet.",
-                );
-              }}
-            >
-              <label className="cm-switch">
-                <input
-                  type="checkbox"
-                  role="switch"
-                  checked={quiet.on}
-                  onChange={(e) => setQuiet({ ...quiet, on: e.target.checked })}
-                />
-                <span className="cm-switch-track" aria-hidden="true" />
-                <span>
-                  <strong>
-                    <Moon size={15} aria-hidden="true" /> Ruhezeit
-                  </strong>
-                  <small>In dieser Zeit kommen keine Pushs.</small>
-                </span>
-              </label>
-              {quiet.on && (
-                <div className="cm-quiet-times">
-                  <label>
-                    Von
-                    <input
-                      type="time"
-                      value={quiet.start}
-                      onChange={(e) => setQuiet({ ...quiet, start: e.target.value })}
-                    />
-                  </label>
-                  <label>
-                    Bis
-                    <input
-                      type="time"
-                      value={quiet.end}
-                      onChange={(e) => setQuiet({ ...quiet, end: e.target.value })}
-                    />
-                  </label>
-                </div>
-              )}
-              <button type="submit" className="btn secondary" disabled={busy !== null}>
-                Ruhezeit speichern
-              </button>
-            </form>
-          )}
+          <InstallApp />
 
           {info.admin && (
             <div className="cm-pref cm-admin-prefs">

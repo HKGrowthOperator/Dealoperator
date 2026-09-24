@@ -1206,7 +1206,7 @@
 .cm-device-state.warn > svg {
   color: var(--cm-warn-text);
 }
-.cm-ios-steps {
+.cm-app-steps {
   display: grid;
   gap: 8px;
   margin: 0;
@@ -1214,7 +1214,7 @@
   list-style: none;
   counter-reset: cm-step;
 }
-.cm-ios-steps li {
+.cm-app-steps li {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1226,7 +1226,7 @@
   line-height: 1.55;
   counter-increment: cm-step;
 }
-.cm-ios-steps li::before {
+.cm-app-steps li::before {
   content: counter(cm-step);
   flex: none;
   display: grid;
@@ -1239,7 +1239,7 @@
   font-size: 13px;
   font-weight: 800;
 }
-.cm-ios-steps svg {
+.cm-app-steps svg {
   flex: none;
   margin-top: 2px;
   color: #174a9e;
@@ -1314,20 +1314,31 @@
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.cm-quiet-times {
+.cm-app-head {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 2px;
 }
-.cm-quiet-times label {
-  display: grid;
-  gap: 6px;
+.cm-app-head strong {
   color: var(--cm-text);
-  font-weight: 650;
-  font-size: 14px;
 }
-.cm-quiet .btn {
-  justify-self: start;
+.cm-app-head small {
+  color: var(--cm-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cm-app-ok {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  color: var(--cm-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.cm-app-ok svg {
+  flex: none;
+  margin-top: 2px;
+  color: #1f7a4d;
 }
 .cm-devices h3 {
   margin-top: 4px;

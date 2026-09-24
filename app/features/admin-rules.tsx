@@ -166,8 +166,7 @@ export function RulesPanel({
           />
           <small>
             Push am Calling-Tag, wenn der eigene Abschluss noch fehlt. Nie am
-            Wochenende, in der Ruhezeit, während einer Pause oder nach dem
-            Einreichen.
+            Wochenende, während einer Pause oder nach dem Einreichen.
           </small>
         </label>
         <label className="adm-field">
