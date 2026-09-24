@@ -20,8 +20,12 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Deal Operator";
   const options = {
     body: data.body || "",
+    // Das D als Bild der Meldung (Chrome, Edge, Android, Windows). Safari
+    // zeigt eigene Symbole nicht an; dort erscheint das D nur, wenn Deal
+    // Operator als Web-App im Dock oder auf dem Home-Bildschirm liegt.
     icon: "/icon-192.png",
-    badge: "/icon-192.png",
+    // Android nutzt vom Badge nur die Deckkraft: einfarbiges D auf transparent.
+    badge: "/badge-96.png",
     // Gleicher tag ersetzt eine ältere Meldung derselben Art, statt eine
     // zweite danebenzulegen.
     tag: data.tag || undefined,
