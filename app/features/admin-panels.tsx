@@ -358,7 +358,7 @@ function stateInfo(item: InboxItem): {
       return {
         label: "Bestätigt",
         tone: "ok",
-        hint: "E-Mail bestätigt. Ein neues Mitglied, keine Übernahme.",
+        hint: "E-Mail bestätigt, ein neues Mitglied. Nur zur Information, nichts zu tun.",
       };
   }
   if (item.kind === "pause") {
@@ -530,10 +530,10 @@ function InboxPanel({
         <div>
           <h2 id="adm-inbox-title">Team-Inbox</h2>
           <p>
-            Bestätigte Registrierungen, prüfbereite Übernahmen,
-            Unterstützungswünsche, Pausenanträge und Teamprüfungen. Offene
-            Einträge stehen oben. „Prüfbereit“ heißt: eine Übernahme wartet auf
-            euch.
+            Offen steht nur, was eine Entscheidung braucht: prüfbereite
+            Übernahmen, Unterstützungswünsche, Pausenanträge und Teamprüfungen.
+            Neue Registrierungen stehen nur zur Information unter „Erledigt“;
+            dafür muss niemand klicken.
           </p>
         </div>
       </div>

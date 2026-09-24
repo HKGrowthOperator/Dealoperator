@@ -479,6 +479,8 @@ export async function bindConfirmedRequest(
       kind: "registration",
       ref: request.id,
       state: request.kind === "claim" ? "review_ready" : "confirmed",
+      // Eine bestätigte Registrierung braucht keine Entscheidung: nur zur Info.
+      done: request.kind !== "claim",
       title:
         request.kind !== "claim"
           ? `Neue Registrierung bestätigt: ${request.full_name}`
@@ -543,6 +545,7 @@ export async function noteConfirmedAccount(
       kind: "registration",
       ref: actor.userId,
       state: "confirmed",
+      done: true,
       title: `Neue Anmeldung bestätigt: ${actor.email}`,
       body: silent
         ? "E-Mail bestätigt, die Übernahme eines Profils wird gerade angefragt."

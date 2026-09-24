@@ -271,6 +271,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         kind: "registration",
         ref: id,
         state: "confirmed",
+        done: true,
         title: `Neues Profil angelegt: ${value.name}`,
         body: phone
           ? "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer angegeben (nicht geprüft)."

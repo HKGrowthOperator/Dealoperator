@@ -330,15 +330,23 @@ export async function teamEvent(
     alert:
       | false
       | { key: string; kind: TeamAlert; push: { title: string; body: string; url?: string } };
+    /**
+     * Nur zur Information: der Eintrag entsteht gleich erledigt und steht in
+     * der Verwaltung unter „Erledigt“, ohne dass jemand klicken muss. Für
+     * alles, was keine Entscheidung braucht (bestätigte Registrierungen).
+     */
+    done?: boolean;
   },
 ) {
   const [entry] = await tx.query(
-    `INSERT INTO team_inbox(dedupe_key,kind,ref,state,title,body) VALUES($1,$2,$3,$4,$5,$6)
+    `INSERT INTO team_inbox(dedupe_key,kind,ref,state,title,body,resolved_at)
+     VALUES($1,$2,$3,$4,$5,$6,CASE WHEN $7::boolean THEN now() END)
      ON CONFLICT(dedupe_key) DO UPDATE SET state=excluded.state,title=excluded.title,
-       body=excluded.body,updated_at=now()
+       body=excluded.body,updated_at=now(),
+       resolved_at=COALESCE(team_inbox.resolved_at,excluded.resolved_at)
      WHERE team_inbox.resolved_at IS NULL
      RETURNING id`,
-    [e.dedupeKey, e.kind, e.ref, e.state, e.title, e.body],
+    [e.dedupeKey, e.kind, e.ref, e.state, e.title, e.body, !!e.done],
   );
   if (!e.alert) return;
   const text = TEAM_ALERTS[e.alert.kind];

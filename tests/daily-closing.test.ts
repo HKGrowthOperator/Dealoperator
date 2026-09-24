@@ -535,3 +535,24 @@ test("the closing can switch the ranking on, never off; the start page switch do
   assert.deepEqual(await showInRanking(db, bob), { ok: true, publicConsent: true });
   assert.equal((await publicRanking(db, today(), today())).length, 2);
 });
+
+test("a confirmed registration is only information: the inbox entry starts resolved", async () => {
+  await noteConfirmedAccount(db, alice);
+  const [entry] = await db.query("SELECT state,resolved_at FROM team_inbox WHERE dedupe_key='account:alice'");
+  assert.equal(entry.state, "confirmed");
+  assert.ok(entry.resolved_at, "steht gleich unter Erledigt");
+  // Etwas, das eine Entscheidung braucht, bleibt offen.
+  await db.transaction((tx) =>
+    teamEvent(tx, {
+      dedupeKey: "pause:x",
+      kind: "pause",
+      ref: "x",
+      state: "requested",
+      title: "Pause gemeldet",
+      body: "",
+      alert: false,
+    }),
+  );
+  const [open] = await db.query("SELECT resolved_at FROM team_inbox WHERE dedupe_key='pause:x'");
+  assert.equal(open.resolved_at, null);
+});
