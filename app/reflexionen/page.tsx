@@ -2,28 +2,51 @@ import Link from "next/link";
 import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { reflectionFeed } from "@/server/reflections";
+import { closingState } from "@/server/closing";
+import { homeState, type HomeState } from "@/server/home";
+import { berlinDate } from "@/lib/kpis";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import AreaNav from "../features/area-nav";
-import ReflectionFeed, { type ReflectionFeedData } from "../features/reflection-feed";
+import ReflectionGate from "../features/reflection-gate";
+import type { ReflectionFeedData } from "../features/reflection-feed";
+import type { ClosingState } from "../features/closing-form";
 import "../commitment.css";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Reflexionen der anderen. Wer lesen darf, sieht sie sofort; die Regeln sind
- * eingeklappt. Ohne Anmeldung gibt es nur den kurzen Nutzen und den direkten
- * Weg hinein, keine Vorschau privater Inhalte.
+ * Reflexionen: erst der eigene Tag, dann die anderen. Angemeldet mit
+ * eigenem Profil steht hier zuerst das eigene Blatt für heute; nach dem
+ * Einreichen die Beiträge des Tages. Ohne Anmeldung gibt es nur den kurzen
+ * Nutzen und den direkten Weg hinein, keine Vorschau privater Inhalte.
  */
 export default async function Page() {
   const actor = await getCurrentUser();
-  let initial: ReflectionFeedData | null = null;
+  const today = berlinDate();
+  let home: HomeState | null = null;
+  let feed: ReflectionFeedData | null = null;
+  let closing: ClosingState | null = null;
+  // Ohne Stand vom Server gilt der eigene Tag als offen: dann steht das eigene
+  // Blatt (es lädt selbst und nennt einen Fehler ehrlich), nicht die anderen.
+  let known = false;
   if (actor && databaseReady()) {
     try {
-      initial = JSON.parse(
-        JSON.stringify(await reflectionFeed(database(), actor, {})),
-      ) as ReflectionFeedData;
+      const db = database();
+      home = await homeState(db, actor, today);
+      const status = home.today?.status ?? null;
+      // Solange der eigene Tag offen ist, braucht es die Beiträge noch nicht;
+      // sie laden nach dem Einreichen frisch, mit dem eigenen dabei.
+      if (status === "open" || status === "draft")
+        closing = JSON.parse(
+          JSON.stringify(await closingState(db, actor, today.slice(0, 7))),
+        ) as ClosingState;
+      else
+        feed = JSON.parse(JSON.stringify(await reflectionFeed(db, actor, {}))) as ReflectionFeedData;
+      known = true;
     } catch {
-      initial = null;
+      home = null;
+      feed = null;
+      closing = null;
     }
   }
   const viewer = viewerOf(actor);
@@ -41,7 +64,13 @@ export default async function Page() {
         </div>
 
         {actor ? (
-          <ReflectionFeed initial={initial} />
+          <ReflectionGate
+            closing={closing}
+            feed={feed}
+            today={today}
+            due={home?.today?.due ?? false}
+            status={known ? (home?.today?.status ?? null) : "open"}
+          />
         ) : (
           <section className="rf-gate" aria-labelledby="rf-gate-title">
             <h2 id="rf-gate-title">Lies mit, was bei anderen funktioniert.</h2>
@@ -66,15 +95,16 @@ export default async function Page() {
           <ul>
             <li>
               Lesen können alle Angemeldeten mit bestätigter E-Mail, Telefonnummer und eigenem
-              Profil.
+              Profil. Der eigene Tag kommt zuerst: An Calling-Tagen erscheinen die Beiträge der
+              anderen, sobald der eigene Tagesabschluss eingereicht ist.
             </li>
             <li>
               Ein Beitrag entsteht nur aus einem vollständig eingereichten Tagesabschluss. Entwürfe
               und übernommene Zahlen erscheinen hier nicht.
             </li>
             <li>
-              Zahlen stehen nur auf Karten von Personen, die der öffentlichen Anzeige zugestimmt
-              haben. Unterstützungswünsche sieht nur das Team.
+              Auf jeder Karte stehen die eingereichten Zahlen. Unterstützungswünsche sieht nur das
+              Team.
             </li>
             <li>
               Antworten geht über Discord, mit dem Knopf an jeder Karte. Hier gibt es kein

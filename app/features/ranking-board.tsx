@@ -52,6 +52,7 @@ import { DISCORD_INVITE } from "@/lib/discord";
 import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
 import type { HomeState } from "@/server/home";
 import { OperatorHeader, OperatorFooter, type Viewer } from "./operator-shell";
+import { dayState, earlierState } from "./day-state";
 import RankingHistory from "./ranking-history";
 
 const fmt = (v: number | null | undefined) =>
@@ -768,93 +769,18 @@ export default function RankingBoard({
   );
 }
 
-const WEEKDAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" });
-function formatWeekday(day: string) {
-  return WEEKDAY.format(new Date(`${day}T12:00:00Z`));
-}
-function formatDeadline(iso: string) {
-  return `${new Intl.DateTimeFormat("de-DE", {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Berlin",
-  }).format(new Date(iso))} Uhr`;
-}
-
 /** Kompakter Abschnitt „Mein Tag“ auf der Startseite, je nach Stand. */
+const DAY_ICON = {
+  clock: Clock3,
+  check: Check,
+  "circle-check": CircleCheck,
+  dashed: CircleDashed,
+  draft: NotebookPen,
+} as const;
 function PersonalPanel({ home }: { home: HomeState }) {
-  const state = (() => {
-    if (!home.participant) {
-      if (home.request && ["pending", "info_needed"].includes(home.request.status))
-        return {
-          icon: Clock3,
-          tone: "wait",
-          title:
-            home.request.status === "info_needed"
-              ? "Das Team hat eine Rückfrage zu deiner Profilübernahme."
-              : "Deine Profilübernahme wird geprüft.",
-          text: "Sobald das Team freigibt, trägst du hier deinen Tag ein.",
-          href: "/status",
-          action: home.request.status === "info_needed" ? "Rückfrage beantworten" : "Stand ansehen",
-        };
-      return {
-        icon: CircleDashed,
-        tone: "open",
-        title: "Dein Konto hat noch kein Profil.",
-        text: "Leg ein Profil an oder übernimm deine Zahlen, wenn du schon in der Rangliste stehst.",
-        href: "/start",
-        action: "Profil einrichten",
-      };
-    }
-    const t = home.today!;
-    if (home.earlier && t.status !== "done")
-      return {
-        icon: Clock3,
-        tone: "open",
-        title: `Dein Abschluss für ${formatWeekday(home.earlier.day)} ist noch offen.`,
-        text: `Bis ${formatDeadline(home.earlier.deadline)} zählt er noch für deine Serie.`,
-        href: `/tagesabschluss?tag=${home.earlier.day}`,
-        action: `${formatWeekday(home.earlier.day)} abschließen`,
-      };
-    if (t.status === "done")
-      return {
-        icon: CircleCheck,
-        tone: "done",
-        title: "Heute abgeschlossen.",
-        text: "Deine Zahlen und deine Reflexion sind eingereicht.",
-        href: "/tagesabschluss",
-        action: "Meinen Tag ansehen",
-      };
-    if (t.status === "imported")
-      return {
-        icon: Check,
-        tone: "done",
-        title: "Deine Zahlen für heute sind eingetragen.",
-        text: "Das Team hat sie übernommen.",
-        href: "/tagesabschluss",
-        action: "Meinen Tag ansehen",
-      };
-    if (t.status === "draft")
-      return {
-        icon: NotebookPen,
-        tone: "draft",
-        title: "Dein Entwurf für heute ist gespeichert.",
-        text: "Er zählt, sobald du ihn einreichst.",
-        href: "/tagesabschluss",
-        action: "Fortsetzen",
-      };
-    return {
-      icon: CircleDashed,
-      tone: "open",
-      title: t.due ? "Dein Abschluss für heute ist noch offen." : "Heute ist kein Calling-Tag.",
-      text: t.due
-        ? "Zahlen und zwei kurze Fragen, dann zählt dein Tag."
-        : "Ein Abschluss ist freiwillig und zählt als Bonus.",
-      href: "/tagesabschluss",
-      action: "Zahlen eintragen",
-    };
-  })();
-  const Icon = state.icon;
+  // Ein noch offener Calling-Tag davor hat Vorrang: dort läuft eine Frist.
+  const state = earlierState(home) ?? dayState(home, "board");
+  const Icon = DAY_ICON[state.icon];
   return (
     <section className="rb-me" data-tone={state.tone} aria-labelledby="rb-me-title">
       <span className="rb-me-icon" aria-hidden="true">

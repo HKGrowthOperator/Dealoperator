@@ -94,7 +94,9 @@ export function OperatorHeader({
     return () => window.removeEventListener("beforeinstallprompt", keepInstallPrompt);
   }, []);
   const signedIn = !!viewer?.signedIn;
-  const onClosing = path.startsWith("/tagesabschluss");
+  // Zahlen eintragen läuft über die Reflexionen (erst der eigene Tag, dann die
+  // anderen); dort und unter Mein Tag steht der Knopf nicht noch einmal.
+  const onEntry = /^\/(reflexionen|tagesabschluss)(\/|$)/.test(path);
   // Die Reiterleiste am Handy schiebt sich seitlich; der aktuelle Bereich
   // soll beim Öffnen sichtbar sein, nicht hinter dem Rand.
   const strip = useRef<HTMLElement>(null);
@@ -164,9 +166,9 @@ export function OperatorHeader({
                 </Link>
               </>
             )}
-            {/* Die Hauptsache auf jeder Seite; auf dem Tagesabschluss selbst nicht doppelt. */}
-            {signedIn && !onClosing && (
-              <Link className="do-button do-button-primary do-header-cta" href="/tagesabschluss">
+            {/* Die Hauptsache auf jeder Seite; wo eingetragen wird, nicht doppelt. */}
+            {signedIn && !onEntry && (
+              <Link className="do-button do-button-primary do-header-cta" href="/reflexionen">
                 <PencilLine size={17} aria-hidden="true" />
                 <span className="do-cta-long">Zahlen eintragen</span>
                 <span className="do-cta-short">Eintragen</span>

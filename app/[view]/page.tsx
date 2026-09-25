@@ -24,8 +24,9 @@ export default async function Page({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { view } = await params;
-  // Die tägliche Reflexion ist Teil des Tagesabschlusses: ein Weg, ein Formular.
-  if (view === "reflexion") redirect("/tagesabschluss");
+  // Die tägliche Reflexion ist Teil des Tagesabschlusses, und der steht in den
+  // Reflexionen zuerst: ein Weg, ein Formular.
+  if (view === "reflexion") redirect("/reflexionen");
   if (view === "partnerregister") {
     const query = await searchParams;
     redirect(

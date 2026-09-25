@@ -4076,6 +4076,88 @@ li[data-medal="gold"] .rb-bar i {
   }
 }
 
+/* ---- Reflexionen: erst der eigene Tag, dann die anderen ------------------ */
+.rf-first h2 {
+  margin: 0;
+  font-size: var(--text-heading);
+  font-weight: 800;
+  line-height: 1.25;
+}
+.rf-first p {
+  max-width: 60ch;
+  margin: var(--space-2) 0 0;
+  color: var(--do-ink-2);
+}
+.rf-first .do-link {
+  margin-top: var(--space-2);
+  text-align: left;
+}
+.rf-done {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-l);
+  background: var(--do-green-soft);
+  color: var(--do-ink);
+  animation: md-confirm 360ms var(--ease-out);
+}
+.rf-done > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--do-green);
+}
+.rf-done strong {
+  display: block;
+  font-size: var(--text-lead);
+  font-weight: 800;
+  line-height: 1.3;
+}
+.rf-done p {
+  margin: 2px 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.rf-done a,
+.rf-inline {
+  color: var(--do-blue);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.rf-inline {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rf-done[data-tone="info"] {
+  background: var(--do-blue-soft);
+  animation: none;
+}
+.rf-done[data-tone="info"] > svg {
+  color: var(--do-blue);
+}
+.rf .cm-push-prompt {
+  margin: 0;
+}
+@media (max-width: 599px) {
+  .rf-done {
+    padding: var(--space-4);
+  }
+}
+
+/* ---- Mein Tag: Stand für heute, dann Serie und Level ---------------------- */
+.md-hub .rb-me-more {
+  gap: var(--space-2) var(--space-4);
+}
+.md-hub[data-tone="draft"] .rb-me-icon {
+  background: var(--do-amber-soft);
+  color: var(--do-amber);
+}
+
 /* Podium bei Gleichstand: jede Person mit ihren eigenen Zahlen. */
 .rb-podium-tied {
   gap: var(--space-2);

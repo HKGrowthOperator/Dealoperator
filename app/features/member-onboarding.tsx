@@ -99,7 +99,7 @@ export default function MemberOnboarding({
             kurzer Gedanke dazu.
           </p>
           <div className="flow-actions">
-            <Link className="btn primary full" href="/tagesabschluss">
+            <Link className="btn primary full" href="/reflexionen">
               Ersten Tagesabschluss eintragen
             </Link>
             <Link className="flow-link" href={later}>

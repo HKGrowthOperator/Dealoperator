@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { CircleAlert, ExternalLink, LoaderCircle, MessageCircle, RefreshCw } from "lucide-react";
-import { shortMetricLabels } from "@/lib/kpis";
+import { shortMetricLabels, berlinDate } from "@/lib/kpis";
 import {
   ApiError,
   COUNT_KEYS,
@@ -295,8 +295,8 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
                 Beiträge entstehen nur, wenn jemand seinen Tagesabschluss vollständig einreicht.
                 Deiner kann der erste sein.
               </p>
-              <Link className="btn primary" href="/tagesabschluss">
-                Zum Tagesabschluss
+              <Link className="btn primary" href={`/tagesabschluss?tag=${berlinDate()}`}>
+                Eigenen Tag eintragen
               </Link>
             </>
           )}

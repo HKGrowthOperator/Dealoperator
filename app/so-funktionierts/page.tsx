@@ -126,8 +126,8 @@ export default async function Page() {
               <div className="hw-step-text">
                 <h3>Sehen, was entsteht</h3>
                 <p>
-                  Mit deiner Zustimmung zählen deine Zahlen in der gemeinsamen Summe und in der
-                  Rangliste. Unter Reflexionen liest du, was bei anderen funktioniert hat.
+                  Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter
+                  Reflexionen liest du, was bei anderen funktioniert hat.
                 </p>
               </div>
               <div className="hw-visual hw-rank" aria-hidden="true">
@@ -239,8 +239,13 @@ export default async function Page() {
           <h2 id="hw-fair">Fair gezählt</h2>
           <ul className="hw-rules">
             <li>
-              <strong>0 ist eine Meldung, keine Meldung ist keine 0.</strong> Wer für eine
-              Kennzahl nichts meldet, steht in dieser Rangliste nicht.
+              <strong>Abschlüsse wiegen mehr als Anwahlen.</strong> Die Reihenfolge folgt dem
+              Gesamterfolg des Tages aus Anwahlen, vereinbarten Settings und Closings und
+              gewonnenen Deals; die Zahlen selbst stehen in jeder Zeile.
+            </li>
+            <li>
+              <strong>0 ist eine Meldung, keine Meldung ist keine 0.</strong> Wer nichts meldet,
+              steht in der Rangliste nicht.
             </li>
             <li>
               <strong>Gleiche Werte teilen sich einen Platz.</strong> Stehen drei Personen auf
@@ -330,7 +335,7 @@ export default async function Page() {
 function Cta({ signedIn }: { signedIn: boolean }) {
   return signedIn ? (
     <div className="hw-cta">
-      <Link className="do-button do-button-primary" href="/tagesabschluss">
+      <Link className="do-button do-button-primary" href="/reflexionen">
         Zahlen eintragen
       </Link>
       <Link className="do-button do-button-secondary" href="/">
