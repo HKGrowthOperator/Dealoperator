@@ -137,7 +137,7 @@ export default async function Page() {
                     <i style={{ width: `${[92, 70, 70][i]}%` }} />
                   </span>
                 ))}
-                <em>Gleiche Werte, gleicher Platz</em>
+                <em>Gleichstand, gleicher Platz</em>
               </div>
             </li>
           </ol>
@@ -248,7 +248,7 @@ export default async function Page() {
               steht in der Rangliste nicht.
             </li>
             <li>
-              <strong>Gleiche Werte teilen sich einen Platz.</strong> Stehen drei Personen auf
+              <strong>Gleichstände teilen sich einen Platz.</strong> Stehen drei Personen auf
               Platz 2, folgt Platz 5.
             </li>
             <li>

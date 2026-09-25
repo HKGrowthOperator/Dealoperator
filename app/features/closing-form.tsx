@@ -476,7 +476,7 @@ type DraftStatus =
   | { kind: "pending" | "saving"; day: string }
   | { kind: "saved"; day: string; at: string }
   | { kind: "error"; day: string; message: string };
-type Confirmation = {
+export type Confirmation = {
   day: string;
   unchanged: boolean;
   status: DayStatus;
@@ -608,6 +608,14 @@ function clampDay(state: ClosingState, requested: string | undefined) {
   return requested;
 }
 
+/** Die Folge des Einreichens in einem Satz: Serie, Frist, freier Tag. */
+export function confirmationEffect(c: Confirmation): string | null {
+  const text = CONFIRM_STATUS[c.status];
+  if (!text) return null;
+  return c.streak !== null && (c.status === "called" || c.status === "reflected")
+    ? `${c.status === "reflected" ? "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen." : "Rechtzeitig eingereicht."} Deine Abschluss-Serie steht bei ${c.streak} ${c.streak === 1 ? "Tag" : "Tagen"}.`
+    : text;
+}
 const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
   called:
     "Rechtzeitig eingereicht: Der Tag zählt für deine Serie.",
@@ -635,7 +643,8 @@ export default function ClosingForm({
   initial?: ClosingState | null;
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
-  onSubmitted?: (day: string) => void;
+  /** Nach erfolgreichem Einreichen, mit der Bestätigung (Tag, Folge, Serie, Level). */
+  onSubmitted?: (day: string, confirmation: Confirmation) => void;
   /** Zusatz in der Bestätigung, z. B. das einmalige Angebot für Erinnerungen. */
   afterSubmit?: React.ReactNode;
 }) {
@@ -973,18 +982,19 @@ export default function ClosingForm({
           ? formFor(fresh, form.day)
           : { ...form, baseRevision: result.revision, dirty: false, acknowledged: false, draftAt: null },
       );
-      setConfirmation({
+      const confirmation: Confirmation = {
         day: form.day,
         unchanged: !!result.unchanged,
         status: fresh ? statusOf(fresh, form.day) : "free",
         streak: fresh?.summary?.streak.current ?? null,
         levelUps: fresh ? levelUps(state, fresh) : [],
-      });
+      };
+      setConfirmation(confirmation);
       setAttempted(false);
       setTouched(new Set());
       setDraftStatus({ kind: "idle" });
       announceClosingChange();
-      onSubmitted?.(form.day);
+      onSubmitted?.(form.day, confirmation);
       window.setTimeout(() => confirmRef.current?.focus(), 0);
     } catch (e) {
       const err = e as ApiError;
@@ -1276,14 +1286,7 @@ export default function ClosingForm({
             <p>Deine eingereichte Fassung war schon genau so.</p>
           ) : (
             <ul className="md-effects">
-              {CONFIRM_STATUS[confirmed.status] && (
-                <li>
-                  {confirmed.streak !== null &&
-                  (confirmed.status === "called" || confirmed.status === "reflected")
-                    ? `${confirmed.status === "reflected" ? "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen." : "Rechtzeitig eingereicht."} Deine Abschluss-Serie steht bei ${confirmed.streak} ${confirmed.streak === 1 ? "Tag" : "Tagen"}.`
-                    : CONFIRM_STATUS[confirmed.status]}
-                </li>
-              )}
+              {confirmationEffect(confirmed) && <li>{confirmationEffect(confirmed)}</li>}
               <li>
                 Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe.
               </li>

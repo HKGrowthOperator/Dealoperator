@@ -1,8 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CircleCheck, Lock } from "lucide-react";
-import ClosingForm, { type ClosingState } from "./closing-form";
+import ClosingForm, {
+  confirmationEffect,
+  formatFullDay,
+  type ClosingState,
+  type Confirmation,
+} from "./closing-form";
 import ReflectionFeed, { type ReflectionFeedData } from "./reflection-feed";
 import { PushPrompt } from "./push-setup";
 
@@ -32,9 +37,15 @@ export default function ReflectionGate({
   /** Stand des eigenen Tages; null ohne eigenes Profil. */
   status: TodayStatus | null;
 }) {
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState<Confirmation | null>(null);
   const [skipped, setSkipped] = useState(false);
+  const doneRef = useRef<HTMLElement | null>(null);
   const pending = (status === "open" || status === "draft") && !submitted && !skipped;
+  // Nach dem Einreichen verschwindet das Formular samt Knopf; der Fokus geht
+  // auf die Bestätigung, damit Tastatur und Vorleser mitkommen.
+  useEffect(() => {
+    if (submitted) doneRef.current?.focus();
+  }, [submitted]);
 
   if (pending)
     return (
@@ -56,26 +67,42 @@ export default function ReflectionGate({
           initial={closing}
           // Das Formular kann auch einen früheren Tag einreichen (Nachtrag,
           // offener Calling-Tag): erst der eigene Tag von heute öffnet die anderen.
-          onSubmitted={(day) => {
+          onSubmitted={(day, confirmation) => {
             if (day !== today) return;
-            setSubmitted(true);
+            setSubmitted(confirmation);
             window.scrollTo({ top: 0 });
           }}
         />
       </>
     );
 
-  const done = submitted || status === "done";
+  const done = !!submitted || status === "done";
+  const effect = submitted ? confirmationEffect(submitted) : null;
   return (
     <>
       {done && (
-        <section className="rf-done" role="status" aria-live="polite">
+        <section className="rf-done" ref={doneRef} tabIndex={-1} role="status">
           <CircleCheck size={20} aria-hidden="true" />
           <div>
-            <strong>Dein Tag ist eingereicht.</strong>
+            <strong>
+              {submitted
+                ? submitted.unchanged
+                  ? "Keine Änderung nötig, dein Tag steht."
+                  : `${formatFullDay(submitted.day)} ist eingereicht.`
+                : "Dein Tag ist eingereicht."}
+            </strong>
+            {effect && !submitted?.unchanged && <p>{effect}</p>}
+            {submitted && submitted.levelUps.length > 0 && (
+              <p>
+                Neues Leistungslevel: {submitted.levelUps.join(", ")}.{" "}
+                <Link href="/heute?modus=eigen">Mein Fortschritt</Link>
+              </p>
+            )}
             <p>
               Hier ist, was bei den anderen heute lief.{" "}
               <Link href={`/tagesabschluss?tag=${today}`}>Eintrag korrigieren</Link>
+              {" · "}
+              <Link href="/">Zu den Ergebnissen</Link>
             </p>
           </div>
         </section>

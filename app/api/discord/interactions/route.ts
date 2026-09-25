@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     );
   switch (interaction.data?.name) {
     case "tagesabschluss":
-      return reply(`Deinen Tagesabschluss mit Zahlen und kurzer Reflexion trägst du hier ein: ${site}/tagesabschluss`);
+      return reply(`Deinen Tagesabschluss mit Zahlen und kurzer Reflexion trägst du hier ein: ${site}/reflexionen`);
     case "serie":
       return reply(await discordStreakText(database(), owner));
     default:

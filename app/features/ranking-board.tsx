@@ -678,7 +678,7 @@ export default function RankingBoard({
                         {row.name}
                         {origin && <small>{origin.reportedAt} Uhr · je zur Hälfte aufgeteilt</small>}
                       </span>
-                      <strong>{fmt(origin?.report.attempts ?? row.counts.attempts ?? null)}</strong>
+                      <strong>{fmt(origin?.report.attempts ?? row.counts.attempts ?? null)} Anwahlen</strong>
                     </li>
                   );
                 })}
@@ -778,8 +778,10 @@ const DAY_ICON = {
   draft: NotebookPen,
 } as const;
 function PersonalPanel({ home }: { home: HomeState }) {
-  // Ein noch offener Calling-Tag davor hat Vorrang: dort läuft eine Frist.
-  const state = earlierState(home) ?? dayState(home, "board");
+  // Ein noch offener Calling-Tag davor hat Vorrang, solange heute offen ist:
+  // dort läuft eine Frist. Ist heute eingereicht, zeigt Mein Tag beides.
+  const state =
+    (home.today?.status !== "done" ? earlierState(home) : null) ?? dayState(home, "board");
   const Icon = DAY_ICON[state.icon];
   return (
     <section className="rb-me" data-tone={state.tone} aria-labelledby="rb-me-title">

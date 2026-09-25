@@ -32,7 +32,7 @@ export function formatDeadline(iso: string) {
 
 /** Ein Calling-Tag davor, der noch rechtzeitig abgeschlossen werden kann. */
 export function earlierState(home: HomeState): DayState | null {
-  if (!home.earlier || !home.today || home.today.status === "done") return null;
+  if (!home.earlier || !home.today) return null;
   const weekday = formatWeekday(home.earlier.day);
   return {
     icon: "clock",

@@ -1616,16 +1616,13 @@ li[data-open] .rb-chevron {
   }
   .rb-tabs {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
   .rb-tabs > button {
     justify-content: center;
     padding: 0 8px;
-  }
-  .rb-more-select {
-    grid-column: 1 / -1;
-    justify-content: space-between;
+    white-space: nowrap;
   }
 }
 

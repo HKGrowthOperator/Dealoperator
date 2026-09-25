@@ -568,11 +568,8 @@ export default function CommunityApp({
   }
   // Zahlen und Reflexion laufen über den Tagesabschluss (/api/closing).
   function openClosing(date?: string) {
-    router.push(
-      date && date !== dateKey()
-        ? `/tagesabschluss?tag=${date}`
-        : "/tagesabschluss",
-    );
+    // Ohne ?tag zeigt Mein Tag die Übersicht; das Formular braucht den Tag.
+    router.push(`/tagesabschluss?tag=${date ?? dateKey()}`);
   }
   /** Call-Partner-Angaben mit Name und Rolle aus dem eigenen Profil. */
   async function saveCallProfile(identity: { name: string; role: string }) {

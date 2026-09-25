@@ -68,7 +68,7 @@ export default async function Page() {
             closing={closing}
             feed={feed}
             today={today}
-            due={home?.today?.due ?? false}
+            due={known ? (home?.today?.due ?? false) : true}
             status={known ? (home?.today?.status ?? null) : "open"}
           />
         ) : (
