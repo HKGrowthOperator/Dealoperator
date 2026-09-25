@@ -98,9 +98,10 @@ Mobil (360/390/430) und Desktop (1280) prüfen:
 5. Zahlen und Reflexion einreichen: Bestätigung nennt Tag und tatsächliche Folgen; Erinnerungen werden einmal angeboten.
 6. Fehlende Telefonnummer: früher Hinweis, Nummer im Profil ergänzen, zurück zum Tagesabschluss, Entwurf ist noch da.
 7. Nach dem Einreichen zeigt die Startseite „Heute abgeschlossen“.
-8. Tag und Monat getrennt; historische Links behalten Tag und Kennzahl; Verlauf zeigt Einzelwerte je Tag.
-9. Gleichstand: alle gleichplatzierten Personen stehen mit derselben Platzzahl und Gestaltung in der Liste.
-10. Reflexionen: ohne Zugang nur Nutzen und Weg hinein, keine Inhalte; mit Zugang direkt die Beiträge.
+8. Tag und Monat getrennt; historische Links behalten den Tag (eine Kennzahl im Link führt zur einen Rangliste, `dranbleiben` zur Serie); Verlauf zeigt Anwahlen je Tag und Platz 1 nach Wertung.
+9. Gleichstand: alle gleichplatzierten Personen stehen mit derselben Platzzahl und Gestaltung in der Liste. Die Reihenfolge folgt der verdeckten Wertung (Deal 10, Closing vereinbart 5, Setting vereinbart 3, Anwahl 1, +15 je Tag ab 100 Anwahlen), nicht der Reihenfolge der Eingabe; Punkte stehen nirgends, jede Zeile zeigt Anwahlen, Settings und Closings.
+9a. Mein Tag ohne `?tag`: Stand für heute und nächster Schritt, kein Formular; mit `?tag=` das Formular für genau diesen Tag.
+10. Reflexionen: ohne Zugang nur Nutzen und Weg hinein, keine Inhalte. Mit Zugang und offenem Tag zuerst nur das eigene Blatt (keine Karten, kein Kopfknopf „Zahlen eintragen“); nach dem Einreichen ohne Scrollen die Bestätigung mit „Eintrag korrigieren“ und darunter die Beiträge des Tages, der eigene dabei. Mit eingereichtem Tag sofort die Beiträge.
 11. Discord-Knöpfe sagen vor dem Klick, dass Discord geöffnet wird.
 12. Lange Namen umbrechen, Tastatur funktioniert (Tableiste weicht der Bildschirmtastatur), größere Schrift ohne seitliches Scrollen.
 

@@ -90,7 +90,9 @@ Das sind **rechnerisch zugeteilte Werte**, keine einzeln gemeldeten. `lib/joint-
 
 ## Leere Zeilen im Ranking
 
-Eine Rangliste zeigt nur Personen mit einer Meldung **für genau diese Kennzahl**. `ranked()` filtert über `reportedIn()`; wer bei Anwahlen nichts gemeldet hat, fehlt dort und kann trotzdem im Setting-Ranking stehen. Eine ausdrücklich gemeldete **0 bleibt drin** — sie ist eine Aussage, kein fehlender Wert. Wer in keiner öffentlichen Kennzahl etwas gemeldet hat, erscheint in keiner Rangliste. Gelöscht wird dabei nichts: Profile und gespeicherte Werte bleiben, und die Profilauswahl zur späteren Übernahme ist davon unberührt. Die Zahl neben der Liste ist die Zahl der Zeilen darin.
+Seit 25.09.2026 gibt es eine Rangliste, geordnet nach der verdeckten Wertung (`placed()` in `lib/kpis.ts`, Gewichte in `SCORE_WEIGHTS`, Bonus ab 100 Anwahlen je Tag); je Zeile stehen Anwahlen, Settings und Closings nebeneinander, die Wertung selbst erscheint nirgends. `ranked()` je Kennzahl bleibt für die Tagesgewinner im Verlauf (`leaders`) und für Auswertungen erhalten.
+
+Die Rangliste zeigt nur Personen mit einer Meldung in mindestens einer gewerteten Kennzahl. Für `ranked()` je Kennzahl gilt weiter: gefiltert wird über `reportedIn()`; wer bei Anwahlen nichts gemeldet hat, fehlt dort und kann trotzdem bei den Settings vorn stehen. Eine ausdrücklich gemeldete **0 bleibt drin** — sie ist eine Aussage, kein fehlender Wert. Wer in keiner öffentlichen Kennzahl etwas gemeldet hat, erscheint in keiner Rangliste. Gelöscht wird dabei nichts: Profile und gespeicherte Werte bleiben, und die Profilauswahl zur späteren Übernahme ist davon unberührt. Die Zahl neben der Liste ist die Zahl der Zeilen darin.
 
 ## Discord-Einstieg
 
