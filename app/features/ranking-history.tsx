@@ -1,11 +1,9 @@
 "use client";
 import { useState } from "react";
-import type { VisibleMetric } from "@/lib/kpis";
 import {
   eventLabel,
   formatDay,
   formatMonth,
-  metricShortLabels,
   monthRange,
   type RankingDay,
   type RankingEvent,
@@ -15,10 +13,9 @@ const fmt = (value: number | null) =>
   value === null ? "–" : value.toLocaleString("de-DE");
 
 /**
- * Verlauf eines Monats: ein Balken je Tag (Einzelwert, keine laufende
- * Summe) und darunter die Tage mit Meldungen samt Platz 1. Ein Tag öffnet
- * sein Tagesranking. Kalender, Diagramm und Gewinner stehen nicht mehr als
- * gleichwertige Blöcke nebeneinander.
+ * Verlauf eines Monats: ein Balken je Tag (Anwahlen, keine laufende Summe)
+ * und darunter die Tage mit Meldungen samt Platz 1 nach der verdeckten
+ * Wertung. Ein Tag öffnet sein Tagesranking.
  */
 /** „A“, „A und B“, „A, B und C“. */
 function joinNames(names: string[]) {
@@ -28,7 +25,6 @@ function joinNames(names: string[]) {
 export default function RankingHistory({
   month,
   days,
-  metric,
   selectedDay,
   today,
   events,
@@ -36,7 +32,6 @@ export default function RankingHistory({
 }: {
   month: string;
   days: RankingDay[];
-  metric: VisibleMetric;
   selectedDay?: string;
   today: string;
   /** Gekennzeichnete Tage (Akquise Days). Nur Kennzeichnung, keine Wertung. */
@@ -51,10 +46,10 @@ export default function RankingHistory({
   );
   const byDay = new Map(days.map((day) => [day.day, day]));
   const eventByDay = new Map(events.map((event) => [event.day, event]));
-  const max = Math.max(1, ...days.map((day) => day.counts[metric] ?? 0));
+  const max = Math.max(1, ...days.map((day) => day.counts.attempts ?? 0));
   const reported = days.toReversed();
   const shown = all ? reported : reported.slice(0, 5);
-  const unit = metricShortLabels[metric];
+  const unit = "Anwahlen";
   return (
     <section className="rb-history" aria-labelledby="rb-history-title">
       <div className="rb-section-head">
@@ -64,7 +59,7 @@ export default function RankingHistory({
       <div className="rb-chart" aria-hidden="true">
         {calendarDays.map((day) => {
           const entry = byDay.get(day);
-          const value = entry?.counts[metric] ?? null;
+          const value = entry?.counts.attempts ?? null;
           const event = eventByDay.get(day);
           return (
             <button
@@ -98,7 +93,7 @@ export default function RankingHistory({
         <>
           <ol className="rb-days" aria-label={`Tage mit Meldungen im ${formatMonth(month)}`}>
             {shown.map((day) => {
-              const leader = day.leaders[metric];
+              const leader = day.top;
               const event = eventByDay.get(day.day);
               return (
                 <li key={day.day}>
@@ -117,7 +112,7 @@ export default function RankingHistory({
                         : "Kein Platz 1"}
                     </span>
                     <strong>
-                      {fmt(day.counts[metric])}
+                      {fmt(day.counts.attempts)}
                       <small>{unit} gesamt</small>
                     </strong>
                   </button>

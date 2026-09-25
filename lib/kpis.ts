@@ -164,6 +164,11 @@ export type RankingRow = {
   counts: Counts;
   source: string;
   updatedAt: string;
+  /**
+   * Verdeckte Wertung, vom Server mitgegeben, wenn sie über mehrere Tage
+   * summiert wurde (Monat). Fehlt sie, gilt scoreOf(counts).
+   */
+  score?: number;
 };
 export const isJoint = (row: { kind?: unknown }) =>
   participantKind(row.kind) === "joint";
@@ -210,6 +215,54 @@ export function ranked(rows: RankingRow[], metric: Metric) {
       if (v !== last) place = i + 1;
       last = v;
       return { ...r, rank: place };
+    });
+}
+/**
+ * Verdeckte Wertung für die Rangfolge. Sie erscheint nirgends in der
+ * Oberfläche und legt nur fest, wer vor wem steht: Deal gewonnen 10,
+ * Closing vereinbart 5, Setting vereinbart 3, Anwahl 1, dazu 15 für jeden
+ * Tag mit mindestens 100 Anwahlen. Nicht gemeldet zählt 0. Gilt je Tag; für
+ * einen Monat werden die Tageswerte addiert (der Bonus je Tag).
+ */
+export const SCORE_WEIGHTS = {
+  dealsWon: 10,
+  closingsBooked: 5,
+  settingsBooked: 3,
+  attempts: 1,
+} as const satisfies Partial<Record<Metric, number>>;
+export const SCORE_KEYS = Object.keys(SCORE_WEIGHTS) as (keyof typeof SCORE_WEIGHTS)[];
+export const CENTURY = 100;
+export const CENTURY_BONUS = 15;
+export function scoreOf(counts: Counts): number {
+  const n = (v: number | null | undefined) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const base = SCORE_KEYS.reduce((sum, k) => sum + n(counts[k]) * SCORE_WEIGHTS[k], 0);
+  return base + (n(counts.attempts) >= CENTURY ? CENTURY_BONUS : 0);
+}
+/**
+ * Zeilen mit irgendeiner Meldung in einer öffentlichen Kennzahl. Wer nur
+ * durchgeführte Termine gemeldet hat, steht mit Wertung 0 am Ende, nicht
+ * außerhalb der Liste: „Am Start“ und Rangliste zählen dieselben Personen.
+ */
+export const scored = <T extends { counts: Counts }>(rows: T[]) =>
+  rows.filter((row) => visibleMetrics.some((k) => row.counts[k] !== null));
+/**
+ * Persönliche Platzierung nach der verdeckten Wertung. Gemeinsame Meldungen
+ * treten nicht an (wie bei ranked()). Gleiche Punkte teilen sich einen
+ * Platz; innerhalb eines Platzes ist die Reihenfolge nur Anzeige (Name).
+ */
+export function placed<T extends RankingRow>(rows: T[]): (T & { rank: number; score: number })[] {
+  let place = 0,
+    last: number | null = null;
+  return scored(soloRows(rows))
+    .map((row) => ({ ...row, score: row.score ?? scoreOf(row.counts) }))
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.name.localeCompare(b.name, "de") || a.id.localeCompare(b.id),
+    )
+    .map((row, i) => {
+      if (row.score !== last) place = i + 1;
+      last = row.score;
+      return { ...row, rank: place };
     });
 }
 export function aggregate(values: Counts[]): Counts {

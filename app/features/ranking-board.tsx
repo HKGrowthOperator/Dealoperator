@@ -33,16 +33,15 @@ import {
   isJoint,
   metricLabels,
   visibleMetrics,
-  ranked,
+  placed,
   soloRows,
+  type Counts,
   type RankingRow,
-  type VisibleMetric,
 } from "@/lib/kpis";
 import {
   eventLabel,
   formatDay,
   formatMonth,
-  metricShortLabels,
   monthRange,
   monthSchema,
   withPermanentEvents,
@@ -59,18 +58,41 @@ const fmt = (v: number | null | undefined) =>
   v === null || v === undefined ? "–" : v.toLocaleString("de-DE");
 
 /**
- * Getrennte Ranglisten je Kennzahl. Die Abschluss-Serie ist eine eigene
- * Wertung aus den Tagesabschlüssen, kein Mischwert aus Kennzahlen.
+ * Eine Rangliste: die Reihenfolge folgt der verdeckten Wertung (placed()),
+ * gezeigt werden die Zahlen selbst. Die Abschluss-Serie ist eine eigene
+ * Wertung aus den Tagesabschlüssen und steht als zweite Ansicht daneben.
  */
 const COMMITMENT = "dranbleiben";
-type Choice = VisibleMetric | typeof COMMITMENT;
-const primaryMetrics: VisibleMetric[] = ["attempts", "settingsBooked", "closingsBooked"];
-const secondaryChoices: { value: Choice; label: string }[] = [
-  { value: "dealsWon", label: metricLabels.dealsWon },
-  { value: "settingsHeld", label: metricLabels.settingsHeld },
-  { value: "closingsHeld", label: metricLabels.closingsHeld },
-  { value: COMMITMENT, label: "Abschluss-Serie" },
-];
+const RANKING = "rangliste";
+type Choice = typeof RANKING | typeof COMMITMENT;
+/** Die drei Zahlen jeder Zeile, in fester Reihenfolge. */
+const SHOWN = ["attempts", "settingsBooked", "closingsBooked"] as const;
+const SHOWN_LABEL = { attempts: "Anwahlen", settingsBooked: "Settings", closingsBooked: "Closings" } as const;
+/** „127 Anwahlen · 4 Settings · 0 Closings“, dazu Deals, wenn gemeldet und über 0. */
+function numbersLine(counts: Counts) {
+  const parts = SHOWN.map((k) => `${fmt(counts[k])} ${SHOWN_LABEL[k]}`);
+  if (counts.dealsWon) parts.push(`${fmt(counts.dealsWon)} ${counts.dealsWon === 1 ? "Deal" : "Deals"}`);
+  return parts.join(" · ");
+}
+/** Die Zahlen einer Zeile nebeneinander; keine davon ist „die“ Wertung. */
+function NumberTrio({ counts, compact = false }: { counts: Counts; compact?: boolean }) {
+  return (
+    <span className="rb-trio" data-compact={compact || undefined}>
+      {SHOWN.map((k) => (
+        <span key={k}>
+          <strong>{fmt(counts[k])}</strong>
+          <small>{SHOWN_LABEL[k]}</small>
+        </span>
+      ))}
+      {!!counts.dealsWon && (
+        <span>
+          <strong>{fmt(counts.dealsWon)}</strong>
+          <small>{counts.dealsWon === 1 ? "Deal" : "Deals"}</small>
+        </span>
+      )}
+    </span>
+  );
+}
 
 type Loaded = {
   key: string;
@@ -177,15 +199,10 @@ export default function RankingBoard({
   const monthly = params.has("month") && parsedMonth.success && !params.has("day");
   // Ohne gewählten Zeitraum: heute bzw. der letzte gemeldete Tag.
   const latestMode = !parsedDay.success && !monthly;
-  const requested = params.get("metric");
-  const choice: Choice =
-    requested === COMMITMENT
-      ? COMMITMENT
-      : visibleMetrics.includes(requested as VisibleMetric)
-        ? (requested as VisibleMetric)
-        : "attempts";
+  // Ältere Links tragen noch eine Kennzahl im Parameter; sie führen alle
+  // zur einen Rangliste. Nur die Abschluss-Serie ist eine eigene Ansicht.
+  const choice: Choice = params.get("metric") === COMMITMENT ? COMMITMENT : RANKING;
   const commitmentView = choice === COMMITMENT;
-  const metric: VisibleMetric = commitmentView ? "attempts" : choice;
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [retry, setRetry] = useState(0);
@@ -212,7 +229,7 @@ export default function RankingBoard({
   const rows = useMemo(() => data?.rows || [], [data]);
   // ranked() lässt gemeinsame Meldungen nicht antreten. Die Summe rechnet mit
   // allen Zeilen, damit jede Meldung genau einmal zählt.
-  const all = useMemo(() => ranked(rows, metric), [rows, metric]);
+  const all = useMemo(() => placed(rows), [rows]);
   const totals = useMemo(() => aggregate(rows.map((row) => row.counts)), [rows]);
   const joint = useMemo(() => rows.filter(isJoint), [rows]);
   const people = useMemo(() => soloRows(rows), [rows]);
@@ -220,7 +237,7 @@ export default function RankingBoard({
   const matches = (row: { name: string; company: string }) =>
     `${row.name} ${row.company}`.toLocaleLowerCase("de").includes(needle);
   const filtered = all.filter(matches);
-  const best = all[0]?.counts[metric] ?? 0;
+  const best = all[0]?.score ?? 0;
   const ownId = home?.participant?.id ?? null;
   const own = ownId ? all.find((row) => row.id === ownId) : undefined;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
@@ -327,7 +344,7 @@ export default function RankingBoard({
 
   function navigate(period: { day: string } | { month: string } | null, nextChoice: Choice = choice) {
     const next = new URLSearchParams(period ?? {});
-    if (nextChoice !== "attempts" || period) next.set("metric", nextChoice);
+    if (nextChoice === COMMITMENT) next.set("metric", nextChoice);
     const query = next.toString();
     window.history.pushState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
     setOpenId(null);
@@ -337,7 +354,7 @@ export default function RankingBoard({
     navigate(latestMode ? null : monthly ? { month } : { day }, value);
   }
   async function share() {
-    const url = `${window.location.origin}/ranking?${new URLSearchParams({ ...(monthly ? { month } : { day }), metric: choice })}`;
+    const url = `${window.location.origin}/ranking?${new URLSearchParams({ ...(monthly ? { month } : { day }), ...(commitmentView ? { metric: COMMITMENT } : {}) })}`;
     try {
       await navigator.clipboard.writeText(url);
       setShareMessage("Link kopiert");
@@ -366,7 +383,7 @@ export default function RankingBoard({
 
   const signedIn = viewer?.signedIn ?? !!home;
   const KPI_ICON = { attempts: Phone, settingsBooked: CalendarCheck, closingsBooked: Handshake, people: UsersRound } as const;
-  const kpis: { key: VisibleMetric | "people"; label: string; value: number | null; note: string }[] = [
+  const kpis: { key: keyof typeof KPI_ICON; label: string; value: number | null; note: string }[] = [
     { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
     { key: "settingsBooked", label: "Settings", value: totals.settingsBooked, note: totals.settingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
     { key: "closingsBooked", label: "Closings", value: totals.closingsBooked, note: totals.closingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
@@ -551,33 +568,19 @@ export default function RankingBoard({
             <span>
               {commitmentView
                 ? "Abschluss-Serie, Stand heute"
-                : `${metricLabels[metric]} · ${monthly ? formatMonth(month) : formatDay(day, true)}`}
+                : monthly
+                  ? formatMonth(month)
+                  : formatDay(day, true)}
             </span>
           </div>
           <div className="rb-filters">
-            <div className="rb-tabs" role="group" aria-label="Rangliste nach">
-              {primaryMetrics.map((key) => (
-                <button key={key} type="button" aria-pressed={choice === key} onClick={() => choose(key)}>
-                  {metricShortLabels[key]}
-                </button>
-              ))}
-              <label className="rb-more-select" data-active={secondaryChoices.some((c) => c.value === choice) || undefined}>
-                <span className="do-sr">Weitere Ranglisten</span>
-                <select
-                  value={secondaryChoices.some((c) => c.value === choice) ? choice : ""}
-                  onChange={(e) => e.target.value && choose(e.target.value as Choice)}
-                >
-                  <option value="" disabled>
-                    Weitere Ranglisten
-                  </option>
-                  {secondaryChoices.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} aria-hidden="true" />
-              </label>
+            <div className="rb-tabs" role="group" aria-label="Ansicht">
+              <button type="button" aria-pressed={!commitmentView} onClick={() => choose(RANKING)}>
+                Rangliste
+              </button>
+              <button type="button" aria-pressed={commitmentView} onClick={() => choose(COMMITMENT)}>
+                Abschluss-Serie
+              </button>
             </div>
             <label className="rb-search">
               <Search size={18} aria-hidden="true" />
@@ -607,9 +610,7 @@ export default function RankingBoard({
               {own ? (
                 <button type="button" onClick={showOwn}>
                   <span className="rb-own-place">{own.rank}.</span>
-                  <span>
-                    Dein Platz mit {fmt(own.counts[metric])} {metricShortLabels[metric]}
-                  </span>
+                  <span>Dein Platz mit {numbersLine(own.counts)}</span>
                 </button>
               ) : (
                 <span className="rb-own-empty">
@@ -620,7 +621,7 @@ export default function RankingBoard({
           )}
 
           {!commitmentView && !loading && !error && !search && (
-            <Podium rows={filtered} metric={metric} ownId={ownId} onShow={showRow} />
+            <Podium rows={filtered} ownId={ownId} onShow={showRow} />
           )}
           {commitmentView ? (
             <CommitmentList state={commitmentState} rows={commitmentFiltered} total={commitmentRows.length} search={search} ownId={ownId} month={month} onRetry={() => setRetry((v) => v + 1)} />
@@ -631,12 +632,11 @@ export default function RankingBoard({
               ))}
             </ol>
           ) : error ? null : filtered.length ? (
-            <ol className="rb-list" key={`${requestKey}-${metric}`} aria-label={`Rangliste nach ${metricLabels[metric]}`}>
+            <ol className="rb-list" key={requestKey} aria-label="Rangliste">
               {filtered.map((row, index) => (
                 <RankRow
                   key={row.id}
                   row={row}
-                  metric={metric}
                   best={best}
                   index={index}
                   own={row.id === ownId}
@@ -654,15 +654,11 @@ export default function RankingBoard({
                 <strong>
                   {search
                     ? "Kein Name gefunden."
-                    : people.length > 0
-                      ? `Noch keine Meldung für ${metricShortLabels[metric]}.`
-                      : `Für ${monthly ? "diesen Monat" : "diesen Tag"} ist noch nichts gemeldet.`}
+                    : `Für ${monthly ? "diesen Monat" : "diesen Tag"} ist noch nichts gemeldet.`}
                 </strong>{" "}
                 {search
                   ? "Prüfe die Schreibweise oder such nach dem Nachnamen."
-                  : people.length > 0
-                    ? "Für andere Kennzahlen gibt es Meldungen."
-                    : "Wähle einen anderen Tag im Verlauf."}
+                  : "Wähle einen anderen Tag im Verlauf."}
               </p>
             </div>
           )}
@@ -681,7 +677,7 @@ export default function RankingBoard({
                         {row.name}
                         {origin && <small>{origin.reportedAt} Uhr · je zur Hälfte aufgeteilt</small>}
                       </span>
-                      <strong>{fmt(origin?.report[metric] ?? row.counts[metric] ?? null)}</strong>
+                      <strong>{fmt(origin?.report.attempts ?? row.counts.attempts ?? null)}</strong>
                     </li>
                   );
                 })}
@@ -697,7 +693,7 @@ export default function RankingBoard({
               <p>
                 {commitmentView
                   ? "Die Serie zählt jeden rechtzeitig eingereichten Tagesabschluss an Calling-Tagen, auch mit 0 Anwahlen."
-                  : "Gleiche Werte teilen sich einen Platz. 0 ist eine Meldung, keine Meldung ist keine 0."}
+                  : "Gleichstände teilen sich einen Platz. 0 ist eine Meldung, keine Meldung ist keine 0."}
               </p>
               <div>
                 {newest && !commitmentView && (
@@ -726,7 +722,6 @@ export default function RankingBoard({
           <RankingHistory
             month={month}
             days={data.days}
-            metric={metric}
             selectedDay={monthly ? undefined : day}
             today={today}
             events={events}
@@ -771,6 +766,19 @@ export default function RankingBoard({
       <OperatorFooter discordUrl={discord} showAdmin={!!viewer?.team || !!home?.team} />
     </div>
   );
+}
+
+const WEEKDAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" });
+function formatWeekday(day: string) {
+  return WEEKDAY.format(new Date(`${day}T12:00:00Z`));
+}
+function formatDeadline(iso: string) {
+  return `${new Intl.DateTimeFormat("de-DE", {
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Berlin",
+  }).format(new Date(iso))} Uhr`;
 }
 
 /** Kompakter Abschnitt „Mein Tag“ auf der Startseite, je nach Stand. */
@@ -899,23 +907,6 @@ function DiscordPanel({ url }: { url: string }) {
   );
 }
 
-const WEEKDAY = new Intl.DateTimeFormat("de-DE", { weekday: "long", timeZone: "UTC" });
-function formatWeekday(day: string) {
-  return WEEKDAY.format(new Date(`${day}T12:00:00Z`));
-}
-function formatDeadline(iso: string) {
-  return `${new Intl.DateTimeFormat("de-DE", {
-    weekday: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Berlin",
-  }).format(new Date(iso))} Uhr`;
-}
-
-/** „A“, „A und B“, „A, B und C“. */
-function joinNames(names: string[]) {
-  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names.at(-1)}`;
-}
 const initials = (name: string) =>
   name
     .split(/\s+/)
@@ -930,19 +921,16 @@ const initials = (name: string) =>
  */
 function Podium({
   rows,
-  metric,
   ownId,
   onShow,
 }: {
-  rows: (RankingRow & { rank: number })[];
-  metric: VisibleMetric;
+  rows: (RankingRow & { rank: number; score: number })[];
   ownId: string | null;
   onShow: (id: string) => void;
 }) {
-  const places: { rank: number; rows: (RankingRow & { rank: number })[] }[] = [];
+  const places: { rank: number; rows: (RankingRow & { rank: number; score: number })[] }[] = [];
   for (const row of rows) {
-    const value = row.counts[metric];
-    if (!value || value <= 0 || row.rank > 3) continue;
+    if (row.score <= 0 || row.rank > 3) continue;
     const place = places.find((p) => p.rank === row.rank);
     if (place) place.rows.push(row);
     else places.push({ rank: row.rank, rows: [row] });
@@ -956,7 +944,6 @@ function Podium({
         const Icon = place.rank === 1 ? Trophy : Medal;
         const first = place.rows[0];
         const single = place.rows.length === 1;
-        const value = first.counts[metric];
         const own = place.rows.some((r) => r.id === ownId);
         return (
           <li key={place.rank} data-medal={tier} data-own={own || undefined}>
@@ -972,14 +959,28 @@ function Podium({
                 ))}
                 {place.rows.length > 3 && <span>+{place.rows.length - 3}</span>}
               </span>
-              <span className="rb-podium-who">
-                <strong>{joinNames(place.rows.map((r) => r.name))}</strong>
-                {single && first.company && <small>{first.company}</small>}
-              </span>
-              <span className="rb-podium-value">
-                <strong>{fmt(value)}</strong>
-                <small>{metricShortLabels[metric]}</small>
-              </span>
+              {single ? (
+                <>
+                  <span className="rb-podium-who">
+                    <strong>{first.name}</strong>
+                    {first.company && <small>{first.company}</small>}
+                  </span>
+                  <span className="rb-podium-value">
+                    <NumberTrio counts={first.counts} compact />
+                  </span>
+                </>
+              ) : (
+                /* Gleichauf heißt gleiche Wertung, nicht gleiche Zahlen: jede
+                   Person mit ihren eigenen. */
+                <span className="rb-podium-who rb-podium-tied">
+                  {place.rows.map((r) => (
+                    <span key={r.id}>
+                      <strong>{r.name}</strong>
+                      <small>{numbersLine(r.counts)}</small>
+                    </span>
+                  ))}
+                </span>
+              )}
             </button>
           </li>
         );
@@ -990,7 +991,6 @@ function Podium({
 
 function RankRow({
   row,
-  metric,
   best,
   index,
   own,
@@ -1000,8 +1000,7 @@ function RankRow({
   signedIn,
   onToggle,
 }: {
-  row: RankingRow & { rank: number };
-  metric: VisibleMetric;
+  row: RankingRow & { rank: number; score: number };
   best: number;
   index: number;
   own: boolean;
@@ -1011,8 +1010,7 @@ function RankRow({
   signedIn: boolean;
   onToggle: () => void;
 }) {
-  const value = row.counts[metric];
-  const tier = medal(row.rank, value);
+  const tier = medal(row.rank, row.score);
   const origin = splitOrigin(row.key);
   return (
     <li
@@ -1042,14 +1040,13 @@ function RankRow({
           <span className="rb-bar" aria-hidden="true">
             <i
               style={{
-                transform: `scaleX(${best > 0 && value !== null ? value / best : 0})`,
+                transform: `scaleX(${best > 0 ? row.score / best : 0})`,
               }}
             />
           </span>
         </span>
         <span className="rb-value">
-          <strong>{fmt(value)}</strong>
-          <small>{metricShortLabels[metric]}</small>
+          <NumberTrio counts={row.counts} />
         </span>
         <ChevronDown className="rb-chevron" size={18} aria-hidden="true" />
       </button>

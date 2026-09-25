@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   aggregate,
   berlinDate,
+  placed,
   ranked,
+  scoreOf,
   soloRows,
   visibleMetrics,
   type Counts,
@@ -97,6 +99,8 @@ export type RankingDay = {
   joint: number;
   counts: Counts;
   leaders: Record<VisibleMetric, DailyLeader | null>;
+  /** Platz 1 des Tages nach der verdeckten Wertung; bei Gleichstand mehrere. */
+  top: { people: { id: string; name: string }[] } | null;
 };
 export type DatedRankingRow = RankingRow & { day: string };
 export type RankingMonth = {
@@ -114,8 +118,11 @@ export function summarizeRankingMonth(
 ) {
   const byDay = new Map<string, RankingRow[]>();
   const byPerson = new Map<string, RankingRow>();
-  for (const { day: recordDay, ...row } of records) {
+  for (const { day: recordDay, ...raw } of records) {
     if (!recordDay.startsWith(`${month}-`)) continue;
+    // Die Wertung gilt je Tag (der Bonus für 100 Anwahlen auch); für den
+    // Monat werden die Tageswerte addiert, nicht die Summen bewertet.
+    const row: RankingRow = { ...raw, score: scoreOf(raw.counts) };
     const daily = byDay.get(recordDay) || [];
     daily.push(row);
     byDay.set(recordDay, daily);
@@ -127,6 +134,7 @@ export function summarizeRankingMonth(
         ? {
             ...row,
             counts: aggregate([previous.counts, row.counts]),
+            score: (previous.score ?? 0) + (row.score ?? 0),
             updatedAt:
               row.updatedAt > previous.updatedAt
                 ? row.updatedAt
@@ -162,6 +170,10 @@ export function summarizeRankingMonth(
           ];
         }),
       ) as RankingDay["leaders"],
+      top: (() => {
+        const first = placed(rows).filter((row) => row.rank === 1 && row.score > 0);
+        return first.length ? { people: first.map(({ id, name }) => ({ id, name })) } : null;
+      })(),
     }));
   return { month, days, rows: [...byPerson.values()] };
 }

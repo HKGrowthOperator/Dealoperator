@@ -4018,3 +4018,151 @@ li[data-medal="gold"] .rb-bar i {
     justify-self: start;
   }
 }
+
+/* Rangliste: die drei Zahlen jeder Zeile nebeneinander, keine ist „die“ Wertung. */
+.rb-trio {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+.rb-trio > span {
+  display: grid;
+  justify-items: end;
+  text-align: right;
+}
+.rb-trio strong {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: oklch(30% 0.12 262);
+}
+.rb-trio > span:first-child strong {
+  font-size: 1.375rem;
+}
+.rb-trio small {
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+  white-space: nowrap;
+}
+.rb-podium-value .rb-trio {
+  justify-content: center;
+  gap: var(--space-4);
+}
+.rb-podium-value .rb-trio > span {
+  justify-items: center;
+  text-align: center;
+}
+.rb-podium-value .rb-trio strong {
+  font-size: 1.5rem;
+  color: oklch(36% 0.16 262);
+}
+.rb-podium-value .rb-trio > span:first-child strong {
+  font-size: 2rem;
+}
+@media (max-width: 599px) {
+  .rb-trio {
+    gap: var(--space-2);
+  }
+  .rb-trio strong,
+  .rb-trio > span:first-child strong {
+    font-size: 1.125rem;
+  }
+  .rb-podium-value .rb-trio strong {
+    font-size: 1.25rem;
+  }
+  .rb-podium-value .rb-trio > span:first-child strong {
+    font-size: 1.625rem;
+  }
+}
+
+/* Podium bei Gleichstand: jede Person mit ihren eigenen Zahlen. */
+.rb-podium-tied {
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  justify-self: stretch;
+}
+.rb-podium-tied > span {
+  display: grid;
+  gap: 1px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--do-line);
+}
+.rb-podium-tied > span:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.rb-podium-tied small {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Handy: die drei Zahlen stehen unter dem Namen, damit auch lange Namen und
+   große Schrift nie seitlich hinauslaufen; im Podium schmale Karten untereinander. */
+@media (max-width: 599px) {
+  button.rb-row {
+    grid-template-columns: 36px minmax(0, 1fr) 18px;
+    grid-template-areas:
+      "place name chevron"
+      "place value chevron";
+    row-gap: var(--space-2);
+  }
+  button.rb-row > .rb-place {
+    grid-area: place;
+    align-self: start;
+    margin-top: 2px;
+  }
+  button.rb-row > .rb-name {
+    grid-area: name;
+  }
+  button.rb-row > .rb-value {
+    grid-area: value;
+    justify-items: start;
+    text-align: left;
+  }
+  button.rb-row > .rb-chevron {
+    grid-area: chevron;
+  }
+  .rb-list .rb-trio {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-1) var(--space-4);
+  }
+  .rb-list .rb-trio > span {
+    grid-auto-flow: column;
+    align-items: baseline;
+    justify-items: start;
+    gap: 5px;
+    text-align: left;
+  }
+  /* Schmale Karten (Platz 2 und 3 nebeneinander): die Zahlen untereinander. */
+  .rb-podium[data-count="3"] > li:not(:first-child) .rb-trio {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .rb-podium[data-count="3"] > li:not(:first-child) .rb-trio > span {
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 5px;
+  }
+  /* Breite Karten: die Zahlen in einer Zeile unter dem Namen. */
+  .rb-podium > li:first-child .rb-podium-value,
+  .rb-podium[data-count="2"] > li .rb-podium-value {
+    grid-column: 2 / -1;
+    justify-items: start;
+  }
+  .rb-podium > li:first-child .rb-trio,
+  .rb-podium[data-count="2"] > li .rb-trio {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: var(--space-1) var(--space-4);
+  }
+  .rb-podium > li:first-child .rb-trio > span,
+  .rb-podium[data-count="2"] > li .rb-trio > span {
+    grid-auto-flow: column;
+    align-items: baseline;
+    gap: 5px;
+    text-align: left;
+  }
+}
