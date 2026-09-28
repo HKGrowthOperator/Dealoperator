@@ -17,7 +17,7 @@ const s = z.string().trim();
 const profileSchema = z.object({
   name: s.min(2).max(60),
   role: s.max(80),
-  niche: s.min(1).max(80),
+  niche: s.max(80),
   time: z.enum(["Vormittags", "Nachmittags", "Abends", "Flexibel"]),
   bio: s.max(500),
   goal: z.number().int().min(1).max(5000),

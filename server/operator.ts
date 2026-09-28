@@ -239,7 +239,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       actor.userId,
     ]);
     const profile = {
-      niche: "Noch offen",
+      niche: "",
       time: "Flexibel",
       bio: "",
       goal: 100,

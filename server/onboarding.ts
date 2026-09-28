@@ -801,7 +801,7 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     const base = oldProfile
       ? JSON.parse(oldProfile.data)
       : {
-          niche: "Noch offen",
+          niche: "",
           time: "Flexibel",
           bio: "",
           goal: 200,

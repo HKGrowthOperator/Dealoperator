@@ -20,11 +20,14 @@ function returnTarget(value: string | null) {
 export default function AccountSettings({
   demo,
   extra,
+  plan,
   onSaved,
   standalone,
 }: {
   demo: boolean;
   extra?: ReactNode;
+  /** Wochenziel und Call-Tage; eigener Block, weil sie „Diese Woche“ treiben. */
+  plan?: ReactNode;
   onSaved?: (identity: { name: string; role: string }) => Promise<boolean>;
   /** Ohne eigenes Profil: stattdessen gezeigt (z. B. das Call-Profil allein). */
   standalone?: ReactNode;
@@ -197,6 +200,12 @@ export default function AccountSettings({
               Rangliste. E-Mail und Nummer bleiben privat.
             </p>
           </div>
+          {plan && (
+            <fieldset className="account-extra" id="wochenziel">
+              <legend>Dein Wochenziel</legend>
+              {plan}
+            </fieldset>
+          )}
           {extra && (
             <fieldset className="account-extra">
               <legend>Für Call-Partner</legend>

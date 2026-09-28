@@ -43,7 +43,6 @@ import {
   Send,
   ShieldCheck,
   Sparkles,
-  Target,
   UserRound,
   Users,
   LoaderCircle,
@@ -159,6 +158,8 @@ function Tag({
 }) {
   return <span className={`tag ${tone}`}>{children}</span>;
 }
+/** Der frühere Platzhalter „Noch offen“ älterer Profile ist keine Zielgruppe. */
+const nicheOf = (niche: string) => (niche.trim() === "Noch offen" ? "" : niche.trim());
 function FieldSelect({
   value,
   onChange,
@@ -677,37 +678,12 @@ export default function CommunityApp({
         : s.kind === sessionFilter)
     );
   }
-  function planForm() {
+  /** Wochenziel und Call-Tage: sie treiben „Diese Woche“ unter Fortschritt. */
+  function planFields() {
     return (
-      <form
-        className="form-stack"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!profile.days.length) {
-            toast.error("Wähle mindestens einen Call-Tag.");
-            return;
-          }
-          if (
-            await mutate(
-              "plan",
-              { goal: profile.goal, days: profile.days },
-              (d) => ({
-                ...d,
-                profile: {
-                  ...d.profile,
-                  goal: profile.goal,
-                  days: profile.days,
-                },
-              }),
-            )
-          ) {
-            setModal(null);
-            toast.success("Dein Wochenplan ist gespeichert.");
-          }
-        }}
-      >
+      <>
         <label>
-          Dein Ziel: Anwahlen pro Woche
+          Wochenziel (Anwahlen pro Woche)
           <input
             type="number"
             min={1}
@@ -718,9 +694,14 @@ export default function CommunityApp({
               setProfile({ ...profile, goal: Number(e.target.value) })
             }
           />
+          <small>
+            {profile.days.length
+              ? `Richtwert: ${Math.ceil(profile.goal / profile.days.length)} Anwahlen je Call-Tag.`
+              : "Wähle unten deine Call-Tage."}
+          </small>
         </label>
         <fieldset>
-          <legend>Deine Call-Tage (nur zur Planung)</legend>
+          <legend>Deine Call-Tage</legend>
           <div className="day-checks">
             {[1, 2, 3, 4, 5, 6, 0].map((day) => (
               <label
@@ -729,10 +710,10 @@ export default function CommunityApp({
               >
                 <Checkbox
                   checked={profile.days.includes(day)}
-                  onCheckedChange={(v) =>
+                  onCheckedChange={(checked) =>
                     setProfile({
                       ...profile,
-                      days: v
+                      days: checked
                         ? [...profile.days, day]
                         : profile.days.filter((d) => d !== day),
                     })
@@ -743,26 +724,7 @@ export default function CommunityApp({
             ))}
           </div>
         </fieldset>
-        <div className="plan-estimate">
-          <Target size={23} />
-          <span>
-            <strong>
-              {profile.days.length
-                ? Math.ceil(profile.goal / profile.days.length)
-                : "–"}{" "}
-              Versuche pro Call-Tag
-            </strong>
-            <small>
-              Ein Richtwert für deine Planung. Du kannst dein Ziel jederzeit
-              anpassen.
-            </small>
-          </span>
-        </div>
-        <button className="btn primary" disabled={saving}>
-          <Check size={17} />
-          Wochenplan speichern
-        </button>
-      </form>
+      </>
     );
   }
   /** Angaben nur für Call-Partner; Name und Rolle stehen im Profil. */
@@ -773,8 +735,9 @@ export default function CommunityApp({
           <label>
             Dein Markt / deine Zielgruppe
             <input
-              required
+              required={profile.listed}
               maxLength={80}
+              placeholder="zum Beispiel B2B-Dienstleistungen"
               value={profile.niche}
               onChange={(e) =>
                 setProfile({ ...profile, niche: e.target.value })
@@ -803,19 +766,6 @@ export default function CommunityApp({
         </label>
         <div className="form-grid">
           <label>
-            Wochenziel (Anwahlen)
-            <input
-              type="number"
-              min={1}
-              max={5000}
-              required
-              value={profile.goal}
-              onChange={(e) =>
-                setProfile({ ...profile, goal: Number(e.target.value) })
-              }
-            />
-          </label>
-          <label>
             Dein Discord-Name (freiwillig)
             <input
               maxLength={40}
@@ -831,30 +781,6 @@ export default function CommunityApp({
             <small>So finden dich andere im Discord und schreiben dich an.</small>
           </label>
         </div>
-        <fieldset>
-          <legend>Deine geplanten Call-Tage (nur zur Planung)</legend>
-          <div className="day-checks">
-            {[1, 2, 3, 4, 5, 6, 0].map((day) => (
-              <label
-                key={day}
-                className={profile.days.includes(day) ? "selected" : ""}
-              >
-                <Checkbox
-                  checked={profile.days.includes(day)}
-                  onCheckedChange={(checked) =>
-                    setProfile({
-                      ...profile,
-                      days: checked
-                        ? [...profile.days, day]
-                        : profile.days.filter((d) => d !== day),
-                    })
-                  }
-                />
-                {dayNames[day]}
-              </label>
-            ))}
-          </div>
-        </fieldset>
         <label className="checkbox-row">
           <Checkbox
             checked={profile.listed}
@@ -912,6 +838,7 @@ export default function CommunityApp({
             </label>
           </div>
         )}
+        {planFields()}
         {callFields()}
         <button className="btn primary" disabled={saving}>
           <Check size={18} />
@@ -995,7 +922,7 @@ export default function CommunityApp({
             {m.time ? ` · ${m.time}` : ""}
           </span>
         </p>
-        {m.niche && (
+        {nicheOf(m.niche) && (
           <div className="member-tags">
             <Tag>{m.niche}</Tag>
           </div>
@@ -1068,7 +995,6 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Mein Fortschritt"
-                    text="Deine Woche, deine Serie und deine Leistungslevel."
                   />
                   <section className="ca-section" aria-labelledby="ca-week">
                     <div className="ca-section-head">
@@ -1107,15 +1033,9 @@ export default function CommunityApp({
                       />
                     </div>
                     <div className="ca-section-actions">
-                      <button
-                        className="do-button do-button-secondary"
-                        onClick={() => {
-                          setProfile(data.profile);
-                          setModal("plan");
-                        }}
-                      >
+                      <Link className="do-button do-button-secondary" href={`${href("profil")}#wochenziel`}>
                         Wochenziel anpassen
-                      </button>
+                      </Link>
                       <Link className="do-link" href={href("zahlen")}>
                         Alle Tage ansehen
                       </Link>
@@ -1137,7 +1057,6 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Meine Tage"
-                    text="Alle Tage mit Zahlen und Reflexion. Korrigieren kannst du unter Mein Tag."
                   >
                     {data.records.length > 0 && (
                       <div className="button-row">
@@ -1247,7 +1166,7 @@ export default function CommunityApp({
                       <Empty
                         icon={BarChart3}
                         title="Jede Routine hat einen ersten Tag."
-                        text="Reiche deinen ersten Tagesabschluss ein. Danach siehst du hier deine Entwicklung."
+                        text="Trag deinen ersten Tag ein, dann siehst du hier deine Entwicklung."
                       >
                         <Link className="btn primary" href="/tagesabschluss">
                           Zahlen für heute eintragen
@@ -1323,10 +1242,8 @@ export default function CommunityApp({
                       <div>
                         <h2 id="ca-listing-title">Zeig dich als Call-Partner</h2>
                         <p>
-                          Andere finden dich hier erst, wenn du dein Call-Profil
-                          zeigst: wann du callst, für wen und was du suchst. Ist
-                          dein Discord verknüpft, können sie dich dort direkt
-                          anschreiben. E-Mail und Telefonnummer bleiben privat.
+                          Zeig, wann du callst und was du suchst, dann finden dich die anderen hier.
+                          E-Mail und Nummer bleiben privat.
                         </p>
                       </div>
                       <button
@@ -1417,7 +1334,7 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Sessions und Roleplay"
-                    text="Übungstermine und zusätzliche Call-Blöcke. Getroffen wird sich im Discord: Jede Session bekommt dort ihren eigenen Raum."
+                    text="Übungstermine und Call-Blöcke, getroffen wird sich im Discord."
                   >
                     {sessionsOpen && (
                       <button className="btn primary" onClick={openNewSession}>
@@ -1575,9 +1492,7 @@ export default function CommunityApp({
                   <Tabs value={knowledgeTab} onValueChange={setKnowledgeTab}>
                     <TabsList>
                       <TabsTrigger value="Austausch">Austausch</TabsTrigger>
-                      <TabsTrigger value="Bibliothek">
-                        Impulse & Merkliste
-                      </TabsTrigger>
+                      <TabsTrigger value="Bibliothek">Impulse</TabsTrigger>
                     </TabsList>
                   </Tabs>
                   {knowledgeTab === "Austausch" ? (
@@ -1717,7 +1632,6 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Profil und Einstellungen"
-                    text="Wie du in der Rangliste und bei Call-Partnern erscheinst, und deine Erinnerungen."
                   />
                   <div className="ca-settings">
                     {data.viewerRole && (
@@ -1741,6 +1655,7 @@ export default function CommunityApp({
                     <AccountSettings
                       key={demo ? "demo" : "own"}
                       demo={demo}
+                      plan={<div className="form-stack">{planFields()}</div>}
                       extra={<div className="form-stack">{callFields()}</div>}
                       onSaved={saveCallProfile}
                       standalone={
@@ -1773,8 +1688,6 @@ export default function CommunityApp({
                 ? "Deine Woche im Detail"
                 : modal === "reflection"
                   ? "Dein Tagesabschluss"
-                  : modal === "plan"
-                    ? "Dein Wochenplan"
                     : modal === "profile"
                       ? "Dein Profil"
                       : modal === "create-session"
@@ -1813,8 +1726,6 @@ export default function CommunityApp({
             </div>
           ) : modal === "profile" ? (
             profileForm()
-          ) : modal === "plan" ? (
-            planForm()
           ) : modal === "create-session" ? (
             <form
               className="form-stack"
@@ -2093,7 +2004,7 @@ export default function CommunityApp({
               <h2>{member.name}</h2>
               <p>{member.role}</p>
               <div className="member-tags">
-                <Tag>{member.niche}</Tag>
+                {nicheOf(member.niche) && <Tag>{member.niche}</Tag>}
                 <Tag>{member.time}</Tag>
               </div>
               {member.latest && (
@@ -2504,7 +2415,7 @@ function PageHeading({
   /** Frühere Unterzeile; nicht mehr angezeigt. */
   eyebrow?: string;
   title: string;
-  text: string;
+  text?: string;
   children?: React.ReactNode;
 }) {
   return (

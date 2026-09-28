@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useId, useState, useSyncExternalStore } from "react";
 import {
   Bell,
-  BellOff,
   CircleAlert,
   CircleCheck,
   LoaderCircle,
@@ -323,7 +322,7 @@ export default function PushSetup({
       return {
         tone: "info",
         title: "Auf iPhone und iPad gibt es Push nur über den Home-Bildschirm",
-        text: "Wie das geht, steht weiter unten. Deal Operator funktioniert auch ganz ohne Push.",
+        text: "Wie das geht, steht weiter unten. Deal Operator funktioniert auch ganz ohne Erinnerungen.",
       };
     if (env.kind === "ios-old")
       return {
@@ -341,18 +340,18 @@ export default function PushSetup({
       return {
         tone: "warn",
         title: "Benachrichtigungen sind blockiert",
-        text: "Erlaube Benachrichtigungen für diese Seite in den Einstellungen deines Browsers oder Geräts. Danach kannst du Push hier einrichten.",
+        text: "Erlaube Benachrichtigungen für diese Seite in den Einstellungen deines Browsers oder Geräts. Danach kannst du Erinnerungen hier einrichten.",
       };
     if (permission === "granted" && keyMismatch)
       return {
         tone: "warn",
-        title: "Bitte Push auf diesem Gerät neu einrichten",
+        title: "Bitte Erinnerungen auf diesem Gerät neu einrichten",
         text: "Der Versandschlüssel auf dem Server hat sich geändert. Bis zur Neueinrichtung kommen auf diesem Gerät keine Pushs an.",
       };
     if (permission === "granted" && thisDevice)
       return {
         tone: "ok",
-        title: "Push ist auf diesem Gerät aktiv",
+        title: "Erinnerungen sind auf diesem Gerät aktiv",
         text: thisDevice.lastSuccess
           ? `Zuletzt erfolgreich zugestellt am ${dateOf(thisDevice.lastSuccess)}.`
           : "Noch keine Nachricht zugestellt. Eine Testnachricht zeigt, ob alles ankommt.",
@@ -366,7 +365,7 @@ export default function PushSetup({
     return {
       tone: "info",
       title: "Auf diesem Gerät noch nicht eingerichtet",
-      text: "Du wirst erst gefragt, wenn du auf „Push einrichten“ tippst.",
+      text: "Du wirst erst gefragt, wenn du auf „Erinnerungen einrichten“ tippst.",
     };
   })();
   const canEnable =
@@ -382,25 +381,11 @@ export default function PushSetup({
           <h2 id={`${uid}-title`}>Erinnerungen</h2>
         </div>
         <p className="cm-muted">
-          Freiwillig. Deal Operator erinnert dich auch bei geschlossener Website.
+          Freiwillig. Um {clockText(settings.eveningReminder)}, wenn dein Tagesabschluss noch
+          fehlt, und um {clockText(settings.streakWarning)} am nächsten Calling-Tag vor
+          Fristende. Nie an freien Tagen, nie in einer Pause.
         </p>
       </header>
-
-      <ul className="cm-rules">
-        <li>
-          <Bell size={16} aria-hidden="true" /> Um {clockText(settings.eveningReminder)}, wenn dein
-          Tagesabschluss an einem Calling-Tag noch fehlt.
-        </li>
-        <li>
-          <Bell size={16} aria-hidden="true" /> Um {clockText(settings.streakWarning)} am nächsten
-          Calling-Tag, wenn dein Abschluss noch offen ist und bis {settings.deadlineHour}:00 Uhr
-          noch für deine laufende Serie zählt.
-        </li>
-        <li>
-          <BellOff size={16} aria-hidden="true" /> Nie an freien Tagen, nie in einer bestätigten
-          Pause, nie nach eingereichtem Abschluss.
-        </li>
-      </ul>
 
       {loadError && (
         <p className="cm-alert error" role="alert">
@@ -433,10 +418,10 @@ export default function PushSetup({
               <Bell size={17} aria-hidden="true" />
             )}
             {keyMismatch
-              ? "Push neu einrichten"
+              ? "Erinnerungen neu einrichten"
               : permission === "granted" && endpoint
                 ? "Mit meinem Konto verbinden"
-                : "Push einrichten"}
+                : "Erinnerungen einrichten"}
           </button>
         )}
         {info && devices.length > 0 && (
@@ -472,6 +457,7 @@ export default function PushSetup({
 
       {info && (
         <>
+          {devices.length > 0 && (
           <div className="cm-pref">
             <label className="cm-switch">
               <input
@@ -491,14 +477,11 @@ export default function PushSetup({
               <span className="cm-switch-track" aria-hidden="true" />
               <span>
                 <strong>Erinnerungen an meinen Tagesabschluss</strong>
-                <small>
-                  {devices.length
-                    ? "Abends und vor der Frist, wie oben beschrieben."
-                    : "Gilt, sobald ein Gerät eingetragen ist."}
-                </small>
+                <small>Abends und vor der Frist.</small>
               </span>
             </label>
           </div>
+          )}
 
           <InstallApp />
 
@@ -554,11 +537,9 @@ export default function PushSetup({
             </div>
           )}
 
+          {devices.length > 0 && (
           <div className="cm-devices">
             <h3>Eingetragene Geräte</h3>
-            {devices.length === 0 ? (
-              <p className="cm-muted">Noch kein Gerät eingetragen.</p>
-            ) : (
               <ul>
                 {devices.map((d) => (
                   <li key={d.endpoint}>
@@ -591,8 +572,8 @@ export default function PushSetup({
                   </li>
                 ))}
               </ul>
-            )}
           </div>
+          )}
         </>
       )}
     </section>
