@@ -764,7 +764,7 @@ export default function OnboardingStart({
             )}
             <ProfileSearch query={query} onQuery={setQuery} onPick={pick} notFound={missing} />
             <button type="button" className="flow-link" onClick={() => go("choice", null, null)}>
-              Zurück zur Auswahl
+              Zurück
             </button>
           </>
         )}

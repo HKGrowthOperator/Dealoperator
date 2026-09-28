@@ -600,7 +600,7 @@ export function PrivacyNote() {
   return (
     <p className="flow-privacy">
       <Lock size={15} aria-hidden="true" />
-      E-Mail und Telefonnummer sind nur für dich und das Team sichtbar.
+      E-Mail und Nummer sind nur für dich und das Team sichtbar.
     </p>
   );
 }

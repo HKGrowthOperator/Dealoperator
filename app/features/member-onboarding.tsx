@@ -282,7 +282,7 @@ export default function MemberOnboarding({
           {more ? (
             <>
               <div className="flow-field">
-                <label htmlFor={`${id}-company`}>Unternehmen (optional)</label>
+                <label htmlFor={`${id}-company`}>Firma (optional)</label>
                 <input
                   id={`${id}-company`}
                   autoComplete="organization"
@@ -305,7 +305,7 @@ export default function MemberOnboarding({
             </>
           ) : (
             <button type="button" className="flow-link flow-add" onClick={() => setMore(true)}>
-              <Plus size={16} aria-hidden="true" /> Unternehmen und Rolle angeben
+              <Plus size={16} aria-hidden="true" /> Firma und Rolle angeben
             </button>
           )}
 
