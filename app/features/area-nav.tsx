@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 
 /**
  * Kleine Bereichsnavigation unter dem Seitentitel (nicht fest, keine zweite
- * Leiste). „mine“: der eigene Bereich. „exchange“: Reflexionen, Sessions
- * und Wissen. Call-Partner ist ein eigener Reiter im Kopf.
+ * Leiste). „mine“: der eigene Bereich. „partner“: Call-Partner, Sessions und
+ * Wissen, alles rund um den Austausch mit den anderen.
  */
 const AREAS = {
   mine: {
@@ -17,10 +17,10 @@ const AREAS = {
       { path: "/profil", href: "/profil?modus=eigen", label: "Profil" },
     ],
   },
-  exchange: {
+  partner: {
     label: "Austausch",
     items: [
-      { path: "/reflexionen", href: "/reflexionen", label: "Reflexionen" },
+      { path: "/partner", href: "/partner?modus=eigen", label: "Call-Partner" },
       { path: "/sessions", href: "/sessions?modus=eigen", label: "Sessions" },
       { path: "/wissen", href: "/wissen?modus=eigen", label: "Wissen" },
     ],

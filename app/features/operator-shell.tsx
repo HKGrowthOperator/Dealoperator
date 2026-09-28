@@ -49,25 +49,26 @@ function useViewer(initial?: Viewer | null) {
 
 /**
  * Bereiche der Seite. Ergebnisse ist die gemeinsame Startseite; „Mein Tag“
- * umfasst Tagesabschluss, Fortschritt und eigene Zahlen; der Austausch hängt
- * an den Reflexionen; Call-Partner ist ein eigener Reiter.
+ * umfasst Tagesabschluss samt Reflexionen, Fortschritt und eigene Zahlen;
+ * Call-Partner umfasst Sessions und Wissen. Abgemeldet steht statt der
+ * eigenen Bereiche „So funktioniert’s“.
  */
-type Area = "results" | "day" | "exchange" | "partner" | "profile" | "admin" | "";
+type Area = "results" | "day" | "partner" | "how" | "profile" | "admin" | "";
 function areaOf(path: string): Area {
   if (path === "/" || path.startsWith("/ranking")) return "results";
   if (/^\/verwaltung(\/|$)/.test(path)) return "admin";
-  if (/^\/(tagesabschluss|heute|zahlen|reflexion)(\/|$)/.test(path)) return "day";
-  if (/^\/partner(\/|$)/.test(path)) return "partner";
-  if (/^\/(reflexionen|sessions|wissen)(\/|$)/.test(path)) return "exchange";
+  if (/^\/(tagesabschluss|heute|zahlen|reflexion|reflexionen)(\/|$)/.test(path)) return "day";
+  if (/^\/(partner|sessions|wissen)(\/|$)/.test(path)) return "partner";
+  if (/^\/so-funktionierts(\/|$)/.test(path)) return "how";
   if (/^\/(profil|passwort)(\/|$)/.test(path)) return "profile";
   return "";
 }
 
 const MAIN = [
   { area: "results", href: "/", label: "Ergebnisse" },
-  { area: "day", href: "/tagesabschluss", label: "Mein Tag" },
-  { area: "exchange", href: "/reflexionen", label: "Reflexionen" },
-  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner" },
+  { area: "day", href: "/tagesabschluss", label: "Mein Tag", only: "in" },
+  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner", only: "in" },
+  { area: "how", href: "/so-funktionierts", label: "So funktioniert’s", only: "out" },
 ] as const;
 
 /**
@@ -106,8 +107,11 @@ export function OperatorHeader({
     if (current && strip.current && strip.current.scrollWidth > strip.current.clientWidth)
       current.scrollIntoView({ inline: "center", block: "nearest" });
   }, [area]);
-  // Abgemeldet entfällt „Mein Tag“; „Anmelden“ steht rechts im Kopf.
-  const areas = MAIN.filter((item) => !(viewer && !signedIn && item.area === "day"));
+  // Abgemeldet entfallen die eigenen Bereiche; „Anmelden“ steht rechts im
+  // Kopf. Solange der Anmeldestand noch lädt, bleibt die angemeldete Leiste.
+  const areas = MAIN.filter((item) =>
+    !("only" in item) ? true : viewer ? (item.only === "in") === signedIn : item.only === "in",
+  );
   const links = (
     <>
       {areas.map((item) => (
@@ -204,7 +208,6 @@ export function OperatorFooter({
         <nav aria-label="Weitere Seiten">
           <Link href="/">Ergebnisse</Link>
           <Link href="/tagesabschluss">Mein Tag</Link>
-          <Link href="/reflexionen">Reflexionen</Link>
           <Link href="/partner?modus=eigen">Call-Partner</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">

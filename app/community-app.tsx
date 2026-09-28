@@ -1038,7 +1038,7 @@ export default function CommunityApp({
       <OperatorHeader discordUrl={discordUrl} />
       <main id="inhalt" className="do-page ca-main">
         {/* Call-Partner ist ein eigener Reiter ohne Unterbereiche. */}
-        {initialView !== "partner" && <AreaNav area={exchangeView ? "exchange" : "mine"} />}
+        <AreaNav area={exchangeView || initialView === "partner" ? "partner" : "mine"} />
           {!demo && !signedIn ? (
             <Empty
               icon={LogIn}
