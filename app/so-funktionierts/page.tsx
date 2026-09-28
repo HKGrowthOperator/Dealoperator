@@ -8,6 +8,7 @@ import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commit
 import { ACTIVE_LOST_AFTER_IDLE, ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
 import { tracks } from "@/lib/kpis";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
+import DiscordSteps from "../features/discord-steps";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -314,6 +315,7 @@ export default async function Page() {
               euch zu Sessions und Roleplay, findet Call-Partner und pusht euch gegenseitig.
               Aktive Caller tragen dort ihren Rang.
             </p>
+            <DiscordSteps />
           </div>
           <a className="do-button do-button-secondary" href={discord} target="_blank" rel="noopener noreferrer">
             Discord öffnen
@@ -335,7 +337,7 @@ export default async function Page() {
 function Cta({ signedIn }: { signedIn: boolean }) {
   return signedIn ? (
     <div className="hw-cta">
-      <Link className="do-button do-button-primary" href="/reflexionen">
+      <Link className="do-button do-button-primary" href="/tagesabschluss">
         Zahlen eintragen
       </Link>
       <Link className="do-button do-button-secondary" href="/">

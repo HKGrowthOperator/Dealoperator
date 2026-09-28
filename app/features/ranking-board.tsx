@@ -25,6 +25,7 @@ import {
   Trophy,
   UsersRound,
   X,
+  PencilLine,
 } from "lucide-react";
 import {
   aggregate,
@@ -52,7 +53,10 @@ import { DISCORD_INVITE } from "@/lib/discord";
 import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
 import type { HomeState } from "@/server/home";
 import { OperatorHeader, OperatorFooter, type Viewer } from "./operator-shell";
-import { dayState, earlierState } from "./day-state";
+import { dayState, earlierState, type DayState } from "./day-state";
+import { PushPrompt } from "./push-setup";
+import DiscordSteps from "./discord-steps";
+import { takeSubmitted, type SubmittedNote } from "./submitted-note";
 import RankingHistory from "./ranking-history";
 
 const fmt = (v: number | null | undefined) =>
@@ -242,6 +246,26 @@ export default function RankingBoard({
   const ownId = home?.participant?.id ?? null;
   const own = ownId ? all.find((row) => row.id === ownId) : undefined;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
+  // Rückkehr aus dem Formular: die Karte oben wird zur Bestätigung, die eigene
+  // Zeile leuchtet kurz auf. Die Notiz dazu gibt es genau einmal.
+  const justSubmitted = params.get("eingereicht") === "1" && !!ownId;
+  const noteDay = parsedDay.success ? parsedDay.data : today;
+  const [note, setNote] = useState<SubmittedNote | null>(null);
+  const flashed = useRef(false);
+  useEffect(() => {
+    if (!justSubmitted) return;
+    // Erst nach dem Aufbau lesen: der Server kennt den Tab-Speicher nicht.
+    const timer = window.setTimeout(() => setNote(takeSubmitted(noteDay)), 0);
+    return () => window.clearTimeout(timer);
+  }, [justSubmitted, noteDay]);
+  useEffect(() => {
+    if (!justSubmitted || loading || !own || flashed.current) return;
+    flashed.current = true;
+    const timer = window.setTimeout(() => showRow(own.id), 400);
+    return () => window.clearTimeout(timer);
+    // showRow ändert sich nicht in der Sache; ein Aufleuchten je Rückkehr reicht.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justSubmitted, loading, own?.id]);
   const newest = rows.reduce((latest, row) => (row.updatedAt > latest ? row.updatedAt : latest), "");
 
   const events = useMemo(() => withPermanentEvents(eventList), [eventList]);
@@ -410,10 +434,25 @@ export default function RankingBoard({
                 Meine Zahlen sind schon hier
               </Link>
             </div>
+            <p className="rb-intro-signin">
+              Schon registriert?{" "}
+              <Link className="do-link" href="/anmelden">
+                Anmelden und Zahlen eintragen
+              </Link>
+            </p>
           </section>
         )}
         {(onlyRanking || signedIn) && <h1 className="do-sr">Ergebnisse</h1>}
-        {signedIn && home && <PersonalPanel home={home} />}
+        {signedIn && home && (
+          <PersonalPanel
+            home={home}
+            submitted={justSubmitted}
+            note={note}
+            own={own ? { rank: own.rank, counts: own.counts } : undefined}
+            dayLabel={formatDay(day)}
+            onShowOwn={showOwn}
+          />
+        )}
         {signedIn && home?.participant && <DiscordPanel url={discord} />}
 
         <section className="rb-results" id="ergebnisse" aria-labelledby="rb-results-title">
@@ -777,14 +816,61 @@ const DAY_ICON = {
   dashed: CircleDashed,
   draft: NotebookPen,
 } as const;
-function PersonalPanel({ home }: { home: HomeState }) {
+/**
+ * Mein Tag auf der Startseite: der eine nächste Schritt. Direkt nach dem
+ * Einreichen wird die Karte zur Bestätigung: Tag, Folge für die Serie, eigener
+ * Platz, einmal das Erinnerungs-Angebot. Danach „Reflexionen lesen“.
+ */
+function PersonalPanel({
+  home,
+  submitted,
+  note,
+  own,
+  dayLabel,
+  onShowOwn,
+}: {
+  home: HomeState;
+  /** Gerade eingereicht (Rückkehr aus dem Formular). */
+  submitted: boolean;
+  note: SubmittedNote | null;
+  own: { rank: number; counts: Counts } | undefined;
+  dayLabel: string;
+  onShowOwn: () => void;
+}) {
   // Ein noch offener Calling-Tag davor hat Vorrang, solange heute offen ist:
   // dort läuft eine Frist. Ist heute eingereicht, zeigt Mein Tag beides.
-  const state =
-    (home.today?.status !== "done" ? earlierState(home) : null) ?? dayState(home, "board");
+  const base =
+    (home.today?.status !== "done" ? earlierState(home) : null) ?? dayState(home);
+  const state: DayState = submitted
+    ? {
+        icon: "circle-check",
+        tone: "done",
+        title: note?.unchanged
+          ? "Keine Änderung nötig, dein Tag steht."
+          : note && note.day !== home.today?.day
+            ? `${dayLabel} ist drin.`
+            : "Dein Tag ist drin.",
+        text:
+          note?.effect ?? "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe.",
+        // Nachtrag an einem Tag, an dem heute noch offen ist: als Nächstes heute.
+        ...(note &&
+        note.day !== home.today?.day &&
+        (home.today?.status === "open" || home.today?.status === "draft")
+          ? { href: "/tagesabschluss", action: "Heute eintragen" }
+          : { href: "/reflexionen", action: "Reflexionen lesen" }),
+      }
+    : base;
   const Icon = DAY_ICON[state.icon];
+  const correctHref =
+    note && note.day !== home.today?.day ? `/tagesabschluss?tag=${note.day}` : "/tagesabschluss";
   return (
-    <section className="rb-me" data-tone={state.tone} aria-labelledby="rb-me-title">
+    <section
+      className="rb-me"
+      data-tone={state.tone}
+      data-submitted={submitted ? "" : undefined}
+      aria-labelledby="rb-me-title"
+      role={submitted ? "status" : undefined}
+    >
       <span className="rb-me-icon" aria-hidden="true">
         <Icon size={22} />
       </span>
@@ -792,6 +878,22 @@ function PersonalPanel({ home }: { home: HomeState }) {
         <p className="rb-me-kicker">Mein Tag</p>
         <h2 id="rb-me-title">{state.title}</h2>
         <p>{state.text}</p>
+        {submitted && own && (
+          <p className="rb-me-rank">
+            <button type="button" className="do-link" onClick={onShowOwn}>
+              <Trophy size={16} aria-hidden="true" />
+              Platz {own.rank} mit {numbersLine(own.counts)}
+            </button>
+          </p>
+        )}
+        {submitted && note && note.levelUps.length > 0 && (
+          <p className="rb-me-level">
+            Neues Leistungslevel: {note.levelUps.join(", ")}.{" "}
+            <Link className="do-link" href="/heute?modus=eigen">
+              Mein Fortschritt
+            </Link>
+          </p>
+        )}
       </div>
       <Link
         className={`do-button ${state.tone === "done" ? "do-button-secondary" : "do-button-primary"}`}
@@ -799,19 +901,28 @@ function PersonalPanel({ home }: { home: HomeState }) {
       >
         {state.action}
       </Link>
-      {home.participant && (
+      {home.participant && (submitted || home.today?.status === "done" || home.today?.status === "imported") && (
         <p className="rb-me-more">
-          <span>Jemanden zum Üben oder für Feedback?</span>
-          <Link className="do-link" href="/partner?modus=eigen">
-            <UsersRound size={16} aria-hidden="true" />
-            Call-Partner finden
+          <Link className="do-link" href={correctHref}>
+            <PencilLine size={16} aria-hidden="true" />
+            {home.today?.status === "imported" && !submitted
+              ? "Übernommene Zahlen ansehen"
+              : "Eintrag ansehen oder korrigieren"}
           </Link>
         </p>
+      )}
+      {submitted && (
+        <div className="rb-me-push">
+          <PushPrompt settings={note?.settings ?? undefined} variant="after-submit" />
+        </div>
       )}
     </section>
   );
 }
-/** Discord ist für Calls da. In einem Satz, was dort passiert, und ein Knopf. */
+/**
+ * Discord ist für Calls da: ein Satz, ein Knopf, und für alle, die Discord
+ * noch nicht kennen, der Weg hinein in drei Schritten.
+ */
 function DiscordPanel({ url }: { url: string }) {
   return (
     <section className="rb-discord" aria-labelledby="rb-discord-title">
@@ -820,17 +931,21 @@ function DiscordPanel({ url }: { url: string }) {
       </span>
       <div className="rb-me-text">
         <p className="rb-me-kicker">Discord</p>
-        <h2 id="rb-discord-title">Calls, Sessions und Roleplays laufen im Discord.</h2>
-        <p>
-          Dort trefft ihr euch zum Üben, findet Call-Partner und pusht euch gegenseitig. Zahlen
-          und Reflexionen bleiben hier.
-        </p>
+        <h2 id="rb-discord-title">Calls, Sessions und Roleplay laufen im Discord.</h2>
+        <p>Dort findet ihr euch zum Üben und pusht euch gegenseitig. Zahlen bleiben hier.</p>
       </div>
       <a className="do-button do-button-secondary" href={url} target="_blank" rel="noopener noreferrer">
         Discord öffnen
         <ExternalLink size={16} aria-hidden="true" />
         <span className="do-sr">(neues Fenster)</span>
       </a>
+      <div className="rb-me-more rb-discord-more">
+        <DiscordSteps />
+        <Link className="do-link" href="/partner?modus=eigen">
+          <UsersRound size={16} aria-hidden="true" />
+          Wer sucht gerade einen Call-Partner?
+        </Link>
+      </div>
     </section>
   );
 }

@@ -3081,6 +3081,9 @@ li[data-open] .rb-chevron {
   margin: var(--space-2) 0 0;
   color: var(--do-ink-2);
 }
+.hw-discord .rb-discord-steps {
+  margin-top: var(--space-3);
+}
 .hw-end {
   margin-top: var(--space-8);
   padding: var(--space-6) var(--space-5);
@@ -3910,6 +3913,81 @@ li[data-medal="gold"] .rb-bar i {
   .rb-discord .do-button {
     grid-column: 1 / -1;
   }
+}
+
+/* Einstieg: Anmelden auch im Text, nicht nur im Kopf. */
+.rb-intro-signin {
+  margin: var(--space-3) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+
+/* Mein Tag direkt nach dem Einreichen: Bestätigung, Platz, Erinnerung. */
+.rb-me[data-submitted] {
+  border-color: color-mix(in oklch, var(--do-green) 35%, var(--do-line));
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--do-green) 10%, transparent);
+}
+.rb-me-rank,
+.rb-me-level {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-label);
+}
+.rb-me-rank .do-link {
+  gap: var(--space-2);
+  font-weight: 700;
+}
+.rb-me-level {
+  color: var(--do-ink-2);
+}
+.rb-me-push {
+  grid-column: 1 / -1;
+}
+.rb-me-push .cm-push-prompt {
+  margin: 0;
+}
+.rb-me-push:empty {
+  display: none;
+}
+
+/* Discord: der Weg hinein, aufklappbar, für alle, die Discord nicht kennen. */
+.rb-discord-more {
+  display: grid;
+  gap: var(--space-2);
+}
+.rb-discord-steps summary {
+  cursor: pointer;
+  color: var(--do-ink-1);
+  font-weight: 700;
+  list-style: none;
+}
+.rb-discord-steps summary::-webkit-details-marker {
+  display: none;
+}
+.rb-discord-steps summary::before {
+  content: "+";
+  display: inline-block;
+  width: 1.2em;
+  color: var(--do-blue);
+  font-weight: 800;
+}
+.rb-discord-steps[open] summary::before {
+  content: "–";
+}
+.rb-discord-steps ol {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+  padding-left: 1.3em;
+  color: var(--do-ink-2);
+  line-height: 1.5;
+}
+.rb-discord-steps strong {
+  color: var(--do-ink-1);
+}
+
+/* Mein Tag: Kopf über dem Formular. */
+.md-page-head p strong {
+  color: var(--do-ink-1);
 }
 
 /* Verwaltung: Push-Hinweise nur auf eingerichteten Geräten. */
