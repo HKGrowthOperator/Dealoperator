@@ -6,7 +6,6 @@ import { homeState } from "@/server/home";
 import { reflectionFeed } from "@/server/reflections";
 import { berlinDate, daySchema } from "@/lib/kpis";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
-import AreaNav from "../features/area-nav";
 import type { ClosingState } from "../features/closing-form";
 import type { ReflectionFeedData } from "../features/reflection-feed";
 import DayEntry from "../features/day-entry";
@@ -97,9 +96,8 @@ export default async function Page({
 
   return (
     <div className="operator-site">
-      <OperatorHeader viewer={viewerOf(actor)} />
+      <OperatorHeader viewer={{ ...viewerOf(actor), hasProfile: !!name, today: status }} />
       <main id="inhalt" className="do-page do-page-narrow md">
-        <AreaNav area="mine" />
         <div className="do-page-head md-page-head">
           <div>
             <h1>Mein Tag</h1>
