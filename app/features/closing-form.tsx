@@ -1064,7 +1064,13 @@ export default function ClosingForm({
 
   const dayNote = (() => {
     if (imported) return null;
-    if (state.trackingStart && form.day < state.trackingStart && !submitted)
+    // Am Starttag selbst beginnt mit dem Abschluss die Serie; die Notiz gilt nur davor.
+    if (
+      state.trackingStart &&
+      form.day < state.trackingStart &&
+      form.day !== state.firstClosableDay &&
+      !submitted
+    )
       return `Dieser Tag liegt vor deinem Start im Tagesabschluss (${formatShortDay(state.trackingStart)}). Er zählt nicht für die Serie.`;
     if (paused) return "Dieser Tag liegt in einer bestätigten Pause. Ein Abschluss ist freiwillig.";
     if (!due)
@@ -1202,60 +1208,6 @@ export default function ClosingForm({
           {confirmed ? "Eingereicht" : badge.text}
         </span>
       </header>
-
-      <div className="md-day">
-        {pickDay ? (
-          <>
-            <label htmlFor={`${uid}-day`}>Anderen Tag wählen</label>
-            <div className="md-day-row">
-              <input
-                id={`${uid}-day`}
-                type="date"
-                value={form.day}
-                max={today}
-                min={state.firstClosableDay || undefined}
-                disabled={busy}
-                onChange={(e) => {
-                  const day = e.target.value;
-                  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) selectDay(day);
-                }}
-              />
-              {form.day !== today && (
-                <button type="button" className="do-button do-button-secondary" onClick={() => selectDay(today)}>
-                  Heute
-                </button>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="md-day-links">
-            <button
-              type="button"
-              className="do-link"
-              aria-expanded={false}
-              onClick={() => setPickDay(true)}
-            >
-              <CalendarDays size={16} aria-hidden="true" />
-              Anderen Tag wählen
-            </button>
-            {form.day !== today && (
-              <button type="button" className="do-link" onClick={() => selectDay(today)}>
-                Zu heute
-              </button>
-            )}
-          </div>
-        )}
-        {otherDrafts.length > 0 && (
-          <p className="cm-other-drafts">
-            Weitere Entwürfe:{" "}
-            {otherDrafts.map((d) => (
-              <button type="button" key={d} className="cm-chip" onClick={() => selectDay(d)}>
-                {formatShortDay(d)}
-              </button>
-            ))}
-          </p>
-        )}
-      </div>
 
       {openEarlier && !confirmed && (
         <div className={`cm-alert ${openEarlier.risk ? "warn" : "info"}`}>
@@ -1585,6 +1537,60 @@ export default function ClosingForm({
           </div>
         </form>
       ) : null}
+
+      <div className="md-day">
+        {pickDay ? (
+          <>
+            <label htmlFor={`${uid}-day`}>Anderen Tag wählen</label>
+            <div className="md-day-row">
+              <input
+                id={`${uid}-day`}
+                type="date"
+                value={form.day}
+                max={today}
+                min={state.firstClosableDay || undefined}
+                disabled={busy}
+                onChange={(e) => {
+                  const day = e.target.value;
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(day)) selectDay(day);
+                }}
+              />
+              {form.day !== today && (
+                <button type="button" className="do-button do-button-secondary" onClick={() => selectDay(today)}>
+                  Heute
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="md-day-links">
+            <button
+              type="button"
+              className="do-link"
+              aria-expanded={false}
+              onClick={() => setPickDay(true)}
+            >
+              <CalendarDays size={16} aria-hidden="true" />
+              Anderen Tag nachtragen oder ansehen
+            </button>
+            {form.day !== today && (
+              <button type="button" className="do-link" onClick={() => selectDay(today)}>
+                Zu heute
+              </button>
+            )}
+          </div>
+        )}
+        {otherDrafts.length > 0 && (
+          <p className="cm-other-drafts">
+            Weitere Entwürfe:{" "}
+            {otherDrafts.map((d) => (
+              <button type="button" key={d} className="cm-chip" onClick={() => selectDay(d)}>
+                {formatShortDay(d)}
+              </button>
+            ))}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
