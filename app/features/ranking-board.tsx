@@ -167,7 +167,7 @@ const steps = [
   },
   {
     title: "Sehen, was entsteht",
-    text: "Mit deiner Zustimmung zählen deine Zahlen in der gemeinsamen Summe und in der Rangliste. Unter Reflexionen liest du, was bei anderen funktioniert hat.",
+    text: "Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein Tag liest du danach, was bei anderen funktioniert hat.",
   },
 ];
 
@@ -773,9 +773,9 @@ export default function RankingBoard({
         )}
 
         <section className="rb-exchange" aria-label="Austausch">
-          <Link href="/reflexionen">
+          <Link href="/tagesabschluss#andere">
             <strong>Reflexionen lesen</strong>
-            <span>Was bei anderen heute funktioniert hat.</span>
+            <span>Was bei anderen heute funktioniert hat, unter Mein Tag.</span>
           </Link>
           <a href={discord} target="_blank" rel="noopener noreferrer">
             <strong>Call-Partner im Discord finden</strong>
@@ -857,7 +857,7 @@ function PersonalPanel({
         note.day !== home.today?.day &&
         (home.today?.status === "open" || home.today?.status === "draft")
           ? { href: "/tagesabschluss", action: "Heute eintragen" }
-          : { href: "/reflexionen", action: "Reflexionen lesen" }),
+          : { href: "/tagesabschluss#andere", action: "Reflexionen lesen" }),
       }
     : base;
   const Icon = DAY_ICON[state.icon];

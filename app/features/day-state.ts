@@ -4,7 +4,7 @@ import type { HomeState } from "@/server/home";
  * Der eigene Stand für heute als Karte: was offen ist und wohin es geht.
  * Ein Ort für die Wortwahl, damit Startseite und Bestätigung dasselbe sagen.
  * Eintragen, ansehen und korrigieren laufen über das Formular unter Mein Tag;
- * nach dem Einreichen führt der nächste Schritt zu den Reflexionen.
+ * nach dem Einreichen stehen dort die Reflexionen der anderen.
  */
 
 export type DayStateIcon = "clock" | "check" | "circle-check" | "dashed" | "draft";
@@ -75,7 +75,7 @@ export function dayState(home: HomeState): DayState {
       tone: "done",
       title: "Dein Tag ist drin.",
       text: "Zahlen und Reflexion sind eingereicht und zählen.",
-      href: "/reflexionen",
+      href: "/tagesabschluss#andere",
       action: "Reflexionen lesen",
     };
   if (t.status === "imported")
@@ -84,7 +84,7 @@ export function dayState(home: HomeState): DayState {
       tone: "done",
       title: "Deine Zahlen für heute sind eingetragen.",
       text: "Das Team hat sie übernommen.",
-      href: "/reflexionen",
+      href: "/tagesabschluss#andere",
       action: "Reflexionen lesen",
     };
   if (t.status === "draft")

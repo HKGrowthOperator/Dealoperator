@@ -169,6 +169,6 @@ function toPost(r: {
     next: r.reflection.next,
     // Unterstützungswünsche bleiben beim Team.
     help: "",
-    url: new URL(`/reflexionen?tag=${r.day}`, base).toString(),
+    url: new URL("/tagesabschluss#andere", base).toString(),
   };
 }

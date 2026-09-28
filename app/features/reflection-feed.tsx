@@ -204,7 +204,7 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
         <h2>Zum Lesen fehlt noch ein Schritt.</h2>
         <EligibilityChecklist
           missing={feed.missing ?? []}
-          next="/reflexionen"
+          next="/tagesabschluss"
           purpose="feed"
         />
       </section>

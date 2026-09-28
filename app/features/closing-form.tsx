@@ -1295,7 +1295,7 @@ export default function ClosingForm({
                 Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe.
               </li>
               <li>
-                Deine Reflexion steht unter Reflexionen, mit deinen Zahlen.
+                Deine Reflexion steht unter Mein Tag bei den anderen, mit deinen Zahlen.
               </li>
             </ul>
           )}
@@ -1309,7 +1309,7 @@ export default function ClosingForm({
             <Link className="do-button do-button-primary" href="/">
               Zu den Ergebnissen
             </Link>
-            <Link className="do-button do-button-secondary" href="/reflexionen">
+            <Link className="do-button do-button-secondary" href="/tagesabschluss#andere">
               Reflexionen lesen
             </Link>
             <button type="button" className="do-link md-correct" onClick={() => setConfirmation(null)}>
@@ -1455,14 +1455,12 @@ export default function ClosingForm({
               <legend>Wer sieht deinen Tagesabschluss?</legend>
               <ul className="md-visibility">
                 <li>
-                  Deine Reflexion lesen alle Angemeldeten mit eigenem Profil und Telefonnummer unter
-                  Reflexionen.
+                  Deine Zahlen stehen mit deinem Anzeigenamen in Rangliste und gemeinsamer Summe.
                 </li>
                 <li>
-                  Deine Zahlen zählen öffentlich in Rangliste und gemeinsamer Summe, mit deinem
-                  Anzeigenamen.
+                  Deine Reflexion lesen Angemeldete mit eigenem Profil unter Mein Tag; deinen
+                  Wunsch nach Unterstützung nur das Team.
                 </li>
-                <li>Deinen Wunsch nach Unterstützung sieht nur das Team.</li>
               </ul>
               <label className={`cm-check ${ackError ? "invalid" : ""}`}>
                 <input

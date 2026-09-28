@@ -127,8 +127,8 @@ export default async function Page() {
               <div className="hw-step-text">
                 <h3>Sehen, was entsteht</h3>
                 <p>
-                  Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter
-                  Reflexionen liest du, was bei anderen funktioniert hat.
+                  Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein
+                  Tag liest du danach, was bei anderen funktioniert hat.
                 </p>
               </div>
               <div className="hw-visual hw-rank" aria-hidden="true">
@@ -217,9 +217,9 @@ export default async function Page() {
             <div>
               <dt>Angemeldete mit Profil und Telefonnummer</dt>
               <dd>
-                Deine eingereichten Reflexionen: was gut lief, dein nächster Schritt, deine
-                Energie. Zahlen stehen dort nur mit deiner Zustimmung. Dein Call-Profil, wenn du
-                es bei den Call-Partnern zeigst.
+                Deine eingereichten Reflexionen unter Mein Tag: was gut lief, dein nächster
+                Schritt, deine Energie, mit den Zahlen des Tages. Dein Call-Profil, wenn du es
+                bei den Call-Partnern zeigst.
               </dd>
             </div>
             <div>

@@ -120,7 +120,7 @@ export default function Page() {
           </p>
           <p>
             Ein eingereichter Tagesabschluss (Anzeigename, Tag, Energie, was gut
-            lief, nächster Schritt) ist unter „Reflexionen“ für angemeldete
+            lief, nächster Schritt) ist unter „Mein Tag“ für angemeldete
             Nutzer sichtbar, die ihre E-Mail bestätigt, ein eigenes Profil
             angelegt und eine Telefonnummer hinterlegt haben, mit den Zahlen des
             Tages. Darauf weist das Formular vor dem ersten Einreichen hin.
