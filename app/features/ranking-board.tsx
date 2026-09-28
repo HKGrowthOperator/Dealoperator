@@ -261,7 +261,7 @@ export default function RankingBoard({
   useEffect(() => {
     if (!justSubmitted || loading || !own || flashed.current) return;
     flashed.current = true;
-    const timer = window.setTimeout(() => showRow(own.id), 400);
+    const timer = window.setTimeout(() => showRow(own.id, false), 400);
     return () => window.clearTimeout(timer);
     // showRow ändert sich nicht in der Sache; ein Aufleuchten je Rückkehr reicht.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -391,14 +391,14 @@ export default function RankingBoard({
     if (own) showRow(own.id);
   }
   /** Zeile öffnen, hinscrollen und kurz aufleuchten lassen. */
-  function showRow(id: string) {
+  function showRow(id: string, scroll = true) {
     setSearch("");
     setOpenId(id);
     window.setTimeout(() => {
       const row = document.getElementById(`rb-row-${id}`);
       if (!row) return;
       const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+      if (scroll) row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
       // Kurzes, ruhiges Aufleuchten der eigenen Zeile.
       row.removeAttribute("data-flash");
       void row.offsetWidth;
@@ -453,7 +453,6 @@ export default function RankingBoard({
             onShowOwn={showOwn}
           />
         )}
-        {signedIn && home?.participant && <DiscordPanel url={discord} />}
 
         <section className="rb-results" id="ergebnisse" aria-labelledby="rb-results-title">
           <div className="rb-results-head">
@@ -684,6 +683,7 @@ export default function RankingBoard({
                   periodLabel={periodLabel}
                   monthly={monthly}
                   signedIn={signedIn}
+                  hasProfile={!!home?.participant}
                   onToggle={() => setOpenId((id) => (id === row.id ? null : row.id))}
                 />
               ))}
@@ -772,6 +772,7 @@ export default function RankingBoard({
           />
         )}
 
+        {signedIn && home?.participant && <DiscordPanel url={discord} />}
         <section className="rb-exchange" aria-label="Austausch">
           <Link href="/tagesabschluss#andere">
             <strong>Reflexionen lesen</strong>
@@ -1041,6 +1042,7 @@ function RankRow({
   periodLabel,
   monthly,
   signedIn,
+  hasProfile,
   onToggle,
 }: {
   row: RankingRow & { rank: number; score: number };
@@ -1051,6 +1053,8 @@ function RankRow({
   periodLabel: string;
   monthly: boolean;
   signedIn: boolean;
+  /** Mit eigenem Profil gibt es keinen „Das sind meine Zahlen“-Knopf mehr. */
+  hasProfile: boolean;
   onToggle: () => void;
 }) {
   const tier = medal(row.rank, row.score);
@@ -1132,7 +1136,7 @@ function RankRow({
               </Link>
             )
           )}
-          {!row.claimed && signedIn && (
+          {!row.claimed && signedIn && !hasProfile && (
             <p className="rb-detail-hint">Du wirst mit deinem Konto zur Übernahme geführt.</p>
           )}
         </div>
