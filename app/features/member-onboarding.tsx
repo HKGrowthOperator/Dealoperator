@@ -1,15 +1,23 @@
 "use client";
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
-import { LoaderCircle, Plus } from "lucide-react";
+import { ChevronRight, LoaderCircle, Plus, Search, UserRound } from "lucide-react";
 import { DEFAULT_PHONE_COUNTRY, normalisePhone, PHONE_COUNTRIES } from "@/lib/phone";
-import { call, FlowProgress, RequestError, useStepHeading } from "./flow-parts";
+import {
+  call,
+  FlowProgress,
+  profileMeta,
+  RequestError,
+  useStepHeading,
+  type Profile,
+} from "./flow-parts";
 
 /**
- * Profil anlegen nach bestätigter E-Mail (Weg „Ich starte neu“). Gefragt wird
- * nur, was noch fehlt: Anzeigename, Telefon nur ohne hinterlegte Nummer,
- * Sichtbarkeit. Danach geht es zum ersten Tagesabschluss. Eine
- * Profilübernahme läuft nicht hierüber, sondern über die Teamfreigabe.
+ * Profil einrichten für ein angemeldetes Konto ohne Profil. Wer schon in der
+ * Rangliste steht, erkennt zuerst sein Profil (Vorschläge zum Namen) und
+ * übernimmt es über die Teamfreigabe; wer neu ist, gibt nur den Anzeigenamen
+ * an (Telefon nur ohne hinterlegte Nummer) und trägt danach direkt den ersten
+ * Tag ein. Eine Übernahme läuft nie hierüber, sondern über die Teamfreigabe.
  */
 export default function MemberOnboarding({
   next,
@@ -17,6 +25,8 @@ export default function MemberOnboarding({
   needsPhone,
   discordUrl,
   takenProfile = "",
+  suggestions = [],
+  fromRegistration = false,
 }: {
   next: string;
   presetName: string;
@@ -24,6 +34,10 @@ export default function MemberOnboarding({
   discordUrl: string;
   /** Übernahme lief ins Leere: Profil inzwischen anderweitig zugeordnet. */
   takenProfile?: string;
+  /** Profile in der Rangliste, die zum Namen der Person passen. */
+  suggestions?: Profile[];
+  /** Direkt aus der Registrierung (E-Mail gerade bestätigt), nicht aus einer Anmeldung. */
+  fromRegistration?: boolean;
 }) {
   const id = useId();
   const [value, setValue] = useState({
@@ -36,12 +50,13 @@ export default function MemberOnboarding({
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [showForm, setShowForm] = useState(suggestions.length === 0);
   const [errors, setErrors] = useState<{ name?: string; phone?: string }>({});
   const [message, setMessage] = useState("");
   const inFlight = useRef(false);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
-  const heading = useStepHeading(done ? "done" : "form");
+  const heading = useStepHeading(done ? "done" : showForm ? "form" : "suggest");
   const later = next.startsWith("/tagesabschluss") ? "/" : next;
 
   async function submit(event: React.FormEvent) {
@@ -95,22 +110,21 @@ export default function MemberOnboarding({
             Dein Profil ist angelegt.
           </h1>
           <p className="flow-lead">
-            Als Nächstes trägst du deinen ersten Calling-Tag ein: Zahlen und ein
-            kurzer Gedanke dazu.
+            Jetzt fehlt nur noch dein erster Tag: Zahlen und zwei kurze Antworten.
           </p>
           <div className="flow-actions">
-            <Link className="btn primary full" href="/reflexionen">
-              Ersten Tagesabschluss eintragen
+            <Link className="btn primary full" href="/tagesabschluss">
+              Zahlen für heute eintragen
             </Link>
             <Link className="flow-link" href={later}>
-              Erst umsehen
+              Erst die Ergebnisse ansehen
             </Link>
           </div>
           <div className="flow-notice">
-            <strong>Austausch auf Discord</strong>
+            <strong>Calls und Roleplay laufen im Discord</strong>
             <p>
-              Im Discord trefft ihr euch zu Sessions und Roleplay und pusht euch
-              gegenseitig. Kostenfrei und freiwillig.{" "}
+              Dort findet ihr euch zum Üben und pusht euch gegenseitig. Kostenfrei und
+              freiwillig.{" "}
               <a href={discordUrl} target="_blank" rel="noopener noreferrer">
                 Discord öffnen
               </a>
@@ -120,18 +134,64 @@ export default function MemberOnboarding({
       </section>
     );
 
+  // Erst erkennen, dann anlegen: Wer schon in der Rangliste steht, übernimmt
+  // sein Profil; das Team prüft die Zuordnung, ein zweites Profil entsteht nicht.
+  if (!showForm)
+    return (
+      <section className="auth-card card flow">
+        <div className="flow-step">
+          <h1 ref={heading} tabIndex={-1}>
+            Bist du schon in der Rangliste?
+          </h1>
+          <p className="flow-lead">
+            {suggestions.length === 1
+              ? "Dieses Profil passt zu deinem Namen."
+              : "Diese Profile passen zu deinem Namen."}{" "}
+            Ist es deins, übernimm es: Das Team prüft kurz, danach gehören alle bisherigen
+            Tage zu deinem Konto.
+          </p>
+          <div className="flow-choices">
+            {suggestions.map((p) => (
+              <Link
+                key={p.id}
+                className="flow-option"
+                href={`/profil-uebernehmen?profil=${encodeURIComponent(p.id)}`}
+              >
+                <UserRound aria-hidden="true" />
+                <span>
+                  <strong>{p.name}</strong>
+                  <small>{profileMeta(p) || "Steht in der Rangliste"} · Das bin ich</small>
+                </span>
+                <ChevronRight size={18} aria-hidden="true" />
+              </Link>
+            ))}
+          </div>
+          <div className="flow-actions">
+            <button type="button" className="btn secondary full" onClick={() => setShowForm(true)}>
+              Keins davon, ich bin neu hier
+            </button>
+            <Link className="flow-link" href="/profil-uebernehmen">
+              Anderes Profil suchen
+            </Link>
+          </div>
+        </div>
+      </section>
+    );
+
   return (
     <section className="auth-card card flow">
       <div className="flow-step">
-        <FlowProgress
-          steps={["Weg wählen", "Deine Angaben", "E-Mail bestätigen", "Profil anlegen"]}
-          current={3}
-        />
+        {fromRegistration && (
+          <FlowProgress
+            steps={["Weg wählen", "Deine Angaben", "E-Mail bestätigen", "Profil anlegen"]}
+            current={3}
+          />
+        )}
         <h1 ref={heading} tabIndex={-1}>
-          E-Mail bestätigt. Leg dein Profil an.
+          {fromRegistration ? "E-Mail bestätigt. Leg dein Profil an." : "Leg dein Profil an."}
         </h1>
         <p className="flow-lead">
-          Noch dein Anzeigename, dann trägst du deinen ersten Tag ein.
+          Nur dein Anzeigename, dann trägst du deinen ersten Tag ein.
         </p>
         {takenProfile && (
           <div className="flow-alert">
@@ -141,6 +201,18 @@ export default function MemberOnboarding({
             </p>
             <Link className="btn secondary" href="/profil-uebernehmen?weg=team">
               Team um Zuordnung bitten
+            </Link>
+          </div>
+        )}
+        {!takenProfile && suggestions.length === 0 && (
+          <div className="flow-choices">
+            <Link className="flow-option" href="/profil-uebernehmen">
+              <Search aria-hidden="true" />
+              <span>
+                <strong>Meine Zahlen sind schon hier</strong>
+                <small>Profil in der Rangliste suchen und mit allen bisherigen Tagen übernehmen.</small>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
             </Link>
           </div>
         )}
@@ -244,10 +316,14 @@ export default function MemberOnboarding({
             Profil anlegen
           </button>
         </form>
-        <p className="flow-small">
-          Deine Zahlen stehen schon in der Rangliste?{" "}
-          <Link href="/profil-uebernehmen">Profil übernehmen</Link>
-        </p>
+        {suggestions.length > 0 && (
+          <p className="flow-small">
+            Doch schon in der Rangliste?{" "}
+            <button type="button" className="flow-link" onClick={() => setShowForm(false)}>
+              Zu den Vorschlägen
+            </button>
+          </p>
+        )}
       </div>
     </section>
   );

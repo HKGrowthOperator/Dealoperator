@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isTeam, safeNext } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
+import { homeState } from "@/server/home";
 import {
   bindConfirmedRequest,
   noteConfirmedAccount,
   ONBOARDING_COOKIE,
   requestIdFromCookie,
+  suggestProfiles,
 } from "@/server/onboarding";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberOnboarding from "../features/member-onboarding";
@@ -58,8 +60,17 @@ export default async function Page({
   // danach führt /passwort wieder hierher.
   if (target.pathname === "/passwort") redirect("/passwort");
 
-  // Bereits freigegebenes Profil: direkt in den eigenen Bereich.
-  if (state.participant) redirect(next);
+  // Bereits freigegebenes Profil: ohne ausdrückliches Ziel an einem
+  // Calling-Tag mit offenem Abschluss direkt zum Eintragen, sonst zu den
+  // Ergebnissen. Ausdrückliche Ziele bleiben erhalten.
+  if (state.participant) {
+    if (next === "/") {
+      const home = await homeState(db, actor);
+      if (home.today?.due && (home.today.status === "open" || home.today.status === "draft"))
+        redirect("/tagesabschluss");
+    }
+    redirect(next);
+  }
 
   // Laufende Übernahmeanfrage: Prüfstatus statt Profilformular. Es entsteht
   // ausdrücklich kein zweites Profil mit leeren Zahlen. Nach einer Ablehnung
@@ -95,6 +106,9 @@ export default async function Page({
           [requestId, actor.email, actor.userId],
         )
       : [];
+  // Wer schon in der Rangliste steht, soll sein Profil erkennen, statt ein
+  // zweites anzulegen: Vorschläge zum Namen aus der Registrierung.
+  const suggested = lost ? { profiles: [] } : await suggestProfiles(db, actor, bound?.fullName || "");
 
   return (
     <div className="operator-site">
@@ -106,6 +120,8 @@ export default async function Page({
           needsPhone={!phone}
           takenProfile={(lost?.name as string | undefined) || ""}
           discordUrl={discordDestination().url}
+          suggestions={suggested.profiles}
+          fromRegistration={!!bound}
         />
       </main>
       <OperatorFooter />
