@@ -4371,3 +4371,12 @@ li[data-medal="gold"] .rb-bar i {
   align-items: center;
   gap: 4px;
 }
+
+/* Call-Partner: der Weg in den Discord direkt unter der Überschrift. */
+.rb-discord-inline {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+}

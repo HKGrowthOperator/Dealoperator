@@ -56,6 +56,7 @@ import {
 } from "lucide-react";
 import { OperatorHeader, OperatorFooter } from "./features/operator-shell";
 import AreaNav from "./features/area-nav";
+import DiscordSteps from "./features/discord-steps";
 import {
   Dialog,
   DialogContent,
@@ -1269,6 +1270,10 @@ export default function CommunityApp({
                       </button>
                     )}
                   </PageHeading>
+                  {/* Wer Discord noch nicht kennt, sieht hier den Weg hinein. */}
+                  <section className="rb-discord-inline" aria-label="Discord">
+                    <DiscordSteps summary="Verabreden im Discord: so kommst du rein." />
+                  </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
                       Als {data.viewerRole === "admin" ? "Admin" : "Moderator"} siehst
