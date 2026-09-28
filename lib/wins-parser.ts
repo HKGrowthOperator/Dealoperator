@@ -17,8 +17,10 @@ import { metricLabels, type Counts, type Metric } from "./kpis";
  *   Auszug der betroffenen Zeile.
  *
  * Leistungstag — für welchen Tag eine Meldung zählt:
- * 1. Ausdrücklich datiert („22.9.: …“, „Nachtrag vom 22.09.: …“, am Anfang
- *    „Fr: …“) → dieser Tag. Nie mehrdeutig.
+ * 1. Ausdrücklich datiert („22.9.: …“, „Nachtrag vom 22.09.: …“, „Datum:
+ *    21.09.“ aus der Tagesvorlage, am Anfang „Fr: …“) → dieser Tag. Nie
+ *    mehrdeutig. „heute“ im Vorlagen-Etikett („Anwahlen heute: 52“) ist keine
+ *    Tagesangabe.
  * 2. Nach Mitternacht bis zur Tagesgrenze (LATE_NIGHT_CUTOFF, 06:00) →
  *    automatisch der Vortag. „heute“/„gestern“ ändern daran nichts: gemeint
  *    ist der gerade beendete Calling-Tag.
@@ -409,7 +411,8 @@ const PATTERNS: Pattern[] = [
   },
   {
     metric: "attempts",
-    words: String.raw`(?:anwahl(?:en|versuche)?|w(?:ä|ae)hlversuche|anrufe|calls|dials|telefonate)`,
+    // „Abwahlen“ ist ein häufiger Tippfehler in der Tagesvorlage der Gruppe.
+    words: String.raw`(?:anwahl(?:en|versuche)?|abwahl(?:en)?|w(?:ä|ae)hlversuche|anrufe|calls|dials|telefonate)`,
   },
   // Termine ohne Typangabe — bewusst zuletzt, damit „Setting-Termine“ und
   // „Closing-Termine“ vorher erkannt sind.
@@ -473,7 +476,13 @@ export function readMetrics(text: string): {
       // Keine Zahl direkt nach „Ziffer + Komma/Punkt“ lesen: aus „1,5 Settings“
       // darf nie „5 Settings“ werden.
       const before = new RegExp(String.raw`(^|[\s,;(])(?<!\d[.,])${NUMBER}\s*(?:x\s*)?${words}\b`, "giu");
-      const after = new RegExp(String.raw`(^|[\s,;(])${words}\s*[:=\-–]?\s*${NUMBER}\b`, "giu");
+      // Tagesvorlage der Gruppe: „Anwahlen heute: 52“, „Termine gestern: 1“.
+      // Ein Zeitwort zwischen Kennzahl und Zahl gehört zur Kennzahl; den
+      // Leistungstag liest dayMarks getrennt davon.
+      const after = new RegExp(
+        String.raw`(^|[\s,;(])${words}(?:\s+(?:heute|gestern|gesamt|insgesamt|total))?\s*[:=\-–]?\s*${NUMBER}\b`,
+        "giu",
+      );
       const forms = orientation === "before" ? [before] : orientation === "after" ? [after] : [before, after];
       for (const re of forms) {
         // In beiden Mustern ist die Zahl die zweite Gruppe; die Wortgruppen
@@ -552,10 +561,11 @@ const WEEKDAYS_DE = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", 
 const WEEKDAY_SHORT: Record<string, number> = { mo: 1, di: 2, mi: 3, do: 4, fr: 5, sa: 6, so: 7 };
 
 // Einleitende Wörter vor einer Tagesangabe am Anfang der Nachricht.
-const LEAD = String.raw`(?:(?:kurzer?\s+)?nachtr(?:ag|äge|aege)|nachgereicht|nachreichung|zahlen|stand|update|ergebnis(?:se)?|bilanz|calls|wins?)`;
+// „Datum“ steht in der Tagesvorlage der Gruppe („Datum: 21.09.“).
+const LEAD = String.raw`(?:(?:kurzer?\s+)?nachtr(?:ag|äge|aege)|nachgereicht|nachreichung|zahlen|stand|update|ergebnis(?:se)?|bilanz|calls|wins?|datum)`;
 // Dieselben Wörter mitten im Text — ohne „Stand“, „Calls“, „Wins“, die dort
 // auch anders gemeint sein können („ich stand gestern im Stau“).
-const LEAD_ANYWHERE = String.raw`(?:nachtr(?:ag|äge|aege)|nachgereicht|nachreichung|zahlen|ergebnis(?:se)?|bilanz|update)`;
+const LEAD_ANYWHERE = String.raw`(?:nachtr(?:ag|äge|aege)|nachgereicht|nachreichung|zahlen|ergebnis(?:se)?|bilanz|update|datum)`;
 const PREP = String.raw`(?:(?:von|vom|für|fuer|am|den|zu)\s+){0,2}`;
 const DATE_START = new RegExp(
   String.raw`^\s*(?:${LEAD}\s*[:\-–]?\s*)?${PREP}(\d{1,2})\.(\d{1,2})(?:\.(\d{4}|\d{2})?|(?=\s*[:\-–]))(?=[\s:\-–,]|$)`,
@@ -619,8 +629,15 @@ export type DayMarks = {
   conflict: boolean;
 };
 
+// Etikett der Tagesvorlage („Anwahlen heute: 52“): dieses „heute“ gehört zur
+// Kennzahl und ist keine Tagesangabe. Sonst landete ein Nachtrag („Datum:
+// 22.09. Nachtrag“) oder eine Meldung nach Mitternacht auf dem Tag des
+// Absendens. „Anwahlen gestern: 30“ bleibt eine Tagesangabe.
+const LABEL_TODAY = new RegExp(String.raw`(${PATTERNS.map((p) => p.words).join("|")})\s+heute\s*([:=])`, "giu");
+
 /** Tagesangaben in einer Nachricht finden (Regeln siehe Kopf der Datei). */
 export function dayMarks(text: string, messageDay: string): DayMarks {
+  text = text.replace(LABEL_TODAY, "$1$2");
   const prev = shift(messageDay, -1);
   const explicit: DayMarks["explicit"] = [];
   const clauses = text.split(CLAUSE).map((c) => c.trim()).filter(Boolean);
