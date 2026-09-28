@@ -828,6 +828,15 @@ export function parseWins({
       reasons.push(
         `Die Nachricht nennt mehrere Tage (${named.join(", ")}). Bitte die Zahlen je Tag prüfen und einzeln als „Name: …“ mit dem passenden Leistungstag einfügen.`,
       );
+    } else if (dated && dated.day < shift(m.messageDay, -14)) {
+      // Ein Datum Wochen vor der Nachricht ist meist ein Tippfehler im Monat
+      // („03.07.“ am 3. September). Nicht still übernehmen: Prüffall mit dem
+      // Tag der Nachricht als Vorschlag.
+      day = m.messageDay;
+      days = [m.messageDay, dated.day];
+      reasons.push(
+        `„${dated.from}“ liegt mehr als zwei Wochen vor der Nachricht (${shortDay(m.messageDay)}). Vorschlag: Tag der Nachricht. Bitte beim Prüffall den Tag wählen.`,
+      );
     } else if (dated) {
       day = dated.day;
       if (day !== m.messageDay) notes.push(`Leistungstag aus „${dated.from}“ abgeleitet.`);

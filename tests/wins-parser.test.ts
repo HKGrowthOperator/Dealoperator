@@ -123,6 +123,17 @@ test("the template's date line sets the day; the label word „heute“ is not a
   });
   assert.equal(heading[0].day, "2026-09-24");
   assert.equal(heading[0].status, "ok");
+  // Datum Wochen vor der Nachricht (Monat vertippt): Prüffall, Vorschlag Tag der Nachricht.
+  const typo = parseWins({
+    text: lines("[03.09.26, 21:12:00] Anna Beispiel: Datum: 03.07.", "Anwahlen heute: 118"),
+    defaultDay: "2026-09-03",
+    directory,
+    today: "2026-09-28",
+  });
+  assert.equal(typo[0].day, "2026-09-03");
+  assert.equal(typo[0].status, "review");
+  assert.equal(typo[0].review, "day");
+  assert.deepEqual(typo[0].days, ["2026-09-03", "2026-07-03"]);
 });
 
 test("incremental phrasing and contradictions are flagged, never guessed", () => {
