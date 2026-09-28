@@ -65,6 +65,66 @@ test("metric words map to the defined metrics; untyped appointments never become
   assert.deepEqual(readMetrics("4 erreicht, 4 Follow-ups").metrics, {});
 });
 
+test("the group's daily template: a time word between metric and number belongs to the metric", () => {
+  // Vorlage aus der Gruppe (Werte erfunden): jede Angabe in einer Zeile.
+  const template = [
+    "Datum: 18.08.26",
+    "Anwahlen heute: 52",
+    "Entscheider gesprochen: 20",
+    "Termine: 1",
+    "Energielevel 1 bis 10: 5",
+  ].join("\n");
+  assert.deepEqual(readMetrics(template).metrics, { attempts: 52, legacyMeetings: 1 });
+  assert.deepEqual(readMetrics("Abwahlen heute: 40\nTermine: 0").metrics, { attempts: 40, legacyMeetings: 0 });
+  assert.deepEqual(readMetrics("Anwahlen gestern: 30").metrics, { attempts: 30 });
+  assert.deepEqual(readMetrics("Settings heute: 2, Closings gesamt: 1").metrics, {
+    settingsBooked: 2,
+    closingsBooked: 1,
+  });
+  // Das Datum und die Energie werden nicht zu Kennzahlen.
+  assert.equal(readMetrics(template).uncertain, false);
+});
+
+test("the template's date line sets the day; the label word „heute“ is not a day statement", () => {
+  const lines = (...l: string[]) => l.join("\n");
+  // Nachtrag am Folgetag mit Datum in der Vorlage: zählt für den genannten Tag.
+  const late = parseWins({
+    text: lines("[23.09.26, 21:14:00] Anna Beispiel: Datum: 22.09.26 Nachtrag", "Anwahlen heute: 40", "Termine: 1"),
+    defaultDay: "2026-09-23",
+    directory,
+    today: "2026-09-28",
+  });
+  assert.equal(late[0].day, "2026-09-22");
+  assert.equal(late[0].status, "ok");
+  assert.equal(late[0].metrics.attempts, 40);
+  // Nach Mitternacht ohne Datum: der gerade beendete Calling-Tag, trotz „heute“ im Etikett.
+  const night = parseWins({
+    text: lines("[24.09.26, 00:40:00] Emil Test: Anwahlen heute: 60", "Termine: 0"),
+    defaultDay: "2026-09-24",
+    directory,
+    today: "2026-09-28",
+  });
+  assert.equal(night[0].day, "2026-09-23");
+  // Am Abend ohne Datum: der Tag der Nachricht.
+  const evening = parseWins({
+    text: lines("[24.09.26, 19:05:00] Emil Test: Anwahlen heute: 70"),
+    defaultDay: "2026-09-24",
+    directory,
+    today: "2026-09-28",
+  });
+  assert.equal(evening[0].day, "2026-09-24");
+  assert.equal(evening[0].status, "ok");
+  // Datum mitten in der Nachricht, nach einer Kopfzeile.
+  const heading = parseWins({
+    text: lines("[25.09.26, 08:10:00] Anna Beispiel: Cold Calling", "Datum: 24.09.26", "Anwahlen heute: 33"),
+    defaultDay: "2026-09-25",
+    directory,
+    today: "2026-09-28",
+  });
+  assert.equal(heading[0].day, "2026-09-24");
+  assert.equal(heading[0].status, "ok");
+});
+
 test("incremental phrasing and contradictions are flagged, never guessed", () => {
   assert.equal(readMetrics("noch ein Setting").increment, true);
   assert.equal(readMetrics("2. Termin gelegt").increment, true);
