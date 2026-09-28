@@ -27,11 +27,13 @@ export function Choice({
   value,
   onChange,
   options,
+  optionLabel = (o) => o,
 }: {
   label: string;
   value: string;
   onChange: (s: string) => void;
   options: string[];
+  optionLabel?: (option: string) => string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
@@ -41,7 +43,7 @@ export function Choice({
       <SelectContent>
         {options.map((o) => (
           <SelectItem key={o} value={o}>
-            {o}
+            {optionLabel(o)}
           </SelectItem>
         ))}
       </SelectContent>

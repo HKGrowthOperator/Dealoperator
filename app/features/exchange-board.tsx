@@ -19,6 +19,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import type { AppData } from "../data";
 import { Choice, Initials, Time, ConfirmAction, type Mutate } from "./shared";
+
+/** Anzeige der Beitragsart; der gespeicherte Wert bleibt „Learning“. */
+const CATEGORY_LABEL: Record<string, string> = { Learning: "Erfahrung" };
+const categoryLabel = (category: string) => CATEGORY_LABEL[category] ?? category;
 export default function ExchangeBoard({
   data,
   mutate,
@@ -75,7 +79,7 @@ export default function ExchangeBoard({
             <TabsList>
               {["Alle", "Learning", "Frage", "Feedback", "Mindset"].map((t) => (
                 <TabsTrigger key={t} value={t}>
-                  {t}
+                  {categoryLabel(t)}
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -103,7 +107,7 @@ export default function ExchangeBoard({
                   <Time value={p.created} />
                 </small>
               </span>
-              <span className="tag">{p.category}</span>
+              <span className="tag">{categoryLabel(p.category)}</span>
             </div>
             <button
               className="discussion-title"
@@ -199,6 +203,7 @@ export default function ExchangeBoard({
                 label="Art des Beitrags"
                 value={draft.category}
                 options={["Learning", "Frage", "Feedback", "Mindset"]}
+                optionLabel={categoryLabel}
                 onChange={(v) => setDraft({ ...draft, category: v })}
               />
             </label>
@@ -237,7 +242,7 @@ export default function ExchangeBoard({
           <DialogHeader>
             <DialogTitle>{post?.title}</DialogTitle>
             <DialogDescription>
-              {post?.name} · {post?.category} ·{" "}
+              {post?.name} · {categoryLabel(post?.category ?? "")} ·{" "}
               {demo ? "Beispielbeitrag" : "Beitrag im Austausch"}
             </DialogDescription>
           </DialogHeader>

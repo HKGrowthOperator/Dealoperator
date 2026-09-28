@@ -1687,9 +1687,8 @@ td .tag {
   margin-bottom: 8px;
 }
 .session-principles p {
-  font-size: 13px;
-  line-height: 1.85;
-  color: #99a4b2;
+  font-size: 15px;
+  line-height: 1.7;
 }
 [data-slot="tabs-list"] {
   background: #eaeef2;
@@ -2771,7 +2770,7 @@ td .tag {
     font-size: 14px;
   }
   .session-principles p {
-    font-size: 13px;
+    font-size: 15px;
   }
   .session-principles h3 {
     margin-bottom: 6px;
@@ -3092,7 +3091,7 @@ td .tag {
     font-size: 16px;
   }
   .session-principles p {
-    font-size: 14px;
+    font-size: 15px;
   }
   .resource-body p {
     font-size: 14px;
@@ -3448,7 +3447,7 @@ body {
   font-size: 18px;
 }
 .session-principles p {
-  font-size: 14px;
+  font-size: 15px;
 }
 .session-roster h3 {
   margin-bottom: 12px;
@@ -4345,7 +4344,7 @@ th {
     min-height: 38px;
   }
   .session-principles p {
-    font-size: 14px;
+    font-size: 15px;
   }
   .date-tile span {
     font-size: 13px;

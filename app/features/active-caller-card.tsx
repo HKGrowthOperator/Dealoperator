@@ -44,12 +44,10 @@ export default function ActiveCallerCard({
           <Flame size={22} />
         </span>
         <div>
-          <p className="ac-kicker">Aktive Calling-Tage</p>
           <strong>Du bist Aktiver Caller</strong>
           <p>
             {state.since ? `Freigeschaltet am ${day(state.since)}. ` : ""}
-            Sessions &amp; Roleplay stehen dir offen, im Discord trägst du den Rang
-            „Aktiver Caller“.
+            Sessions und Roleplay stehen dir offen, im Discord trägst du den Rang.
           </p>
           {state.idle > 0 && (
             <p className="ac-warn">
@@ -69,7 +67,6 @@ export default function ActiveCallerCard({
         <Lock size={20} />
       </span>
       <div>
-        <p className="ac-kicker">Aktive Calling-Tage</p>
         <strong>
           {left === 1 ? "Noch 1 aktiver Calling-Tag" : `Noch ${left} aktive Calling-Tage`} bis
           zum Rang „Aktiver Caller“
@@ -83,9 +80,8 @@ export default function ActiveCallerCard({
         </div>
         {!compact && (
           <p>
-            Damit schaltest du Sessions &amp; Roleplay frei und bekommst im Discord den Rang
-            „Aktiver Caller“. Nach {ACTIVE_LOST_AFTER_IDLE} Calling-Tagen in Folge ohne
-            Anwahlen ist er wieder weg.
+            Damit stehen dir Sessions und Roleplay offen, im Discord bekommst du den Rang.
+            Nach {ACTIVE_LOST_AFTER_IDLE} Calling-Tagen in Folge ohne Anwahlen ist er wieder weg.
             {team ? " Als Team hast du schon jetzt Zugang zu allen Sessions." : ""}
           </p>
         )}

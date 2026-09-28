@@ -245,18 +245,6 @@ export default async function Page() {
               <strong>Gleichstände teilen sich einen Platz.</strong> Stehen drei Personen auf
               Platz 2, folgt Platz 5.
             </li>
-            <li>
-              <strong>Tag und Monat stehen getrennt.</strong> Der Verlauf zeigt jeden Tag einzeln,
-              keine laufende Summe.
-            </li>
-            <li>
-              <strong>Gemeinsame Meldungen zählen genau einmal.</strong> Sie bekommen keinen
-              eigenen Platz; aufgeteilte Werte sind als zugeteilt gekennzeichnet.
-            </li>
-            <li>
-              <strong>Ehrlich bei leeren Tagen.</strong> Ist für heute noch nichts gemeldet, zeigt
-              die Startseite den letzten gemeldeten Tag und sagt das dazu.
-            </li>
           </ul>
         </section>
 
@@ -296,6 +284,23 @@ export default async function Page() {
                 Zahlen“. Nach der Prüfung durch das Team gehört das Profil mit allen bisherigen
                 Tagen zu deinem Konto. Es entsteht kein zweites Profil.
               </p>
+            </details>
+            <details>
+              <summary>Weitere Zählregeln</summary>
+              <ul className="hw-rules">
+                <li>
+                  <strong>Tag und Monat stehen getrennt.</strong> Der Verlauf zeigt jeden Tag einzeln,
+                  keine laufende Summe.
+                </li>
+                <li>
+                  <strong>Gemeinsame Meldungen zählen genau einmal.</strong> Sie bekommen keinen
+                  eigenen Platz; aufgeteilte Werte sind als zugeteilt gekennzeichnet.
+                </li>
+                <li>
+                  <strong>Ehrlich bei leeren Tagen.</strong> Ist für heute noch nichts gemeldet, zeigt
+                  die Startseite den letzten gemeldeten Tag und sagt das dazu.
+                </li>
+              </ul>
             </details>
           </div>
         </section>

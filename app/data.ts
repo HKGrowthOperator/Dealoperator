@@ -16,8 +16,8 @@ export const labels: Record<View, string> = {
   zahlen: "Meine Tage",
   reflexion: "Tägliche Reflexion",
   partner: "Call-Partner",
-  sessions: "Sessions & Roleplay",
-  wissen: "Wissen & Feedback",
+  sessions: "Sessions und Roleplay",
+  wissen: "Wissen und Feedback",
   profil: "Mein Profil",
 };
 export function dateKey(d = new Date()) {

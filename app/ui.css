@@ -2374,11 +2374,6 @@ li[data-open] .rb-chevron {
   margin-bottom: var(--space-5);
   border-radius: var(--radius-l);
 }
-.ac-card .ac-kicker {
-  font-size: var(--text-label);
-  letter-spacing: 0;
-  text-transform: none;
-}
 .ac-card.ac-card[data-active] {
   background: var(--do-blue);
   box-shadow: none;
