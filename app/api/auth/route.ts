@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { authClient, authReady, getCurrentUser, safeNext, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
+import { homeState } from "@/server/home";
 import { AppError, clearRateLimit, rateLimit } from "@/server/operator";
 import { body, errorResponse, json } from "@/server/http";
 import {
@@ -21,11 +22,24 @@ const email = z
   .email("Bitte prüfe deine E-Mail-Adresse.")
   .max(254);
 
-/** Für das Kontosymbol im Kopf: angemeldet ja/nein, sonst nichts. */
+/**
+ * Für Kopf und Reiterleiste: angemeldet ja/nein, Rolle, und ob es ein Profil
+ * und heute noch etwas einzutragen gibt. Keine Kontaktdaten.
+ */
 export async function GET() {
   try {
     const actor = authReady() ? await getCurrentUser() : null;
-    return json(viewerOf(actor));
+    if (!actor || !databaseReady()) return json(viewerOf(actor));
+    try {
+      const home = await homeState(database(), actor);
+      return json({
+        ...viewerOf(actor),
+        hasProfile: !!home.participant,
+        today: home.today?.status ?? null,
+      });
+    } catch {
+      return json(viewerOf(actor));
+    }
   } catch (e) {
     return errorResponse(e);
   }

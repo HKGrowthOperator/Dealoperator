@@ -14,6 +14,10 @@ export type Viewer = {
   hasPassword: boolean;
   team: boolean;
   role?: "admin" | "moderator" | null;
+  /** Eigenes Profil vorhanden; ohne Profil gibt es nichts einzutragen. */
+  hasProfile?: boolean;
+  /** Stand des eigenen Tages heute, falls bekannt. */
+  today?: "open" | "draft" | "done" | "imported" | null;
 };
 
 // Ein Abruf je Seitenaufruf, geteilt von Kopf, Reiterleiste und Kontomenü.
@@ -28,6 +32,8 @@ export function loadViewer(): Promise<Viewer | null> {
             hasPassword: !!data.hasPassword,
             team: !!data.team,
             role: data.role === "admin" || data.role === "moderator" ? data.role : null,
+            hasProfile: typeof data.hasProfile === "boolean" ? data.hasProfile : undefined,
+            today: ["open", "draft", "done", "imported"].includes(data.today) ? data.today : null,
           }
         : null,
     )
@@ -171,8 +177,13 @@ export function OperatorHeader({
                 </Link>
               </>
             )}
-            {/* Die Hauptsache auf jeder Seite; wo eingetragen wird, nicht doppelt. */}
-            {signedIn && !onEntry && (
+            {/* Die Hauptsache auf jeder Seite; wo eingetragen wird, nicht doppelt.
+                Ohne Profil gibt es nichts einzutragen, nach dem Einreichen nichts mehr. */}
+            {signedIn &&
+              !onEntry &&
+              viewer?.hasProfile !== false &&
+              viewer?.today !== "done" &&
+              viewer?.today !== "imported" && (
               <Link className="do-button do-button-primary do-header-cta" href="/tagesabschluss">
                 <PencilLine size={17} aria-hidden="true" />
                 <span className="do-cta-long">Zahlen eintragen</span>

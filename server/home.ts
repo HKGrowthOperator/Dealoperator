@@ -109,7 +109,6 @@ export async function viewerState() {
   } catch {
     actor = null;
   }
-  const viewer = viewerOf(actor);
   let home: HomeState | null = null;
   if (actor && databaseReady()) {
     try {
@@ -118,5 +117,9 @@ export async function viewerState() {
       home = null;
     }
   }
+  // Der Kopf weiß so, ob es ein Profil und heute noch etwas einzutragen gibt.
+  const viewer = home
+    ? { ...viewerOf(actor), hasProfile: !!home.participant, today: home.today?.status ?? null }
+    : viewerOf(actor);
   return { viewer, home };
 }
