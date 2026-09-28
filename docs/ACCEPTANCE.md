@@ -93,14 +93,15 @@ Mobil (360/390/430) und Desktop (1280) prüfen:
 
 1. Neuer Besuch: gemeinsame Ergebnisse stehen vor den Erklärungen; „Kostenfrei starten“ und „Meine Zahlen sind schon hier“ sind getrennt.
 2. Eigenen Namen in der Rangliste suchen, Zeile aufklappen, „Das sind meine Zahlen“: Übernahme genau dieses Profils.
-3. Anmeldung ohne Ziel landet auf der Startseite mit dem Abschnitt „Mein Tag“.
+3. Anmeldung ohne Ziel landet an einem Calling-Tag mit offenem Abschluss direkt im Formular unter Mein Tag („Du trägst ein als …“); sonst auf der Startseite mit dem Abschnitt „Mein Tag“.
+3a. Konto ohne Profil: zuerst „Bist du schon in der Rangliste?“ mit den Profilen, die zum Namen passen; „Das bin ich“ führt in die Übernahme (Teamfreigabe bleibt), „Keins davon“ zum Anlegen. Ohne Treffer steht „Meine Zahlen sind schon hier“ als Karte über dem Formular.
 4. Anmeldung mit Ziel (Tagesabschluss, Reflexionen, Verwaltung) landet genau dort.
-5. Zahlen und Reflexion einreichen: Bestätigung nennt Tag und tatsächliche Folgen; Erinnerungen werden einmal angeboten.
+5. Zahlen und Reflexion unter Mein Tag einreichen: Es geht direkt zu den Ergebnissen des Tages; die Karte „Mein Tag“ nennt Tag, tatsächliche Folgen und den eigenen Platz mit Zahlen, die eigene Zeile wird angesteuert und leuchtet kurz auf; Erinnerungen werden dort einmal angeboten. Nichts davon steht in der Adresse.
 6. Fehlende Telefonnummer: früher Hinweis, Nummer im Profil ergänzen, zurück zum Tagesabschluss, Entwurf ist noch da.
-7. Nach dem Einreichen zeigt die Startseite „Heute abgeschlossen“.
+7. Nach dem Einreichen zeigt die Startseite „Dein Tag ist drin.“ mit „Reflexionen lesen“ und „Eintrag ansehen oder korrigieren“.
 8. Tag und Monat getrennt; historische Links behalten den Tag (eine Kennzahl im Link führt zur einen Rangliste, `dranbleiben` zur Serie); Verlauf zeigt Anwahlen je Tag und Platz 1 nach Wertung.
 9. Gleichstand: alle gleichplatzierten Personen stehen mit derselben Platzzahl und Gestaltung in der Liste. Die Reihenfolge folgt der verdeckten Wertung (Deal 10, Closing vereinbart 5, Setting vereinbart 3, Anwahl 1, +15 je Tag ab 100 Anwahlen), nicht der Reihenfolge der Eingabe; Punkte stehen nirgends, jede Zeile zeigt Anwahlen, Settings und Closings.
-9a. Mein Tag ohne `?tag`: Stand für heute und nächster Schritt, kein Formular; mit `?tag=` das Formular für genau diesen Tag.
+9a. Mein Tag ohne `?tag`: direkt das Formular für heute, keine Zwischenseite; mit `?tag=` das Formular für genau diesen Tag. Darunter Serie und Level.
 10. Reflexionen: ohne Zugang nur Nutzen und Weg hinein, keine Inhalte. Mit Zugang und offenem Tag zuerst nur das eigene Blatt (keine Karten, kein Kopfknopf „Zahlen eintragen“); nach dem Einreichen ohne Scrollen die Bestätigung mit „Eintrag korrigieren“ und darunter die Beiträge des Tages, der eigene dabei. Mit eingereichtem Tag sofort die Beiträge.
 11. Discord-Knöpfe sagen vor dem Klick, dass Discord geöffnet wird.
 12. Lange Namen umbrechen, Tastatur funktioniert (Tableiste weicht der Bildschirmtastatur), größere Schrift ohne seitliches Scrollen.
