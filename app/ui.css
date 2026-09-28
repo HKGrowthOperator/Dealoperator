@@ -4323,3 +4323,45 @@ li[data-medal="gold"] .rb-bar i {
     text-align: left;
   }
 }
+
+/* Mein Tag: kompakt am Handy. Die drei Zahlen nebeneinander, Etikett über dem
+   Feld, Hinweise nur ab Tablet; darunter Serie und Level, dann die anderen. */
+@media (max-width: 639px) {
+  .md .md-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+  .md .md-counts .cm-count {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: space-between;
+    padding: var(--space-2);
+    border: 1px solid var(--do-line);
+    border-radius: var(--radius-m);
+    background: var(--do-surface);
+  }
+  .md .md-counts .cm-count:first-child {
+    border-top: 1px solid var(--do-line);
+  }
+  .md .md-counts .cm-count label {
+    font-size: var(--text-label);
+    line-height: 1.25;
+  }
+  .md .md-counts .cm-count label small {
+    display: none;
+  }
+  .md .md-counts .cm-count input {
+    min-height: 48px;
+    text-align: center;
+    font-size: 22px;
+  }
+}
+.md-skip {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-label);
+}
+.md-others {
+  margin: var(--space-6) 0 var(--space-3);
+  font-size: var(--text-heading);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
