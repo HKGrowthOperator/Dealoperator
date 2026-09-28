@@ -248,7 +248,7 @@ export default function CommitmentDashboard({
   return (
     <section className="cm-card cm-dashboard" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
-        <h2 id={`${uid}-title`}>Abschluss-Serie</h2>
+        <h2 id={`${uid}-title`}>Serie</h2>
       </header>
       <details className="cm-rules-note">
         <summary>So zählt die Serie</summary>
@@ -289,7 +289,7 @@ export default function CommitmentDashboard({
           </p>
         </div>
         <div>
-          <dt>Abschlüsse</dt>
+          <dt>Ab&shy;schlüsse</dt>
           <dd>
             <strong>{summary.closedDays}</strong>
           </dd>
@@ -315,10 +315,7 @@ export default function CommitmentDashboard({
         <p className="cm-note">
           {summary.missingOpen > 0
             ? `${plural(summary.missingOpen, "Calling-Tag", "Calling-Tage")} ohne Abschluss. Nachgetragen zählen die Zahlen.`
-            : "Zuletzt gab es ein paar Calling-Tage ohne Anwahlen."}{" "}
-          {summary.inactive
-            ? "Ein kurzer Calling-Block reicht zum Wiedereinstieg; brauchst du Abstand, melde eine Pause."
-            : ""}
+            : "Zuletzt gab es ein paar Calling-Tage ohne Anwahlen."}
         </p>
       )}
 
@@ -389,12 +386,6 @@ export default function CommitmentDashboard({
             </li>
           ))}
         </ul>
-        {calendar?.month === month && (
-          <p className="cm-muted">
-            Im {monthName(month)}: {plural(calendar.closedDays, "Tag", "Tage")} abgeschlossen,{" "}
-            {plural(calendar.activeDays, "Tag", "Tage")} mit Anwahlen.
-          </p>
-        )}
         {catchUp.length > 0 && (
           <details className="cm-catchup" open={catchUp.length <= 2 || undefined}>
             <summary>

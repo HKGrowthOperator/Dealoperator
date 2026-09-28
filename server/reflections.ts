@@ -121,6 +121,8 @@ export async function reflectionFeed(
   return {
     allowed: true as const,
     missing: [],
+    // Die eigene Karte braucht keinen Antwort-Knopf.
+    me: access.participant?.id ?? null,
     cards,
     people: people.map((p) => ({ id: p.id as string, name: p.name as string })),
     next:

@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { closingState } from "@/server/closing";
-import { homeState } from "@/server/home";
+import { homeState, type HomeState } from "@/server/home";
 import { reflectionFeed } from "@/server/reflections";
 import { berlinDate, daySchema } from "@/lib/kpis";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
@@ -11,6 +12,7 @@ import type { ReflectionFeedData } from "../features/reflection-feed";
 import DayEntry from "../features/day-entry";
 import DayView, { type TodayStatus } from "../features/day-view";
 import DayProgress from "../features/day-progress";
+import { dayState } from "../features/day-state";
 import "../commitment.css";
 
 export const dynamic = "force-dynamic";
@@ -66,10 +68,11 @@ export default async function Page({
   let status: TodayStatus | null = null;
   let due = true;
   let summary = "";
+  let home: HomeState | null = null;
   if (databaseReady()) {
     try {
       const db = database();
-      const home = await homeState(db, actor, today);
+      home = await homeState(db, actor, today);
       name = home.participant?.name ?? "";
       status = home.today?.status ?? null;
       due = home.today?.due ?? true;
@@ -92,8 +95,12 @@ export default async function Page({
       feed = null;
     }
   }
-  const entering = !!day || (status !== "done" && status !== "imported");
-
+  // Ohne Profil, aber mit laufender Übernahme: kein Formular, keine
+  // Checkliste, nur der Stand mit dem Weg zur Prüfung.
+  const waiting =
+    home && !home.participant && home.request && ["pending", "info_needed"].includes(home.request.status)
+      ? dayState(home)
+      : null;
   return (
     <div className="operator-site">
       <OperatorHeader viewer={{ ...viewerOf(actor), hasProfile: !!name, today: status }} />
@@ -101,17 +108,24 @@ export default async function Page({
         <div className="do-page-head md-page-head">
           <div>
             <h1>Mein Tag</h1>
-            <p>
-              {name ? (
-                <>
-                  Du trägst ein als <strong>{name}</strong>.
-                </>
-              ) : null}
-              {entering ? " Zahlen und zwei kurze Antworten, dann zählt dein Tag." : ""}
-            </p>
+            {name ? (
+              <p>
+                Du trägst ein als <strong>{name}</strong>.
+              </p>
+            ) : null}
           </div>
         </div>
-        {day ? (
+        {waiting ? (
+          <section className="rf-done" data-tone="info">
+            <div>
+              <strong>{waiting.title}</strong>
+              <p>{waiting.text}</p>
+              <Link className="do-button do-button-secondary" href={waiting.href}>
+                {waiting.action}
+              </Link>
+            </div>
+          </section>
+        ) : day ? (
           <>
             <DayEntry day={day} today={today} initial={initial} />
             <DayProgress initial={initial} />

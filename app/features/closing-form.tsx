@@ -613,7 +613,7 @@ export function confirmationEffect(c: Confirmation): string | null {
   const text = CONFIRM_STATUS[c.status];
   if (!text) return null;
   return c.streak !== null && (c.status === "called" || c.status === "reflected")
-    ? `${c.status === "reflected" ? "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen." : "Rechtzeitig eingereicht."} Deine Abschluss-Serie steht bei ${c.streak} ${c.streak === 1 ? "Tag" : "Tagen"}.`
+    ? `${c.status === "reflected" ? "Rechtzeitig mit Reflexion, auch mit 0 Anwahlen." : "Rechtzeitig eingereicht."} Deine Serie steht bei ${c.streak} ${c.streak === 1 ? "Tag" : "Tagen"}.`
     : text;
 }
 const CONFIRM_STATUS: Partial<Record<DayStatus, string>> = {
@@ -1014,27 +1014,13 @@ export default function ClosingForm({
 
   // ---- Darstellung --------------------------------------------------------
 
+  // Das Speichern läuft still; sichtbar wird nur, wenn es nicht geklappt hat.
   const draftLine = (() => {
     if (!canDraft) return null;
     const s = draftStatus;
-    if ((s.kind === "pending" || s.kind === "saving") && s.day === form.day)
-      return { tone: "", text: "Entwurf wird gespeichert …" };
-    if (s.kind === "saved" && s.day === form.day)
-      return {
-        tone: "ok",
-        text: `Entwurf gespeichert um ${formatClock(s.at, tz)} Uhr. Er ist privat und zählt erst nach dem Einreichen.`,
-      };
     if (s.kind === "error" && s.day === form.day)
       return { tone: "error", text: `Entwurf nicht gespeichert: ${s.message}` };
-    if (form.draftAt)
-      return {
-        tone: "",
-        text: `Entwurf vom ${formatMoment(form.draftAt, tz)} geladen. Er ist privat und zählt erst nach dem Einreichen.`,
-      };
-    return {
-      tone: "",
-      text: "Wird automatisch als privater Entwurf gespeichert. Zählt erst nach dem Einreichen.",
-    };
+    return null;
   })();
 
   // Stand des Tages in einem Wort: eingereicht, Entwurf, unvollständig, offen.
@@ -1200,7 +1186,7 @@ export default function ClosingForm({
     <section className="cm-card cm-closing md-closing" aria-labelledby={`${uid}-title`}>
       <header className="md-head">
         <div>
-          <p className="md-kicker">{form.day === today ? "Heute" : "Nachtrag"}</p>
+          {form.day !== today && <p className="md-kicker">Nachtrag</p>}
           <h2 id={`${uid}-title`}>{formatLongDay(form.day)}</h2>
         </div>
         <span className={`md-badge md-badge-${confirmed ? "done" : badge.tone}`}>
@@ -1297,15 +1283,6 @@ export default function ClosingForm({
         </div>
       ) : canDraft && !confirmed ? (
         <form className="cm-form" onSubmit={submit} noValidate>
-          {submitted && (
-            <p className="md-info">
-              <ShieldCheck size={18} aria-hidden="true" />
-              <span>
-                Eingereicht{submitted.submittedAt ? ` am ${formatMoment(submitted.submittedAt, tz)}` : ""}.
-                Änderungen gelten erst, wenn du sie erneut einreichst.
-              </span>
-            </p>
-          )}
           {prefilled && (
             <p className="md-info">
               <ShieldCheck size={18} aria-hidden="true" />
@@ -1318,10 +1295,7 @@ export default function ClosingForm({
           {dayNote && <p className="md-day-note">{dayNote}</p>}
 
           <fieldset className="cm-group">
-            <legend>
-              Deine Zahlen
-              <small>0 ist eine gültige Angabe.</small>
-            </legend>
+            <legend>Deine Zahlen</legend>
             <div className="cm-counts md-counts">{counts(REQUIRED_COUNTS, true)}</div>
             <button
               type="button"
@@ -1398,21 +1372,17 @@ export default function ClosingForm({
               "Wobei wünschst du dir Unterstützung?",
               "Privat: Das liest nur das Team, nicht die anderen.",
               false,
-              "Optional",
+              "Zum Beispiel: Einwände bei der Preisfrage.",
             )}
           </fieldset>
 
           {needsAcknowledgement && (
             <fieldset className="cm-group cm-visibility">
-              <legend>Wer sieht deinen Tagesabschluss?</legend>
+              <legend>Wer sieht was?</legend>
               <ul className="md-visibility">
-                <li>
-                  Deine Zahlen stehen mit deinem Anzeigenamen in Rangliste und gemeinsamer Summe.
-                </li>
-                <li>
-                  Deine Reflexion lesen Angemeldete mit eigenem Profil unter Mein Tag; deinen
-                  Wunsch nach Unterstützung nur das Team.
-                </li>
+                <li>Zahlen: alle in der Rangliste.</li>
+                <li>Reflexion: angemeldete Mitglieder unter Mein Tag.</li>
+                <li>Unterstützungswunsch: nur das Team.</li>
               </ul>
               <label className={`cm-check ${ackError ? "invalid" : ""}`}>
                 <input
@@ -1431,7 +1401,7 @@ export default function ClosingForm({
                 <span>
                   Verstanden
                   <span className="cm-required" aria-hidden="true"> *</span>
-                  <small>Dieser Hinweis erscheint nur vor deinem ersten Abschluss.</small>
+                  <small>Nur beim ersten Mal.</small>
                 </span>
               </label>
               {ackError && (
@@ -1478,11 +1448,6 @@ export default function ClosingForm({
           <div className="md-submit">
             {draftLine && (
               <p className={`cm-draft-line ${draftLine.tone}`} aria-live="polite">
-                {draftStatus.kind === "saving" || draftStatus.kind === "pending" ? (
-                  <LoaderCircle className="spin" size={15} aria-hidden="true" />
-                ) : draftLine.tone === "ok" ? (
-                  <Check size={15} aria-hidden="true" />
-                ) : null}
                 {draftLine.text}
               </p>
             )}

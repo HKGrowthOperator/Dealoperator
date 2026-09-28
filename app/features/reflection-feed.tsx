@@ -1,7 +1,13 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { CircleAlert, ExternalLink, LoaderCircle, MessageCircle, RefreshCw } from "lucide-react";
+import {
+  CircleAlert,
+  ExternalLink,
+  LoaderCircle,
+  MessageCircle,
+  RefreshCw,
+} from "lucide-react";
 import { shortMetricLabels, berlinDate } from "@/lib/kpis";
 import {
   ApiError,
@@ -39,6 +45,8 @@ export type ReflectionFeedData = {
   cards: ReflectionCard[];
   people: { id: string; name: string }[];
   next?: string | null;
+  /** Eigene Teilnehmer-ID: die eigene Karte zeigt keinen Antwort-Knopf. */
+  me?: string | null;
 };
 type Filter = { tag: string; person: string };
 
@@ -67,7 +75,7 @@ function query(filter: Filter, before?: string) {
   return `/api/reflections${q ? `?${q}` : ""}`;
 }
 
-function Card({ card }: { card: ReflectionCard }) {
+function Card({ card, own = false }: { card: ReflectionCard; own?: boolean }) {
   const numbers = card.numbers
     ? COUNT_KEYS.filter((k) => typeof card.numbers?.[k] === "number")
     : [];
@@ -80,17 +88,23 @@ function Card({ card }: { card: ReflectionCard }) {
         <div>
           <h3>{card.name}</h3>
           <p>
-            Leistungstag <time dateTime={card.day}>{formatFullDay(card.day)}</time>
+            Leistungstag{" "}
+            <time dateTime={card.day}>{formatFullDay(card.day)}</time>
             <span className="cm-dot" aria-hidden="true">
               ·
             </span>
-            <span className="cm-muted">eingereicht {submittedText(card.submittedAt)}</span>
+            <span className="cm-muted">
+              eingereicht {submittedText(card.submittedAt)}
+            </span>
           </p>
         </div>
       </header>
 
       <div className="cm-feed-meta">
-        <div className="cm-energy-read" aria-label={`Energie ${card.energy} von 10`}>
+        <div
+          className="cm-energy-read"
+          aria-label={`Energie ${card.energy} von 10`}
+        >
           <span>Energie</span>
           <span className="cm-energy-bar" aria-hidden="true">
             {Array.from({ length: 10 }, (_, i) => (
@@ -100,7 +114,9 @@ function Card({ card }: { card: ReflectionCard }) {
           <strong>{card.energy}/10</strong>
         </div>
         {card.numbers === null ? (
-          <p className="cm-muted cm-small">Zahlen nicht öffentlich freigegeben.</p>
+          <p className="cm-muted cm-small">
+            Zahlen nicht öffentlich freigegeben.
+          </p>
         ) : numbers.length > 0 ? (
           <dl className="cm-feed-numbers">
             {numbers.map((k) => (
@@ -121,29 +137,40 @@ function Card({ card }: { card: ReflectionCard }) {
         {/* Der Unterstützungswunsch geht nur an das Team, nie in den Austausch. */}
       </div>
 
-      <footer className="rf-reply">
-        <a href={card.reply.url} target="_blank" rel="noopener noreferrer">
-          <MessageCircle size={16} aria-hidden="true" />
-          Auf Discord antworten
-          <ExternalLink size={14} aria-hidden="true" />
-        </a>
-        <span>
-          {card.reply.kind === "post"
-            ? "Öffnet den Beitrag in Discord."
-            : "Öffnet Discord. Schreib dort im Austausch."}
-        </span>
-      </footer>
-
+      {!own && (
+        <footer className="rf-reply">
+          <a href={card.reply.url} target="_blank" rel="noopener noreferrer">
+            <MessageCircle size={16} aria-hidden="true" />
+            Auf Discord antworten
+            <ExternalLink size={14} aria-hidden="true" />
+          </a>
+          <span>
+            {card.reply.kind === "post"
+              ? "Öffnet den Beitrag in Discord."
+              : "Öffnet Discord. Schreib dort im Austausch."}
+          </span>
+        </footer>
+      )}
     </article>
   );
 }
 
-export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedData | null }) {
+export default function ReflectionFeed({
+  initial,
+}: {
+  initial?: ReflectionFeedData | null;
+}) {
   const uid = useId();
   const [feed, setFeed] = useState<ReflectionFeedData | null>(initial ?? null);
   const [filter, setFilter] = useState<Filter>({ tag: "", person: "" });
-  const [loading, setLoading] = useState<"list" | "more" | null>(initial ? null : "list");
-  const [error, setError] = useState<{ text: string; status: number } | null>(null);
+  // Die Filterkarte bleibt bei wenigen Beiträgen eingeklappt, ein Link holt sie.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loading, setLoading] = useState<"list" | "more" | null>(
+    initial ? null : "list",
+  );
+  const [error, setError] = useState<{ text: string; status: number } | null>(
+    null,
+  );
   const request = useRef(0);
 
   const load = useCallback(async (next: Filter, before?: string) => {
@@ -163,7 +190,12 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
       const err = e as ApiError;
       const data = err.data as Partial<ReflectionFeedData>;
       if (err.status === 401 || data?.allowed === false)
-        setFeed({ allowed: false, missing: data.missing ?? ["login"], cards: [], people: [] });
+        setFeed({
+          allowed: false,
+          missing: data.missing ?? ["login"],
+          cards: [],
+          people: [],
+        });
       else setError({ text: err.message, status: err.status });
     } finally {
       if (id === request.current) setLoading(null);
@@ -182,7 +214,12 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
         if (!alive || id !== request.current) return;
         const data = e.data as Partial<ReflectionFeedData>;
         if (e.status === 401 || data?.allowed === false)
-          setFeed({ allowed: false, missing: data.missing ?? ["login"], cards: [], people: [] });
+          setFeed({
+            allowed: false,
+            missing: data.missing ?? ["login"],
+            cards: [],
+            people: [],
+          });
         else setError({ text: e.message, status: e.status });
       })
       .finally(() => {
@@ -213,16 +250,17 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
   const today = todayIn();
   const filtered = !!(filter.tag || filter.person);
   const cards = feed?.cards ?? [];
+  const showFilters = filtered || cards.length > 5 || filtersOpen;
 
   return (
     <section className="cm-feed" aria-labelledby={`${uid}-title`}>
       <h2 id={`${uid}-title`} className="cm-sr">
         Beiträge
       </h2>
-      {(filtered || cards.length > 0) && (
+      {showFilters ? (
         <div className="cm-card cm-feed-filters" role="search">
           <label>
-            Tag
+            Anderer Tag
             <input
               type="date"
               max={today}
@@ -254,14 +292,28 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
             </button>
           )}
         </div>
-      )}
+      ) : cards.length > 0 ? (
+        <p className="cm-feed-filter-toggle">
+          <button
+            type="button"
+            className="do-link"
+            onClick={() => setFiltersOpen(true)}
+          >
+            Anderen Tag oder Person wählen
+          </button>
+        </p>
+      ) : null}
 
       {error && (
         <div className="cm-alert error" role="alert">
           <CircleAlert size={18} aria-hidden="true" />
           <div>
             <p>{error.text}</p>
-            <button type="button" className="btn secondary" onClick={() => void load(filter)}>
+            <button
+              type="button"
+              className="btn secondary"
+              onClick={() => void load(filter)}
+            >
               <RefreshCw size={16} aria-hidden="true" /> Erneut laden
             </button>
           </div>
@@ -270,7 +322,8 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
 
       {loading === "list" && (
         <p className="cm-loading" aria-live="polite">
-          <LoaderCircle className="spin" size={18} aria-hidden="true" /> Beiträge werden geladen …
+          <LoaderCircle className="spin" size={18} aria-hidden="true" />{" "}
+          Beiträge werden geladen …
         </p>
       )}
 
@@ -292,10 +345,13 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
             <>
               <h3>Noch keine eingereichten Tagesabschlüsse.</h3>
               <p>
-                Beiträge entstehen nur, wenn jemand seinen Tagesabschluss vollständig einreicht.
-                Deiner kann der erste sein.
+                Beiträge entstehen nur, wenn jemand seinen Tagesabschluss
+                vollständig einreicht. Deiner kann der erste sein.
               </p>
-              <Link className="btn primary" href={`/tagesabschluss?tag=${berlinDate()}`}>
+              <Link
+                className="btn primary"
+                href={`/tagesabschluss?tag=${berlinDate()}`}
+              >
                 Eigenen Tag eintragen
               </Link>
             </>
@@ -306,7 +362,11 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
       {cards.length > 0 && (
         <div className={`cm-feed-list ${loading === "list" ? "stale" : ""}`}>
           {cards.map((card) => (
-            <Card key={`${card.participant}:${card.day}`} card={card} />
+            <Card
+              key={`${card.participant}:${card.day}`}
+              card={card}
+              own={card.participant === feed?.me}
+            />
           ))}
         </div>
       )}
@@ -319,7 +379,9 @@ export default function ReflectionFeed({ initial }: { initial?: ReflectionFeedDa
             disabled={loading !== null}
             onClick={() => void load(filter, feed.next ?? undefined)}
           >
-            {loading === "more" && <LoaderCircle className="spin" size={16} aria-hidden="true" />}
+            {loading === "more" && (
+              <LoaderCircle className="spin" size={16} aria-hidden="true" />
+            )}
             Mehr laden
           </button>
         </div>

@@ -5,8 +5,8 @@ import type { RecordDay } from "../data";
 
 /**
  * Leistungslevel im Detail (unter „Mein Fortschritt“): je Kennzahl eine
- * ruhige Zeile mit Leiste und dem Stand in echten Einheiten. Ohne erreichtes
- * Level steht nur, wie weit es bis Level 1 ist.
+ * ruhige Zeile mit Leiste und dem Stand in echten Einheiten. Der Restwert
+ * bis zum nächsten Level steht nur im aria-valuetext der Leiste.
  */
 export default function RankProgress({ records }: { records: RecordDay[] }) {
   const values = aggregate(
@@ -42,11 +42,10 @@ export default function RankProgress({ records }: { records: RecordDay[] }) {
                 aria-valuemin={0}
                 aria-valuemax={card.goalValue ?? card.value}
                 aria-valuenow={card.value}
-                aria-valuetext={card.progressText}
+                aria-valuetext={`${card.progressText}. ${card.remainingText}`}
               >
                 <i style={{ "--p": `${card.percent}%` } as CSSProperties} />
               </div>
-              <p>{card.remainingText}</p>
             </li>
           ))}
       </ul>

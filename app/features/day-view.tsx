@@ -36,7 +36,7 @@ export default function DayView({
   status: TodayStatus | null;
   /** Die eingereichten Zahlen in einer Zeile, z. B. „45 Anwahlen · 1 Setting · 0 Closings“. */
   summary: string;
-  /** Serie und Level, kompakt zwischen Stand und Beiträgen. */
+  /** Serie und Level, kompakt: unter dem Formular, bei eingereichtem Tag am Ende. */
   progress?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -86,8 +86,6 @@ export default function DayView({
               <Link href={`/tagesabschluss?tag=${today}`}>
                 <PencilLine size={14} aria-hidden="true" /> Eintrag ansehen oder korrigieren
               </Link>
-              {" · "}
-              <Link href="/">Zu den Ergebnissen</Link>
             </p>
           </div>
         </section>
@@ -99,8 +97,6 @@ export default function DayView({
             <strong>Deine Zahlen für heute hat das Team übernommen{summary ? `: ${summary}.` : "."}</strong>
             <p>
               <Link href={`/tagesabschluss?tag=${today}`}>Übernommene Zahlen ansehen</Link>
-              {" · "}
-              <Link href="/">Zu den Ergebnissen</Link>
             </p>
           </div>
         </section>
@@ -118,11 +114,11 @@ export default function DayView({
           </div>
         </section>
       )}
-      {progress}
       <h2 className="md-others" id="andere">
         Was bei den anderen heute lief
       </h2>
       <ReflectionFeed initial={feed} />
+      {progress}
     </>
   );
 }

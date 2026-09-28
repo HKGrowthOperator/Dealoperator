@@ -35,7 +35,7 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
   return (
     <section className="md-progress" aria-label="Mein Fortschritt kurz">
       <div>
-        <span className="md-progress-label">Abschluss-Serie</span>
+        <span className="md-progress-label">Serie</span>
         <strong>
           {streak.current > 0
             ? `${streak.current} ${streak.current === 1 ? "Tag" : "Tage"}`
