@@ -112,7 +112,7 @@ export default async function Page({
 
   return (
     <div className="operator-site">
-      <OperatorHeader viewer={viewerOf(actor)} />
+      <OperatorHeader viewer={{ ...viewerOf(actor), hasProfile: false }} />
       <main className="auth-layout">
         <MemberOnboarding
           next={next}
