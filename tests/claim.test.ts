@@ -15,6 +15,7 @@ import {
   resendConfirmationByTeam,
   reviewQueue,
   startRequest,
+  suggestProfiles,
 } from "../server/onboarding";
 
 // Fiktive Konten; keine echten Kontaktdaten.
@@ -580,4 +581,27 @@ test("a team resend binds only for a week and is limited per request", async () 
   await db.query("UPDATE onboarding_requests SET updated_at=now()-interval '9 days' WHERE id=$1", [r.id]);
   await db.query("UPDATE onboarding_events SET created_at=now()-interval '8 days' WHERE request=$1", [r.id]);
   assert.equal(await bindConfirmedRequest(db, alice, null), null);
+});
+
+test("a signed-in account without profile gets its listed profile suggested by name, never a claimed one", async () => {
+  const lena = await profile("Lena Probe");
+  await profile("Lena Muster", { owner: "someone-else" });
+  await profile("Team Nord", { kind: "person" });
+  await db.query("UPDATE participants SET role='Team' WHERE name='Team Nord'");
+  // Registrierung mit vollem Namen, wie sie vor der Bestätigung entsteht.
+  await db.query(
+    `INSERT INTO onboarding_requests(id,kind,email,full_name,phone,status,owner)
+     VALUES($1,'new',$2,'Lena Probe','+49 170 1234567','confirmed',$3)`,
+    [randomUUID(), alice.email, alice.userId],
+  );
+  const mine = await suggestProfiles(db, alice);
+  assert.equal(mine.name, "Lena Probe");
+  assert.deepEqual(mine.profiles.map((p) => p.id), [lena]);
+  // Ohne bekannten Namen kein Vorschlag.
+  assert.deepEqual((await suggestProfiles(db, bob)).profiles, []);
+  // Voller Name ohne Treffer: der Nachname reicht als Hinweis.
+  const byLastName = await suggestProfiles(db, bob, "Tom Probe");
+  assert.deepEqual(byLastName.profiles.map((p) => p.id), [lena]);
+  // Nur öffentliche Angaben, keine Kontaktdaten.
+  assert.deepEqual(Object.keys(mine.profiles[0]).sort(), ["company", "id", "name", "role"]);
 });

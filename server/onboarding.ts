@@ -71,6 +71,52 @@ export async function searchProfiles(db: Database, rawQuery: string) {
   );
 }
 
+/** Öffentliche Profilangaben, wie sie die Auswahl zeigt. */
+export type SuggestedProfile = { id: string; name: string; company: string; role: string };
+
+/**
+ * Konto ohne Profil: Profile aus der Rangliste, die zum Namen der Person
+ * passen, damit sie ihr bestehendes Profil erkennt und kein zweites anlegt.
+ * Der Name kommt aus der Registrierung (auch einer älteren, unbestätigten)
+ * oder aus der laufenden Anfrage. Nur öffentliche Angaben, nie Kontaktdaten;
+ * die Zuordnung selbst bleibt die Übernahme mit Teamfreigabe.
+ */
+export async function suggestProfiles(
+  db: Database,
+  actor: Actor,
+  fullName = "",
+): Promise<{ name: string; profiles: SuggestedProfile[] }> {
+  let name = fullName.trim();
+  if (!name) {
+    const [r] = await db.query(
+      `SELECT full_name FROM onboarding_requests
+        WHERE owner=$1 OR lower(email)=$2
+        ORDER BY updated_at DESC LIMIT 1`,
+      [actor.userId, actor.email.toLowerCase()],
+    );
+    name = String(r?.full_name ?? "").trim();
+  }
+  const words = name.split(/\s+/).filter((w) => w.length >= 2);
+  if (!words.length) return { name, profiles: [] };
+  // Erst der volle Name, dann Nachname, dann Vorname (ab drei Zeichen).
+  const tries = [...new Set([name, ...(words.length > 1 ? [words[words.length - 1], words[0]] : [])])]
+    .filter((q, i) => i === 0 || q.length >= 3);
+  for (const q of tries) {
+    const found = (await searchProfiles(db, q)).filter((p) => !/^team\b/i.test(String(p.role ?? "")));
+    if (found.length)
+      return {
+        name,
+        profiles: found.slice(0, 3).map((p) => ({
+          id: String(p.id),
+          name: String(p.name),
+          company: String(p.company ?? ""),
+          role: String(p.role ?? ""),
+        })),
+      };
+  }
+  return { name, profiles: [] };
+}
+
 /**
  * Ein Profil, das nicht öffentlich auffindbar ist, bleibt über eine persönliche
  * Einladung erreichbar. Der Code schaltet nur die Auswahl frei; die Freigabe
