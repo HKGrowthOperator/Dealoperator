@@ -457,7 +457,7 @@ button.do-link {
     display: none;
   }
   .do-topnav .do-nav-link {
-    --nav-pad: 10px;
+    --nav-pad: 8px;
     flex: none;
     min-height: 46px;
     border-radius: 0;
@@ -476,6 +476,10 @@ button.do-link {
   }
 }
 @media (max-width: 374px) {
+  .do-topnav .do-nav-link {
+    --nav-pad: 6px;
+    font-size: 13px;
+  }
   .do-header-inner {
     gap: var(--space-2);
   }
@@ -862,9 +866,15 @@ button.do-link {
   }
 }
 /* Breit: der Kopfknopf „Zahlen eintragen“ ist immer sichtbar, die Karte
-   braucht bei offenem Tag keinen zweiten. */
+   braucht bei offenem Tag keinen zweiten. Schmal ist es umgekehrt: auf der
+   Startseite steht der Knopf in der Karte direkt unter dem Kopf. */
 @media (min-width: 900px) {
   .rb-me[data-tone="open"] > .do-button-primary {
+    display: none;
+  }
+}
+@media (max-width: 899px) {
+  .do-header-cta-home {
     display: none;
   }
 }

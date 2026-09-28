@@ -187,7 +187,14 @@ export function OperatorHeader({
               viewer?.hasProfile !== false &&
               viewer?.today !== "done" &&
               viewer?.today !== "imported" && (
-              <Link className="do-button do-button-primary do-header-cta" href="/tagesabschluss">
+              <Link
+                className={`do-button do-button-primary do-header-cta${
+                  path === "/" && (viewer?.today === "open" || viewer?.today === "draft")
+                    ? " do-header-cta-home"
+                    : ""
+                }`}
+                href="/tagesabschluss"
+              >
                 <PencilLine size={17} aria-hidden="true" />
                 <span className="do-cta-long">Zahlen eintragen</span>
                 <span className="do-cta-short">Eintragen</span>
