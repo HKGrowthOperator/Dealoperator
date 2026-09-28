@@ -105,8 +105,8 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
               : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
           </p>
           <div className="flow-actions">
-            <Link className="btn primary full" href="/reflexionen">
-              Tagesabschluss eintragen
+            <Link className="btn primary full" href="/tagesabschluss">
+              Zahlen für heute eintragen
             </Link>
             <Link className="flow-link" href="/">
               Zu den Ergebnissen
