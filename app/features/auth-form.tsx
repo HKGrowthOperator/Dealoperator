@@ -299,7 +299,7 @@ export default function AuthForm({
               setPasswordError("");
             }}
           >
-            {mode === "password" ? "Passwort vergessen oder noch keins?" : "Zurück zur Anmeldung mit Passwort"}
+            {mode === "password" ? "Passwort vergessen?" : "Zurück zur Anmeldung mit Passwort"}
           </button>
         </div>
         <p className="flow-signin">

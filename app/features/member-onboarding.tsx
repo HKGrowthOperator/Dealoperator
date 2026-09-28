@@ -136,19 +136,19 @@ export default function MemberOnboarding({
 
   // Erst erkennen, dann anlegen: Wer schon in der Rangliste steht, übernimmt
   // sein Profil; das Team prüft die Zuordnung, ein zweites Profil entsteht nicht.
-  if (!showForm)
+  if (!showForm) {
+    // Genau ein Treffer: die Frage direkt mit dem Namen stellen.
+    const single = suggestions.length === 1 ? suggestions[0] : null;
     return (
       <section className="auth-card card flow">
         <div className="flow-step">
           <h1 ref={heading} tabIndex={-1}>
-            Bist du schon in der Rangliste?
+            {single ? `Bist du ${single.name}?` : "Bist du schon in der Rangliste?"}
           </h1>
           <p className="flow-lead">
-            {suggestions.length === 1
-              ? "Dieses Profil passt zu deinem Namen."
-              : "Diese Profile passen zu deinem Namen."}{" "}
-            Ist es deins, übernimm es: Das Team prüft kurz, danach gehören alle bisherigen
-            Tage zu deinem Konto.
+            {single
+              ? "Dieses Profil aus der Rangliste passt zu deinem Namen."
+              : "Diese Profile passen zu deinem Namen."}
           </p>
           <div className="flow-choices">
             {suggestions.map((p) => (
@@ -159,8 +159,8 @@ export default function MemberOnboarding({
               >
                 <UserRound aria-hidden="true" />
                 <span>
-                  <strong>{p.name}</strong>
-                  <small>{profileMeta(p) || "Steht in der Rangliste"} · Das bin ich</small>
+                  <strong>{single ? "Ja, das bin ich" : p.name}</strong>
+                  <small>{profileMeta(p) || "Steht in der Rangliste"}</small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </Link>
@@ -168,7 +168,7 @@ export default function MemberOnboarding({
           </div>
           <div className="flow-actions">
             <button type="button" className="btn secondary full" onClick={() => setShowForm(true)}>
-              Keins davon, ich bin neu hier
+              {single ? "Nein, ich bin neu hier" : "Keins davon, ich bin neu hier"}
             </button>
             <Link className="flow-link" href="/profil-uebernehmen">
               Anderes Profil suchen
@@ -177,21 +177,24 @@ export default function MemberOnboarding({
         </div>
       </section>
     );
+  }
 
   return (
     <section className="auth-card card flow">
       <div className="flow-step">
         {fromRegistration && (
           <FlowProgress
-            steps={["Weg wählen", "Deine Angaben", "E-Mail bestätigen", "Profil anlegen"]}
-            current={3}
+            steps={["Deine Angaben", "E-Mail bestätigen", "Profil anlegen"]}
+            current={2}
           />
         )}
         <h1 ref={heading} tabIndex={-1}>
           {fromRegistration ? "E-Mail bestätigt. Leg dein Profil an." : "Leg dein Profil an."}
         </h1>
         <p className="flow-lead">
-          Nur dein Anzeigename, dann trägst du deinen ersten Tag ein.
+          {needsPhone
+            ? "Anzeigename und Nummer, dann trägst du deinen ersten Tag ein."
+            : "Nur dein Anzeigename, dann trägst du deinen ersten Tag ein."}
         </p>
         {takenProfile && (
           <div className="flow-alert">
@@ -236,7 +239,7 @@ export default function MemberOnboarding({
               aria-describedby={`${id}-name-note`}
             />
             <p id={`${id}-name-note`} className={errors.name ? "flow-field-error" : "flow-note"}>
-              {errors.name || "So sehen dich die anderen. Dein voller Name bleibt beim Team."}
+              {errors.name || "So stehst du in der Rangliste. E-Mail und Nummer bleiben privat."}
             </p>
           </div>
 
@@ -305,11 +308,6 @@ export default function MemberOnboarding({
               <Plus size={16} aria-hidden="true" /> Unternehmen und Rolle angeben
             </button>
           )}
-
-          <p className="flow-note flow-ranking-note">
-            Deine gemeldeten Zahlen stehen mit deinem Anzeigenamen in der Rangliste. E-Mail und
-            Nummer bleiben privat.
-          </p>
 
           <button className="btn primary full" disabled={busy}>
             {busy && <LoaderCircle className="spin" size={18} />}

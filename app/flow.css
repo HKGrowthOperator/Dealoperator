@@ -185,9 +185,6 @@
   text-underline-offset: 4px;
   cursor: pointer;
 }
-.flow-signin a {
-  min-height: 0;
-}
 
 /* Felder */
 .flow-form {

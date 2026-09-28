@@ -59,9 +59,14 @@ export type PendingStart = {
 const STEPS: Record<Mode, string[]> = {
   claim: ["Profil finden", "Deine Angaben", "E-Mail bestätigen", "Prüfung durch das Team"],
   assign: ["Profil suchen", "Deine Angaben", "E-Mail bestätigen", "Zuordnung durch das Team"],
-  new: ["Weg wählen", "Deine Angaben", "E-Mail bestätigen", "Profil anlegen"],
+  new: ["Deine Angaben", "E-Mail bestätigen", "Profil anlegen"],
 };
-const STEP_INDEX: Partial<Record<Step, number>> = { search: 0, contact: 1, sent: 2 };
+// Der Weg „neu“ hat keinen Suchschritt; seine Zählung beginnt bei den Angaben.
+const STEP_INDEX: Record<Mode, Partial<Record<Step, number>>> = {
+  claim: { search: 0, contact: 1, sent: 2 },
+  assign: { search: 0, contact: 1, sent: 2 },
+  new: { contact: 0, sent: 1 },
+};
 const WEG: Record<Mode, string> = { new: "neu", claim: "profil", assign: "team" };
 const MODE_OF: Record<string, Mode> = { neu: "new", profil: "claim", team: "assign" };
 const SCHRITT: Partial<Record<Step, string>> = {
@@ -528,7 +533,7 @@ export default function OnboardingStart({
   }
 
   const blocked = wait > 0 && contact.email.trim().toLowerCase() === waitFor;
-  const index = mode ? STEP_INDEX[step] : undefined;
+  const index = mode ? STEP_INDEX[mode][step] : undefined;
 
   const missing = (searched: string, hadResults: boolean) => (
     <div className="flow-missing">
@@ -664,10 +669,7 @@ export default function OnboardingStart({
             <h1 ref={heading} tabIndex={-1}>
               Willkommen bei Deal Operator.
             </h1>
-            <p className="flow-lead">
-              Kostenfrei. Halte deine Calling-Tage fest und sieh, was alle
-              zusammen schaffen.
-            </p>
+            <p className="flow-lead">Wie möchtest du starten?</p>
             {message && (
               <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
                 {message}
@@ -752,9 +754,8 @@ export default function OnboardingStart({
               Finde dein Profil.
             </h1>
             <p className="flow-lead">
-              Such nach dem Namen, unter dem deine Zahlen in der Rangliste stehen.
-              Mit der Übernahme gehört das Profil mit allen bisherigen Tagen zu
-              deinem Konto. Es entsteht kein zweites Profil.
+              So, wie du in der Rangliste stehst. Danach gehört das Profil mit
+              allen Tagen zu dir.
             </p>
             {message && (
               <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
@@ -775,7 +776,7 @@ export default function OnboardingStart({
                 ? "Profil übernehmen."
                 : mode === "assign"
                   ? "Team um Zuordnung bitten."
-                  : "Profil anlegen."}
+                  : "Konto anlegen."}
             </h1>
             {mode === "claim" && selected && (
               <ProfileCard profile={selected} onChange={() => go("search", "claim", null)} />
@@ -785,7 +786,7 @@ export default function OnboardingStart({
                 ? "Noch deine Kontaktdaten und ein Passwort, dann bestätigst du einmal deine E-Mail."
                 : mode === "assign"
                   ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
-                  : "Name, E-Mail, Passwort und Nummer. Danach bestätigst du einmal deine E-Mail."}
+                  : "Danach bestätigst du einmal deine E-Mail, dann geht es los."}
             </p>
             {isTeamProfile(selected) && mode === "claim" && (
               <div className="flow-notice">
@@ -814,7 +815,7 @@ export default function OnboardingStart({
                     error={passwordError}
                     autoComplete="new-password"
                     inputRef={passwordInput}
-                    note="Mindestens 8 Zeichen. Damit meldest du dich künftig an, ohne Mail."
+                    note="Mindestens 8 Zeichen."
                   />
                 }
                 value={contact}

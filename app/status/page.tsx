@@ -14,7 +14,12 @@ export const dynamic = "force-dynamic";
  * eigenen Angaben und den Stand, aber keine privaten Daten des ausgewählten
  * Profils — diese gibt erst die Freigabe frei.
  */
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const search = await searchParams;
   const actor = await getCurrentUser();
   if (!actor) redirect("/anmelden?next=%2Fstatus");
   const db = database();
@@ -24,9 +29,10 @@ export default async function Page() {
   if (!request) redirect("/start");
   return (
     <div className="operator-site">
-      <OperatorHeader viewer={viewerOf(actor)} />
+      <OperatorHeader viewer={{ ...viewerOf(actor), hasProfile: false }} />
       <main className="auth-layout">
         <RequestStatus
+          from={search.von || ""}
           request={{
             kind: String(request.kind),
             status: String(request.status),

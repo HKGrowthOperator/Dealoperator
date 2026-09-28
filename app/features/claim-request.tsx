@@ -12,7 +12,6 @@ import {
   FlowProgress,
   focusFirstError,
   isTeamProfile,
-  PrivacyNote,
   ProfileCard,
   ProfileSearch,
   RequestError,
@@ -208,7 +207,9 @@ export default function ClaimRequest({
   return (
     <section className="auth-card card flow">
       <div className="flow-step" key={`${step}:${mode}`}>
-        <FlowProgress steps={STEPS[mode]} current={step === "search" ? 0 : 1} />
+        {!preselected && (
+          <FlowProgress steps={STEPS[mode]} current={step === "search" ? 0 : 1} />
+        )}
         {step === "search" ? (
           <>
             <h1 ref={heading} tabIndex={-1}>
@@ -261,7 +262,7 @@ export default function ClaimRequest({
             <p className="flow-lead">
               {mode === "assign"
                 ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
-                : "Noch zwei Angaben, dann geht die Anfrage an das Team."}
+                : "Prüf deinen Namen, gib deine Nummer an, dann geht die Anfrage an das Team."}
             </p>
             {isTeamProfile(selected) && (
               <div className="flow-notice">
@@ -278,9 +279,6 @@ export default function ClaimRequest({
               </p>
             )}
             <form className="flow-form" onSubmit={submit} noValidate>
-              <p className="flow-note">
-                Angemeldet als <strong>{email}</strong>
-              </p>
               <ContactFields
                 value={contact}
                 onChange={patch}
@@ -291,18 +289,19 @@ export default function ClaimRequest({
                 nameSuggested={suggested && mode === "claim"}
               />
               <p className="flow-note">
-                Freigeben kann nur das Team. Es gleicht deine Angaben mit der
-                bekannten Person ab.
+                Das Team gleicht deine Angaben ab und schaltet frei. Nummer und E-Mail
+                bleiben privat.
               </p>
               <button className="btn primary full" disabled={busy}>
                 {busy ? <LoaderCircle className="spin" size={18} /> : <Send size={18} />}
                 {mode === "assign" ? "Anfrage an das Team senden" : "Übernahme anfragen"}
               </button>
             </form>
-            <PrivacyNote />
-            <button type="button" className="flow-link" onClick={() => go("search", "claim", null)}>
-              {mode === "assign" ? "Doch selbst suchen" : "Zurück zur Suche"}
-            </button>
+            {!selected && (
+              <button type="button" className="flow-link" onClick={() => go("search", "claim", null)}>
+                {mode === "assign" ? "Doch selbst suchen" : "Zurück zur Suche"}
+              </button>
+            )}
           </>
         )}
       </div>

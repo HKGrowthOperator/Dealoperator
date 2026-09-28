@@ -58,14 +58,15 @@ export default async function Page({
       );
       if (!member) {
         // Laufende Übernahmeanfrage: Prüfstatus statt Profilformular, damit
-        // kein zweites Profil mit leeren Zahlen entsteht.
+        // kein zweites Profil mit leeren Zahlen entsteht. ?von= nennt dort,
+        // was nach der Freigabe kommt.
         const [open] = await db.query(
           `SELECT id FROM onboarding_requests
            WHERE owner=$1 AND kind='claim'
              AND status IN ('pending','info_needed') LIMIT 1`,
           [user.userId],
         );
-        redirect(open ? "/status" : `/start?next=${encodeURIComponent(next)}`);
+        redirect(open ? `/status?von=${view}` : `/start?next=${encodeURIComponent(next)}`);
       }
     }
     if (query.modus !== "eigen") redirect(next);

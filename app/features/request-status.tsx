@@ -24,7 +24,7 @@ export type OwnRequest = {
 function steps(status: string, assign: boolean) {
   const decided = ["approved", "rejected", "superseded"].includes(status);
   return [
-    { label: "Konto bestätigt", state: "done" },
+    { label: "Angemeldet", state: "done" },
     { label: assign ? "Zuordnung angefragt" : "Übernahme angefragt", state: "done" },
     {
       label: status === "info_needed" ? "Rückfrage an dich" : "Prüfung durch das Team",
@@ -47,7 +47,14 @@ function steps(status: string, assign: boolean) {
  * offen ist: Eine Freigabe, Rückfrage oder Ablehnung erscheint ohne
  * Neuladen. Keine Versprechen zu Bearbeitungszeiten.
  */
-export default function RequestStatus({ request }: { request: OwnRequest }) {
+export default function RequestStatus({
+  request,
+  from = "",
+}: {
+  request: OwnRequest;
+  /** Reiter, von dem es hierher ging (etwa „partner“): sagt, was nach der Freigabe kommt. */
+  from?: string;
+}) {
   const router = useRouter();
   const [status, setStatus] = useState(request.status);
   const heading = useStepHeading(status);
@@ -134,8 +141,8 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
               : status === "superseded"
                 ? "Dieses Profil ist bereits zugeordnet."
                 : assign
-                  ? "E-Mail bestätigt. Das Team sucht dein Profil heraus."
-                  : "E-Mail bestätigt. Deine Profilübernahme wird geprüft."}
+                  ? "Das Team sucht dein Profil heraus."
+                  : "Deine Profilübernahme wird geprüft."}
         </h1>
         <p className="flow-lead">
           {status === "info_needed"
@@ -144,8 +151,13 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
               ? "Das Team konnte die Übernahme nicht bestätigen. Hier sind deine Möglichkeiten."
               : status === "superseded"
                 ? "Ein anderes Konto wurde dafür freigegeben. Hier sind deine Möglichkeiten."
-                : "Freigeben kann nur das Team. Diese Seite zeigt die Entscheidung, sobald sie da ist."}
+                : "Das Team prüft deine Angaben. Sobald es freigibt, geht es hier weiter."}
         </p>
+        {from && !closed && (
+          <p className="flow-body">
+            Call-Partner, Sessions und Wissen gibt es nach der Freigabe.
+          </p>
+        )}
 
         <ol className="flow-steps" aria-label="Stand deiner Anfrage">
           {steps(status, assign).map((s) => (
@@ -159,15 +171,6 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
             </li>
           ))}
         </ol>
-
-        {request.participantName && (
-          <div className="flow-profile">
-            <div>
-              <span>Angefragtes Profil</span>
-              <strong>{request.participantName}</strong>
-            </div>
-          </div>
-        )}
 
         {request.message && (
           <div className="flow-notice">
@@ -183,13 +186,6 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
             <strong>Deine Antwort liegt beim Team.</strong>
             <p>{request.lastAnswer}</p>
           </div>
-        )}
-
-        {status === "pending" && (
-          <p className="flow-body">
-            Bis dahin kannst du die öffentliche Rangliste ansehen. Nach der
-            Freigabe trägst du neue Tage selbst ein.
-          </p>
         )}
 
         {closed && (
@@ -220,6 +216,12 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
         )}
 
         <dl className="flow-summary">
+          {request.participantName && (
+            <div>
+              <dt>Profil</dt>
+              <dd>{request.participantName}</dd>
+            </div>
+          )}
           <div>
             <dt>Angefragt am</dt>
             <dd>{submitted}</dd>
@@ -229,7 +231,7 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
             <dd>{request.fullName}</dd>
           </div>
           <div>
-            <dt>Bestätigte E-Mail</dt>
+            <dt>E-Mail</dt>
             <dd>{request.email}</dd>
           </div>
           <div>
@@ -246,8 +248,8 @@ export default function RequestStatus({ request }: { request: OwnRequest }) {
 
         {!closed && (
           <div className="flow-actions">
-            <Link className="flow-link" href="/ranking">
-              Zur öffentlichen Rangliste
+            <Link className="flow-link" href="/">
+              Zu den Ergebnissen
             </Link>
           </div>
         )}

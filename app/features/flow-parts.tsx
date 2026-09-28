@@ -150,7 +150,7 @@ export function ProfileCard({
       </div>
       {onChange && (
         <button type="button" className="flow-link" onClick={onChange}>
-          Anderes Profil wählen
+          Anderes Profil suchen
         </button>
       )}
     </div>
@@ -232,7 +232,7 @@ export function ProfileSearch({
         ? results.length === 1
           ? "1 passendes Profil"
           : `${results.length} passende Profile`
-        : trimmed.length < 2
+        : trimmed.length === 1
           ? "Mindestens zwei Buchstaben, zum Beispiel dein Vorname."
           : "";
 
