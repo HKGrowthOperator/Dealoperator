@@ -370,7 +370,7 @@ export function EligibilityChecklist({
     {
       key: "login",
       done: !needs.has("login"),
-      title: "Mit bestätigter E-Mail angemeldet",
+      title: "Angemeldet",
       text: "Mit deiner E-Mail-Adresse und deinem Passwort.",
       links: [
         { href: `/anmelden?next=${encodeURIComponent(next)}`, label: "Anmelden" },
@@ -380,7 +380,7 @@ export function EligibilityChecklist({
       ? {
           key: "review",
           done: false,
-          title: "Profilübernahme wird geprüft",
+          title: "Prüfung durch das Team",
           text: "Das Team gleicht deine Angaben ab. Sobald es freigibt, geht es hier weiter.",
           links: [{ href: "/status", label: "Stand ansehen" }],
         }
@@ -420,7 +420,7 @@ export function EligibilityChecklist({
         </p>
       )}
       <ol>
-        {items.map((item) => (
+        {items.filter((item) => !item.done).map((item) => (
           <li key={item.key} className={item.done ? "done" : ""}>
             <span className="cm-check-mark" aria-hidden="true">
               {item.done ? <Check size={15} /> : null}
@@ -1468,37 +1468,6 @@ export default function ClosingForm({
               )}
               {submitted ? "Korrektur einreichen" : "Tagesabschluss einreichen"}
             </button>
-            {(form.draftAt || form.dirty) &&
-              (confirmDiscard ? (
-                <span className="cm-discard-confirm">
-                  <span>Entwurf wirklich verwerfen?</span>
-                  <button
-                    type="button"
-                    className="do-button do-button-secondary"
-                    disabled={busy}
-                    onClick={() => void discardDraft()}
-                  >
-                    Ja, verwerfen
-                  </button>
-                  <button
-                    type="button"
-                    className="do-button do-button-quiet"
-                    onClick={() => setConfirmDiscard(false)}
-                  >
-                    Behalten
-                  </button>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  className="cm-text-button"
-                  disabled={busy}
-                  onClick={() => setConfirmDiscard(true)}
-                >
-                  <Trash2 size={15} aria-hidden="true" />
-                  {submitted ? "Änderungen verwerfen" : "Entwurf verwerfen"}
-                </button>
-              ))}
           </div>
         </form>
       ) : null}
@@ -1542,6 +1511,40 @@ export default function ClosingForm({
               <button type="button" className="do-link" onClick={() => selectDay(today)}>
                 Zu heute
               </button>
+            )}
+          </div>
+        )}
+        {(form.draftAt || form.dirty) && (
+          <div className="md-day-links">
+            {confirmDiscard ? (
+                <span className="cm-discard-confirm">
+                  <span>Entwurf wirklich verwerfen?</span>
+                  <button
+                    type="button"
+                    className="do-button do-button-secondary"
+                    disabled={busy}
+                    onClick={() => void discardDraft()}
+                  >
+                    Ja, verwerfen
+                  </button>
+                  <button
+                    type="button"
+                    className="do-button do-button-quiet"
+                    onClick={() => setConfirmDiscard(false)}
+                  >
+                    Behalten
+                  </button>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  className="do-link"
+                  disabled={busy}
+                  onClick={() => setConfirmDiscard(true)}
+                >
+                  <Trash2 size={15} aria-hidden="true" />
+                  {submitted ? "Änderungen verwerfen" : "Entwurf verwerfen"}
+                </button>
             )}
           </div>
         )}

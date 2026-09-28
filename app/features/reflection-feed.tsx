@@ -13,7 +13,6 @@ import {
   ApiError,
   COUNT_KEYS,
   EligibilityChecklist,
-  formatFullDay,
   getJson,
   todayIn,
   type CountKey,
@@ -57,14 +56,14 @@ const initials = (name: string) =>
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join("") || "?";
-const submittedText = (iso: string) =>
+/** „Mo., 28.09.“: Karten sind meist von heute, bei anderen Tagen zählt das Datum. */
+const shortDay = (day: string) =>
   new Intl.DateTimeFormat("de-DE", {
+    weekday: "short",
     day: "2-digit",
     month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
     timeZone: "Europe/Berlin",
-  }).format(new Date(iso));
+  }).format(new Date(`${day}T12:00:00+02:00`));
 
 function query(filter: Filter, before?: string) {
   const params = new URLSearchParams();
@@ -88,14 +87,7 @@ function Card({ card, own = false }: { card: ReflectionCard; own?: boolean }) {
         <div>
           <h3>{card.name}</h3>
           <p>
-            Leistungstag{" "}
-            <time dateTime={card.day}>{formatFullDay(card.day)}</time>
-            <span className="cm-dot" aria-hidden="true">
-              ·
-            </span>
-            <span className="cm-muted">
-              eingereicht {submittedText(card.submittedAt)}
-            </span>
+            <time dateTime={card.day}>{shortDay(card.day)}</time>
           </p>
         </div>
       </header>
@@ -144,11 +136,6 @@ function Card({ card, own = false }: { card: ReflectionCard; own?: boolean }) {
             Auf Discord antworten
             <ExternalLink size={14} aria-hidden="true" />
           </a>
-          <span>
-            {card.reply.kind === "post"
-              ? "Öffnet den Beitrag in Discord."
-              : "Öffnet Discord. Schreib dort im Austausch."}
-          </span>
         </footer>
       )}
     </article>

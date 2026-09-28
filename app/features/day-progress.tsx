@@ -32,6 +32,16 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
       aggregate(state.closings.map((c) => ({ ...emptyCounts(), ...c.counts }) as Counts)),
     ).map(levelCard),
   );
+  // Noch nichts erreicht: eine Zeile statt einer leeren Karte.
+  if (streak.current === 0 && streak.best === 0 && level.value === 0)
+    return (
+      <p className="md-progress-empty">
+        Serie und Leistungslevel starten mit deinem ersten Tagesabschluss.{" "}
+        <Link className="do-link" href="/heute?modus=eigen">
+          Mein Fortschritt
+        </Link>
+      </p>
+    );
   return (
     <section className="md-progress" aria-label="Mein Fortschritt kurz">
       <div>
@@ -44,7 +54,7 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
         <small>
           {streak.current > 0
             ? `Bestwert ${streak.best}`
-            : "Startet mit dem nächsten rechtzeitigen Abschluss"}
+            : "Startet mit dem nächsten rechtzeitigen Tagesabschluss"}
         </small>
       </div>
       <div>

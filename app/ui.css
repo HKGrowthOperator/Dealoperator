@@ -2063,10 +2063,6 @@ li[data-open] .rb-chevron {
   min-height: 52px;
   font-size: var(--text-lead);
 }
-.md-submit .cm-text-button {
-  justify-self: start;
-  font-size: var(--text-label);
-}
 .md .cm-alert {
   font-size: var(--text-label);
 }
@@ -2246,6 +2242,14 @@ li[data-open] .rb-chevron {
 .md-progress small {
   color: var(--do-ink-2);
   font-size: var(--text-label);
+}
+.md-progress-empty {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.md-progress-empty .do-link {
+  font-size: inherit;
 }
 @media (max-width: 599px) {
   .md-progress {
@@ -2496,10 +2500,6 @@ li[data-open] .rb-chevron {
 .rf-reply a:hover {
   border-color: var(--do-blue-line);
   color: var(--do-blue);
-}
-.rf-reply span {
-  color: var(--do-ink-3);
-  font-size: var(--text-label);
 }
 .rf .cm-feed-card,
 .rf .cm-card {
