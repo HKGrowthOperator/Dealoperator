@@ -73,9 +73,11 @@ type Choice = typeof RANKING | typeof COMMITMENT;
 /** Die drei Zahlen jeder Zeile, in fester Reihenfolge. */
 const SHOWN = ["attempts", "settingsBooked", "closingsBooked"] as const;
 const SHOWN_LABEL = { attempts: "Anwahlen", settingsBooked: "Settings", closingsBooked: "Closings" } as const;
+/** Einzahl in der Textzeile: „1 Setting“, „1 Closing“; Anwahlen bleiben Anwahlen. */
+const SHOWN_ONE = { attempts: "Anwahlen", settingsBooked: "Setting", closingsBooked: "Closing" } as const;
 /** „127 Anwahlen · 4 Settings · 0 Closings“, dazu Deals, wenn gemeldet und über 0. */
 function numbersLine(counts: Counts) {
-  const parts = SHOWN.map((k) => `${fmt(counts[k])} ${SHOWN_LABEL[k]}`);
+  const parts = SHOWN.map((k) => `${fmt(counts[k])} ${counts[k] === 1 ? SHOWN_ONE[k] : SHOWN_LABEL[k]}`);
   if (counts.dealsWon) parts.push(`${fmt(counts.dealsWon)} ${counts.dealsWon === 1 ? "Deal" : "Deals"}`);
   return parts.join(" · ");
 }
@@ -238,7 +240,10 @@ export default function RankingBoard({
   const totals = useMemo(() => aggregate(rows.map((row) => row.counts)), [rows]);
   const joint = useMemo(() => rows.filter(isJoint), [rows]);
   const people = useMemo(() => soloRows(rows), [rows]);
-  const needle = search.trim().toLocaleLowerCase("de");
+  // Das Suchfeld gibt es erst ab einer längeren Liste; ohne Feld gilt keine Suche.
+  const searchable = all.length > 12;
+  const query = searchable ? search : "";
+  const needle = query.trim().toLocaleLowerCase("de");
   const matches = (row: { name: string; company: string }) =>
     `${row.name} ${row.company}`.toLocaleLowerCase("de").includes(needle);
   const filtered = all.filter(matches);
@@ -412,7 +417,7 @@ export default function RankingBoard({
     { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
     { key: "settingsBooked", label: "Settings", value: totals.settingsBooked, note: totals.settingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
     { key: "closingsBooked", label: "Closings", value: totals.closingsBooked, note: totals.closingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
-    { key: "people", label: "Am Start", value: people.length, note: people.length === 1 ? "Person mit Meldung" : "Personen mit Meldung" },
+    { key: "people", label: "Dabei", value: people.length, note: people.length === 1 ? "mit Meldung" : "mit Meldungen" },
   ];
 
   return (
@@ -423,8 +428,7 @@ export default function RankingBoard({
           <section className="rb-intro" aria-labelledby="rb-title">
             <h1 id="rb-title">Zusammen callen. Gemeinsam dranbleiben.</h1>
             <p>
-              Hier siehst du, was alle zusammen schaffen, und hältst deinen eigenen Calling-Tag fest,
-              kostenfrei.
+              Hier siehst du, was alle zusammen schaffen, und hältst deinen eigenen Calling-Tag fest.
             </p>
             <div className="rb-intro-actions">
               <Link className="do-button do-button-primary" href="/starten?weg=neu">
@@ -434,12 +438,6 @@ export default function RankingBoard({
                 Meine Zahlen sind schon hier
               </Link>
             </div>
-            <p className="rb-intro-signin">
-              Schon registriert?{" "}
-              <Link className="do-link" href="/anmelden">
-                Anmelden und Zahlen eintragen
-              </Link>
-            </p>
           </section>
         )}
         {(onlyRanking || signedIn) && <h1 className="do-sr">Ergebnisse</h1>}
@@ -448,9 +446,7 @@ export default function RankingBoard({
             home={home}
             submitted={justSubmitted}
             note={note}
-            own={own ? { rank: own.rank, counts: own.counts } : undefined}
             dayLabel={formatDay(day)}
-            onShowOwn={showOwn}
           />
         )}
 
@@ -606,7 +602,7 @@ export default function RankingBoard({
             <h2 id="rb-ranking-title">Rangliste</h2>
             <span>
               {commitmentView
-                ? "Abschluss-Serie, Stand heute"
+                ? "Serie, Stand heute"
                 : monthly
                   ? formatMonth(month)
                   : formatDay(day, true)}
@@ -615,29 +611,31 @@ export default function RankingBoard({
           <div className="rb-filters">
             <div className="rb-tabs" role="group" aria-label="Ansicht">
               <button type="button" aria-pressed={!commitmentView} onClick={() => choose(RANKING)}>
-                Rangliste
+                Zahlen
               </button>
               <button type="button" aria-pressed={commitmentView} onClick={() => choose(COMMITMENT)}>
-                Abschluss-Serie
+                Serie
               </button>
             </div>
-            <label className="rb-search">
-              <Search size={18} aria-hidden="true" />
-              <span className="do-sr">Namen suchen</span>
-              <input
-                ref={searchRef}
-                type="search"
-                placeholder="Namen suchen"
-                autoComplete="off"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-              {search && (
-                <button type="button" onClick={() => setSearch("")} aria-label="Suche leeren">
-                  <X size={16} aria-hidden="true" />
-                </button>
-              )}
-            </label>
+            {searchable && (
+              <label className="rb-search">
+                <Search size={18} aria-hidden="true" />
+                <span className="do-sr">Namen suchen</span>
+                <input
+                  ref={searchRef}
+                  type="search"
+                  placeholder="Namen suchen"
+                  autoComplete="off"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                {search && (
+                  <button type="button" onClick={() => setSearch("")} aria-label="Suche leeren">
+                    <X size={16} aria-hidden="true" />
+                  </button>
+                )}
+              </label>
+            )}
           </div>
           {!signedIn && !commitmentView && !loading && !error && filtered.length > 0 && (
             <p className="rb-claim-hint">
@@ -659,11 +657,11 @@ export default function RankingBoard({
             </p>
           )}
 
-          {!commitmentView && !loading && !error && !search && (
+          {!commitmentView && !loading && !error && !query && (
             <Podium rows={filtered} ownId={ownId} onShow={showRow} />
           )}
           {commitmentView ? (
-            <CommitmentList state={commitmentState} rows={commitmentFiltered} total={commitmentRows.length} search={search} ownId={ownId} month={month} onRetry={() => setRetry((v) => v + 1)} />
+            <CommitmentList state={commitmentState} rows={commitmentFiltered} total={commitmentRows.length} search={query} ownId={ownId} month={month} onRetry={() => setRetry((v) => v + 1)} />
           ) : loading ? (
             <ol className="rb-list" aria-busy="true" aria-label="Rangliste wird geladen">
               {Array.from({ length: 5 }, (_, i) => (
@@ -681,7 +679,6 @@ export default function RankingBoard({
                   own={row.id === ownId}
                   open={openId === row.id}
                   periodLabel={periodLabel}
-                  monthly={monthly}
                   signedIn={signedIn}
                   hasProfile={!!home?.participant}
                   onToggle={() => setOpenId((id) => (id === row.id ? null : row.id))}
@@ -692,11 +689,11 @@ export default function RankingBoard({
             <div className="rb-empty">
               <p>
                 <strong>
-                  {search
+                  {query
                     ? "Kein Name gefunden."
                     : `Für ${monthly ? "diesen Monat" : "diesen Tag"} ist noch nichts gemeldet.`}
                 </strong>{" "}
-                {search
+                {query
                   ? "Prüfe die Schreibweise oder such nach dem Nachnamen."
                   : "Wähle einen anderen Tag im Verlauf."}
               </p>
@@ -733,7 +730,7 @@ export default function RankingBoard({
               <p>
                 {commitmentView
                   ? "Die Serie zählt jeden rechtzeitig eingereichten Tagesabschluss an Calling-Tagen, auch mit 0 Anwahlen."
-                  : "Gleichstände teilen sich einen Platz. 0 ist eine Meldung, keine Meldung ist keine 0."}
+                  : "Gleiche Zahlen, gleicher Platz. „–“ heißt: nicht gemeldet."}
               </p>
               <div>
                 {newest && !commitmentView && (
@@ -751,7 +748,7 @@ export default function RankingBoard({
                 )}
                 <button type="button" className="rb-share" onClick={share}>
                   <Link2 size={16} aria-hidden="true" />
-                  {shareMessage || "Link zu dieser Ansicht kopieren"}
+                  {shareMessage || "Link kopieren"}
                 </button>
               </div>
             </div>
@@ -773,16 +770,6 @@ export default function RankingBoard({
         )}
 
         {signedIn && home?.participant && <DiscordPanel url={discord} />}
-        <section className="rb-exchange" aria-label="Austausch">
-          <Link href="/tagesabschluss#andere">
-            <strong>Reflexionen lesen</strong>
-            <span>Was bei anderen heute funktioniert hat, unter Mein Tag.</span>
-          </Link>
-          <a href={discord} target="_blank" rel="noopener noreferrer">
-            <strong>Call-Partner im Discord finden</strong>
-            <span>Sessions, Roleplay und gemeinsames Callen. Öffnet Discord.</span>
-          </a>
-        </section>
 
         {!onlyRanking && !signedIn && (
           <section className="rb-how" id="so-funktionierts" aria-labelledby="rb-how-title">
@@ -796,7 +783,7 @@ export default function RankingBoard({
               ))}
             </ol>
             <p className="rb-how-foot">
-              Kostenfrei. Mehr zu Serie, Level und wer was sieht:{" "}
+              Mehr zu Serie, Level und wer was sieht:{" "}
               <Link className="do-link" href="/so-funktionierts">
                 So funktioniert’s im Detail
               </Link>
@@ -826,17 +813,13 @@ function PersonalPanel({
   home,
   submitted,
   note,
-  own,
   dayLabel,
-  onShowOwn,
 }: {
   home: HomeState;
   /** Gerade eingereicht (Rückkehr aus dem Formular). */
   submitted: boolean;
   note: SubmittedNote | null;
-  own: { rank: number; counts: Counts } | undefined;
   dayLabel: string;
-  onShowOwn: () => void;
 }) {
   // Ein noch offener Calling-Tag davor hat Vorrang, solange heute offen ist:
   // dort läuft eine Frist. Ist heute eingereicht, zeigt Mein Tag beides.
@@ -879,14 +862,6 @@ function PersonalPanel({
         <p className="rb-me-kicker">Mein Tag</p>
         <h2 id="rb-me-title">{state.title}</h2>
         <p>{state.text}</p>
-        {submitted && own && (
-          <p className="rb-me-rank">
-            <button type="button" className="do-link" onClick={onShowOwn}>
-              <Trophy size={16} aria-hidden="true" />
-              Platz {own.rank} mit {numbersLine(own.counts)}
-            </button>
-          </p>
-        )}
         {submitted && note && note.levelUps.length > 0 && (
           <p className="rb-me-level">
             Neues Leistungslevel: {note.levelUps.join(", ")}.{" "}
@@ -897,7 +872,7 @@ function PersonalPanel({
         )}
       </div>
       <Link
-        className={`do-button ${state.tone === "done" ? "do-button-secondary" : "do-button-primary"}`}
+        className={`do-button ${state.tone === "open" || state.tone === "draft" ? "do-button-primary" : "do-button-secondary"}`}
         href={state.href}
       >
         {state.action}
@@ -1040,7 +1015,6 @@ function RankRow({
   own,
   open,
   periodLabel,
-  monthly,
   signedIn,
   hasProfile,
   onToggle,
@@ -1051,7 +1025,6 @@ function RankRow({
   own: boolean;
   open: boolean;
   periodLabel: string;
-  monthly: boolean;
   signedIn: boolean;
   /** Mit eigenem Profil gibt es keinen „Das sind meine Zahlen“-Knopf mehr. */
   hasProfile: boolean;
@@ -1100,15 +1073,18 @@ function RankRow({
       {open && (
         <div className="rb-detail" id={`rb-detail-${row.id}`}>
           <p className="rb-detail-period">{periodLabel}</p>
+          {/* Nur gemeldete Kennzahlen; „–“ steht schon in der Zeile. */}
           <dl>
-            {visibleMetrics.map((key) => (
-              <div key={key}>
-                <dt>{metricLabels[key]}</dt>
-                <dd>{fmt(row.counts[key])}</dd>
-              </div>
-            ))}
+            {visibleMetrics
+              .filter((key) => typeof row.counts[key] === "number")
+              .map((key) => (
+                <div key={key}>
+                  <dt>{metricLabels[key]}</dt>
+                  <dd>{fmt(row.counts[key])}</dd>
+                </div>
+              ))}
           </dl>
-          {origin ? (
+          {origin && (
             <p className="rb-detail-note">
               <strong>{SPLIT_NOTE}</strong> Die gemeinsame Meldung von {origin.name} um{" "}
               {origin.reportedAt} Uhr ist je zur Hälfte auf die Beteiligten gerechnet. Es sind
@@ -1117,24 +1093,19 @@ function RankRow({
                 <span key={k.metric}> {k.why}</span>
               ))}
             </p>
-          ) : (
-            <p className="rb-detail-note">
-              Werte für {monthly ? "den Monat" : "diesen Tag"}. Nicht gemeldete Kennzahlen bleiben offen.
-            </p>
           )}
-          {row.claimed ? (
+          {row.claimed && !own && (
             <p className="rb-detail-claimed">
               <ShieldCheck size={16} aria-hidden="true" /> Dieses Profil gehört bereits zu einem Konto.
             </p>
-          ) : (
-            !own && (
-              <Link
-                className="do-button do-button-secondary"
-                href={`/starten?profil=${encodeURIComponent(row.id)}`}
-              >
-                Das sind meine Zahlen
-              </Link>
-            )
+          )}
+          {!row.claimed && !own && (
+            <Link
+              className="do-button do-button-secondary"
+              href={`/starten?profil=${encodeURIComponent(row.id)}`}
+            >
+              Das sind meine Zahlen
+            </Link>
           )}
           {!row.claimed && signedIn && !hasProfile && (
             <p className="rb-detail-hint">Du wirst mit deinem Konto zur Übernahme geführt.</p>
@@ -1193,7 +1164,7 @@ function CommitmentList({
       </div>
     );
   return (
-    <ol className="rb-list" aria-label={`Rangliste Abschluss-Serie, ${search ? `${rows.length} von ${total}` : total} Personen`}>
+    <ol className="rb-list" aria-label={`Rangliste Serie, ${search ? `${rows.length} von ${total}` : total} Personen`}>
       {rows.map((row, index) => (
         <li
           key={row.id}

@@ -17,11 +17,6 @@ const fmt = (value: number | null) =>
  * und darunter die Tage mit Meldungen samt Platz 1 nach der verdeckten
  * Wertung. Ein Tag öffnet sein Tagesranking.
  */
-/** „A“, „A und B“, „A, B und C“. */
-function joinNames(names: string[]) {
-  return names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names.at(-1)}`;
-}
-
 export default function RankingHistory({
   month,
   days,
@@ -54,7 +49,7 @@ export default function RankingHistory({
     <section className="rb-history" aria-labelledby="rb-history-title">
       <div className="rb-section-head">
         <h2 id="rb-history-title">Verlauf {formatMonth(month)}</h2>
-        <span>{unit} je Tag, keine laufende Summe</span>
+        <span>{unit} je Tag</span>
       </div>
       <div className="rb-chart" aria-hidden="true">
         {calendarDays.map((day) => {
@@ -94,6 +89,12 @@ export default function RankingHistory({
           <ol className="rb-days" aria-label={`Tage mit Meldungen im ${formatMonth(month)}`}>
             {shown.map((day) => {
               const leader = day.top;
+              // Bei Gleichstand nur die Anzahl; die Namen stehen im Tagesranking.
+              const leaderText = !leader
+                ? "Kein Platz 1"
+                : leader.people.length > 1
+                  ? `Platz 1: ${leader.people.length} gleichauf`
+                  : `Platz 1: ${leader.people[0]?.name ?? ""}`;
               const event = eventByDay.get(day.day);
               return (
                 <li key={day.day}>
@@ -106,14 +107,10 @@ export default function RankingHistory({
                       {formatDay(day.day, true)}
                       {event && <em>{event.title}</em>}
                     </span>
-                    <span className="rb-day-leader">
-                      {leader
-                        ? `Platz 1: ${joinNames(leader.people.map((p) => p.name))}`
-                        : "Kein Platz 1"}
-                    </span>
+                    <span className="rb-day-leader">{leaderText}</span>
                     <strong>
                       {fmt(day.counts.attempts)}
-                      <small>{unit} gesamt</small>
+                      <small>{unit}</small>
                     </strong>
                   </button>
                 </li>
