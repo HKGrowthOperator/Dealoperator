@@ -2,9 +2,9 @@ import type { HomeState } from "@/server/home";
 
 /*
  * Der eigene Stand für heute als Karte: was offen ist und wohin es geht.
- * Ein Ort für die Wortwahl, damit Startseite und „Mein Tag“ dasselbe sagen.
- * Zahlen eintragen läuft über die Reflexionen (erst der eigene Tag, dann die
- * anderen); ansehen und korrigieren über das Formular unter Mein Tag.
+ * Ein Ort für die Wortwahl, damit Startseite und Bestätigung dasselbe sagen.
+ * Eintragen, ansehen und korrigieren laufen über das Formular unter Mein Tag;
+ * nach dem Einreichen führt der nächste Schritt zu den Reflexionen.
  */
 
 export type DayStateIcon = "clock" | "check" | "circle-check" | "dashed" | "draft";
@@ -44,12 +44,8 @@ export function earlierState(home: HomeState): DayState | null {
   };
 }
 
-/**
- * Der Stand für heute. Auf der Startseite („board“) geht es bei einem
- * eingereichten Tag zu Mein Tag; unter Mein Tag („hub“) weiter zu den
- * Reflexionen, weil das dort der nächste Schritt ist.
- */
-export function dayState(home: HomeState, where: "board" | "hub"): DayState {
+/** Der Stand für heute mit dem einen nächsten Schritt. */
+export function dayState(home: HomeState): DayState {
   if (!home.participant) {
     if (home.request && ["pending", "info_needed"].includes(home.request.status))
       return {
@@ -67,23 +63,20 @@ export function dayState(home: HomeState, where: "board" | "hub"): DayState {
       icon: "dashed",
       tone: "open",
       title: "Dein Konto hat noch kein Profil.",
-      text: "Leg ein Profil an oder übernimm deine Zahlen, wenn du schon in der Rangliste stehst.",
+      text: "Übernimm dein Profil, wenn du schon in der Rangliste stehst, oder leg eins an.",
       href: "/start",
       action: "Profil einrichten",
     };
   }
   const t = home.today!;
-  const onward =
-    where === "hub"
-      ? { href: "/reflexionen", action: "Reflexionen lesen" }
-      : { href: "/tagesabschluss", action: "Meinen Tag ansehen" };
   if (t.status === "done")
     return {
       icon: "circle-check",
       tone: "done",
-      title: "Heute abgeschlossen.",
-      text: "Deine Zahlen und deine Reflexion sind eingereicht.",
-      ...onward,
+      title: "Dein Tag ist drin.",
+      text: "Zahlen und Reflexion sind eingereicht und zählen.",
+      href: "/reflexionen",
+      action: "Reflexionen lesen",
     };
   if (t.status === "imported")
     return {
@@ -91,7 +84,8 @@ export function dayState(home: HomeState, where: "board" | "hub"): DayState {
       tone: "done",
       title: "Deine Zahlen für heute sind eingetragen.",
       text: "Das Team hat sie übernommen.",
-      ...onward,
+      href: "/reflexionen",
+      action: "Reflexionen lesen",
     };
   if (t.status === "draft")
     return {
@@ -99,17 +93,17 @@ export function dayState(home: HomeState, where: "board" | "hub"): DayState {
       tone: "draft",
       title: "Dein Entwurf für heute ist gespeichert.",
       text: "Er zählt, sobald du ihn einreichst.",
-      href: "/reflexionen",
+      href: "/tagesabschluss",
       action: "Fortsetzen",
     };
   return {
     icon: "dashed",
     tone: "open",
-    title: t.due ? "Dein Abschluss für heute ist noch offen." : "Heute ist kein Calling-Tag.",
+    title: t.due ? "Dein Tag für heute ist noch offen." : "Heute ist kein Calling-Tag.",
     text: t.due
-      ? "Zahlen und zwei kurze Fragen, dann zählt dein Tag."
-      : "Ein Abschluss ist freiwillig und zählt als Bonus.",
-    href: "/reflexionen",
+      ? "Zahlen und zwei kurze Antworten, dann zählt dein Tag."
+      : "Ein Eintrag ist freiwillig und zählt als Bonus.",
+    href: "/tagesabschluss",
     action: "Zahlen eintragen",
   };
 }

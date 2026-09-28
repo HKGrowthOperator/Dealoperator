@@ -644,7 +644,11 @@ export default function ClosingForm({
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
   /** Nach erfolgreichem Einreichen, mit der Bestätigung (Tag, Folge, Serie, Level). */
-  onSubmitted?: (day: string, confirmation: Confirmation) => void;
+  onSubmitted?: (
+    day: string,
+    confirmation: Confirmation,
+    settings: CommitmentSettings | null,
+  ) => void;
   /** Zusatz in der Bestätigung, z. B. das einmalige Angebot für Erinnerungen. */
   afterSubmit?: React.ReactNode;
 }) {
@@ -994,7 +998,7 @@ export default function ClosingForm({
       setTouched(new Set());
       setDraftStatus({ kind: "idle" });
       announceClosingChange();
-      onSubmitted?.(form.day, confirmation);
+      onSubmitted?.(form.day, confirmation, (fresh ?? state)?.settings ?? null);
       window.setTimeout(() => confirmRef.current?.focus(), 0);
     } catch (e) {
       const err = e as ApiError;
