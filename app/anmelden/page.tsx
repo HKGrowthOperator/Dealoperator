@@ -1,6 +1,6 @@
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import AuthForm from "../features/auth-form";
-import { authReady, getCurrentUser, safeNext } from "@/server/auth";
+import { authReady, getCurrentUser, safeNext, viewerOf } from "@/server/auth";
 import { databaseReady } from "@/server/database";
 import { emailCodeEnabled } from "@/server/email-auth";
 import { redirect } from "next/navigation";
@@ -22,7 +22,7 @@ export default async function Page({
   if (await getCurrentUser()) redirect(next);
   return (
     <div className="operator-site">
-      <OperatorHeader />
+      <OperatorHeader viewer={viewerOf(null)} />
       <main className="auth-layout">
         <AuthForm
           ready={authReady() && databaseReady()}

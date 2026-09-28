@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, isTeam } from "@/server/auth";
+import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
 import { requestForActor } from "@/server/onboarding";
@@ -24,7 +24,7 @@ export default async function Page() {
   if (!request) redirect("/start");
   return (
     <div className="operator-site">
-      <OperatorHeader />
+      <OperatorHeader viewer={viewerOf(actor)} />
       <main className="auth-layout">
         <RequestStatus
           request={{

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser, isTeam } from "@/server/auth";
+import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { AppError } from "@/server/operator";
 import { profileForSelection } from "@/server/onboarding";
@@ -77,7 +77,7 @@ export default async function Page({
 
   return (
     <div className="operator-site">
-      <OperatorHeader />
+      <OperatorHeader viewer={viewerOf(actor)} />
       <main className="auth-layout">
         {owned ? (
           <section className="auth-card card flow">

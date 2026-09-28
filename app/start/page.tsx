@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentUser, isTeam, safeNext } from "@/server/auth";
+import { getCurrentUser, isTeam, safeNext, viewerOf } from "@/server/auth";
 import { database } from "@/server/database";
 import { ownState } from "@/server/operator";
 import { homeState } from "@/server/home";
@@ -112,7 +112,7 @@ export default async function Page({
 
   return (
     <div className="operator-site">
-      <OperatorHeader />
+      <OperatorHeader viewer={viewerOf(actor)} />
       <main className="auth-layout">
         <MemberOnboarding
           next={next}
