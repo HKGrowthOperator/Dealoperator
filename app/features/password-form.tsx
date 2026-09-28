@@ -76,8 +76,9 @@ export default function PasswordForm({
           {hasPassword ? "Passwort ändern." : "Passwort festlegen."}
         </h1>
         <p className="flow-lead">
-          Damit meldest du dich künftig mit E-Mail und Passwort an, ohne Mail. Dein
-          Passwort-Manager kann es speichern.
+          {hasPassword
+            ? "Neues Passwort, mindestens 8 Zeichen. Du bleibst angemeldet."
+            : "Damit meldest du dich künftig mit E-Mail und Passwort an, ohne Link per E-Mail. Mindestens 8 Zeichen."}
         </p>
         {message && (
           <p className="form-error" role="alert">
@@ -105,7 +106,6 @@ export default function PasswordForm({
             error={error}
             autoComplete="new-password"
             inputRef={input}
-            note="Mindestens 8 Zeichen."
           />
           <button className="btn primary full" disabled={busy}>
             {busy && <LoaderCircle className="spin" size={18} />}

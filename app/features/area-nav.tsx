@@ -13,7 +13,7 @@ const AREAS = {
     items: [
       { path: "/tagesabschluss", href: "/tagesabschluss", label: "Mein Tag" },
       { path: "/heute", href: "/heute?modus=eigen", label: "Fortschritt" },
-      { path: "/zahlen", href: "/zahlen?modus=eigen", label: "Zahlen" },
+      { path: "/zahlen", href: "/zahlen?modus=eigen", label: "Tage" },
       { path: "/profil", href: "/profil?modus=eigen", label: "Profil" },
     ],
   },

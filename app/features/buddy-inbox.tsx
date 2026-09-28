@@ -48,6 +48,8 @@ export default function BuddyInbox({
           : "Anfrage abgelehnt.",
       );
   }
+  // Ohne Call-Partner gibt es noch nichts anzufragen: Karte weglassen.
+  if (data.buddies.length === 0 && data.members.length === 0) return null;
   // Noch keine Anfragen: nur kurz erklären, wo sie später stehen.
   if (data.buddies.length === 0)
     return (

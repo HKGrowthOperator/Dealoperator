@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PHONE_COUNTRIES, splitPhone } from "@/lib/phone";
+import { loadViewer } from "./operator-shell";
 
 /** Rückweg nach dem Ergänzen, z. B. zum begonnenen Tagesabschluss. */
 function returnTarget(value: string | null) {
@@ -132,7 +133,7 @@ export default function AccountSettings({
         >
           <div className="checkin-fields">
             <label>
-              Anzeigename in der Rangliste
+              Anzeigename
               <input
                 required
                 minLength={2}
@@ -214,6 +215,17 @@ export default function AccountSettings({
 /** Passwort und Abmelden: ruhig am Ende, getrennt vom Speichern. */
 export function AccountAccess() {
   const [error, setError] = useState("");
+  // Gleicher Abruf wie das Kontomenü: ob schon ein Passwort gesetzt ist.
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    void loadViewer().then((v) => {
+      if (live && v) setHasPassword(v.hasPassword);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   return (
     <section className="card padded account-access" aria-labelledby="account-access-title">
       <h2 id="account-access-title">Anmeldung</h2>
@@ -224,7 +236,11 @@ export function AccountAccess() {
       )}
       <div className="account-access-actions">
         <Link className="btn secondary" href="/passwort">
-          Passwort festlegen oder ändern
+          {hasPassword === null
+            ? "Passwort festlegen oder ändern"
+            : hasPassword
+              ? "Passwort ändern"
+              : "Passwort festlegen"}
         </Link>
         <button
           type="button"

@@ -861,6 +861,13 @@ button.do-link {
     grid-column: 1 / -1;
   }
 }
+/* Breit: der Kopfknopf „Zahlen eintragen“ ist immer sichtbar, die Karte
+   braucht bei offenem Tag keinen zweiten. */
+@media (min-width: 900px) {
+  .rb-me[data-tone="open"] > .do-button-primary {
+    display: none;
+  }
+}
 
 /* Gemeinsam erreicht */
 .rb-results {
@@ -1774,40 +1781,7 @@ li[data-open] .rb-chevron {
   }
 }
 
-/* Übernahme, Austausch, Erklärung */
-.rb-exchange {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
-}
-.rb-exchange a {
-  display: grid;
-  gap: 2px;
-  min-height: 72px;
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--do-line);
-  border-radius: var(--radius-l);
-  background: var(--do-surface);
-  color: var(--do-ink);
-  text-decoration: none;
-  transition: border-color 160ms var(--ease-out);
-}
-.rb-exchange a:hover {
-  border-color: var(--do-blue-line);
-}
-.rb-exchange strong {
-  color: var(--do-blue);
-  font-size: var(--text-body);
-}
-.rb-exchange span {
-  color: var(--do-ink-2);
-  font-size: var(--text-label);
-}
-@media (max-width: 599px) {
-  .rb-exchange {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
+/* Übernahme, Erklärung */
 .rb-how h2 {
   margin: 0 0 var(--space-4);
   font-size: var(--text-heading);
@@ -1854,7 +1828,7 @@ li[data-open] .rb-chevron {
   font-size: var(--text-label);
 }
 .rb-how-foot .do-link {
-  min-height: 0;
+  min-height: 44px;
   font-size: inherit;
 }
 .rb-claim-hint {
@@ -2671,7 +2645,7 @@ li[data-open] .rb-chevron {
 .hw-jump a {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--do-line-strong);
   border-radius: 99px;
@@ -3083,33 +3057,6 @@ li[data-open] .rb-chevron {
 }
 .hw-discord .rb-discord-steps {
   margin-top: var(--space-3);
-}
-.hw-end {
-  margin-top: var(--space-8);
-  padding: var(--space-6) var(--space-5);
-  border-radius: var(--radius-l);
-  background: var(--do-ink);
-  color: oklch(97% 0.01 255);
-  text-align: center;
-}
-.hw-end p {
-  margin: 0;
-  color: oklch(97% 0.01 255);
-  font-size: var(--text-heading);
-  font-weight: 800;
-}
-.hw-end .hw-cta {
-  justify-content: center;
-  margin-top: var(--space-4);
-}
-.hw-end .do-button-secondary {
-  border-color: oklch(45% 0.08 260);
-  background: transparent;
-  color: oklch(97% 0.01 255);
-}
-.hw-end .do-button-secondary:hover {
-  border-color: oklch(70% 0.1 258);
-  color: oklch(99% 0.005 255);
 }
 @media (max-width: 599px) {
   .hw {
@@ -3927,14 +3874,9 @@ li[data-medal="gold"] .rb-bar i {
   border-color: color-mix(in oklch, var(--do-green) 35%, var(--do-line));
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--do-green) 10%, transparent);
 }
-.rb-me-rank,
 .rb-me-level {
   margin: var(--space-2) 0 0;
   font-size: var(--text-label);
-}
-.rb-me-rank .do-link {
-  gap: var(--space-2);
-  font-weight: 700;
 }
 .rb-me-level {
   color: var(--do-ink-2);
@@ -4379,4 +4321,21 @@ li[data-medal="gold"] .rb-bar i {
   border: 1px solid var(--do-line);
   border-radius: var(--radius-m);
   background: var(--do-surface);
+}
+.rb-discord-inline .do-button {
+  margin-top: var(--space-3);
+}
+/* Kacheln der Abschluss-Serie: „Abschlüsse“ bricht am weichen Trennzeichen um. */
+.cm-stats dt {
+  hyphens: manual;
+}
+.rf-done .do-button {
+  color: inherit;
+  text-decoration: none;
+}
+/* Fuß am Handy: eine Zeile Links, keine zweite Wortmarke. */
+@media (max-width: 799px) {
+  .do-footer .do-logo {
+    display: none;
+  }
 }

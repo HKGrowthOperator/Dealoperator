@@ -13,7 +13,7 @@ export const views = [
 export type View = (typeof views)[number];
 export const labels: Record<View, string> = {
   heute: "Übersicht",
-  zahlen: "Meine Zahlen",
+  zahlen: "Meine Tage",
   reflexion: "Tägliche Reflexion",
   partner: "Call-Partner",
   sessions: "Sessions & Roleplay",

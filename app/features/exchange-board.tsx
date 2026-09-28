@@ -54,12 +54,12 @@ export default function ExchangeBoard({
   );
   return (
     <section className="exchange-board">
-      <div className="workflow-heading">
-        <p>
-          Dein Gesprächseinstieg, ein schwieriger Einwand, ein kleiner
-          Fortschritt: Bring es in den Austausch.
-        </p>
-        {data.posts.length > 0 && (
+      {data.posts.length > 0 && (
+        <div className="workflow-heading">
+          <p>
+            Dein Gesprächseinstieg, ein schwieriger Einwand, ein kleiner
+            Fortschritt: Bring es in den Austausch.
+          </p>
           <button
             className="btn primary"
             onClick={() => (data.profile.name ? setWriting(true) : onProfile())}
@@ -67,8 +67,8 @@ export default function ExchangeBoard({
             <Plus size={18} />
             Beitrag teilen
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {data.posts.length > 0 && (
         <div className="board-controls">
           <Tabs value={filter} onValueChange={setFilter}>
@@ -135,7 +135,7 @@ export default function ExchangeBoard({
           <h3>
             {data.posts.length
               ? "Keine passenden Beiträge."
-              : "Dein Learning könnte jemandem helfen."}
+              : "Deine Erfahrung könnte jemandem helfen."}
           </h3>
           <p>
             {data.posts.length

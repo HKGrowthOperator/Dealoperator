@@ -18,7 +18,6 @@ import DiscordLink from "./features/discord-link";
 import type { CommitmentSettings } from "@/lib/commitment";
 import BuddyInbox from "./features/buddy-inbox";
 import ExchangeBoard from "./features/exchange-board";
-import DiscordNudge from "./features/discord-nudge";
 import ActiveCallerCard from "./features/active-caller-card";
 import {
   earliestSessionDay,
@@ -117,6 +116,8 @@ function initials(name: string) {
       .join("") || "DU"
   );
 }
+/** Neutraler Wert des Call-Zeit-Filters (zugleich die Beschriftung). */
+const ALL_TIMES = "Alle Call-Zeiten";
 function prettyDate(date: string) {
   return new Date(`${date}T12:00:00`).toLocaleDateString("de-DE", {
     day: "numeric",
@@ -321,7 +322,7 @@ export default function CommunityApp({
   );
   const [profile, setProfile] = useState<Profile>(demoData().profile);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("Alle");
+  const [filter, setFilter] = useState(ALL_TIMES);
   const [sessionFilter, setSessionFilter] = useState("Alle");
   const [message, setMessage] = useState(
     "Hey, hast du Lust, zusammen zu üben oder einen Extra-Block zu machen? Passt dir diese Woche ein Termin?",
@@ -416,7 +417,7 @@ export default function CommunityApp({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Navigation closes drafts belonging to the previous section.
     setSearch("");
-    setFilter("Alle");
+    setFilter(ALL_TIMES);
     setMember(null);
     setSession(null);
     setModal(null);
@@ -631,6 +632,9 @@ export default function CommunityApp({
   weekStart.setUTCDate(
     weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7),
   );
+  // Ende der Kalenderwoche (Sonntag) für die Kopfzeile „Diese Woche“.
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
   const weekRecords = data.records.filter(
     (r) => r.date >= dateKey(weekStart) && r.date <= dateKey(),
   );
@@ -859,11 +863,8 @@ export default function CommunityApp({
           <span>
             Mein Profil bei den Call-Partnern anzeigen
             <small>
-              Andere Angemeldete sehen Name, Rolle, Zielgruppe, Call-Zeit,
-              Wochenziel, Call-Tage, Beschreibung und deinen Discord-Namen.
-              Admins und Moderatoren sehen dein Call-Profil auch ohne Häkchen,
-              um Call-Partner und Sessions zu vermitteln. E-Mail und
-              Telefonnummer bleiben privat.
+              Andere Angemeldete sehen dann dein Call-Profil, ohne E-Mail und
+              Nummer. Das Team sieht es immer.
             </small>
           </span>
         </label>
@@ -1067,13 +1068,13 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Mein Fortschritt"
-                    text="Deine Woche, deine Abschluss-Serie und deine Level."
+                    text="Deine Woche, deine Serie und deine Leistungslevel."
                   />
                   <section className="ca-section" aria-labelledby="ca-week">
                     <div className="ca-section-head">
                       <h2 id="ca-week">Diese Woche</h2>
                       <span>
-                        {prettyDate(dateKey(weekStart))} bis {prettyDate(dateKey())}
+                        {prettyDate(dateKey(weekStart))} bis {prettyDate(dateKey(weekEnd))}
                       </span>
                     </div>
                     <dl className="ca-week-stats">
@@ -1123,6 +1124,7 @@ export default function CommunityApp({
                   <CommitmentDashboard />
                   {!demo && (
                     <ActiveCallerCard
+                      compact
                       state={data.activeCaller}
                       team={data.viewerTeam}
                     />
@@ -1134,27 +1136,30 @@ export default function CommunityApp({
               {initialView === "zahlen" && (
                 <>
                   <PageHeading
-                    title="Meine Zahlen"
-                    text="Jeder Tag einzeln, mit Zahlen und Reflexion. Einen Tag korrigierst du im Tagesabschluss."
+                    title="Meine Tage"
+                    text="Alle Tage mit Zahlen und Reflexion. Korrigieren kannst du unter Mein Tag."
                   >
-                    <div className="button-row">
-                      <button
-                        className="do-button do-button-secondary"
-                        disabled={!data.records.length}
-                        onClick={exportNumbers}
-                      >
-                        <Download size={17} aria-hidden="true" />
-                        Als CSV herunterladen
-                      </button>
-                    </div>
+                    {data.records.length > 0 && (
+                      <div className="button-row">
+                        <button
+                          className="do-button do-button-secondary"
+                          onClick={exportNumbers}
+                        >
+                          <Download size={17} aria-hidden="true" />
+                          Als CSV herunterladen
+                        </button>
+                      </div>
+                    )}
                   </PageHeading>
                   <section className="card">
-                    <div className="card-heading padded">
-                      <div>
-                        <h2>Deine Tage</h2>
+                    {data.records.length > 0 && (
+                      <div className="card-heading padded">
+                        <div>
+                          <h2>Deine Tage</h2>
+                        </div>
+                        <Tag>{data.records.length} {data.records.length === 1 ? "Eintrag" : "Einträge"}</Tag>
                       </div>
-                      <Tag>{data.records.length} {data.records.length === 1 ? "Eintrag" : "Einträge"}</Tag>
-                    </div>
+                    )}
                     {data.records.length ? (
                       <ul className="checkin-cards">
                         {[...data.records]
@@ -1181,7 +1186,7 @@ export default function CommunityApp({
                                     className="btn secondary"
                                     onClick={() => openClosing(r.date)}
                                   >
-                                    Im Tagesabschluss öffnen
+                                    Unter Mein Tag öffnen
                                   </button>
                                 </div>
                                 <dl className="checkin-card-kpis">
@@ -1243,7 +1248,11 @@ export default function CommunityApp({
                         icon={BarChart3}
                         title="Jede Routine hat einen ersten Tag."
                         text="Reiche deinen ersten Tagesabschluss ein. Danach siehst du hier deine Entwicklung."
-                      />
+                      >
+                        <Link className="btn primary" href="/tagesabschluss">
+                          Zahlen für heute eintragen
+                        </Link>
+                      </Empty>
                     )}
                   </section>
                 </>
@@ -1253,7 +1262,7 @@ export default function CommunityApp({
                 <>
                   <PageHeading
                     title="Call-Partner"
-                    text="Wer wann einen Call-Partner sucht: zum Üben, für ehrliches Feedback oder einen zusätzlichen Block. Verabredet wird sich im Discord."
+                    text="Wer wann zum Üben, für Feedback oder einen zusätzlichen Block callt."
                   >
                     {/* Solange das Profil nicht gezeigt wird, führt die Karte
                         darunter dorthin; kein zweiter Knopf. */}
@@ -1273,6 +1282,15 @@ export default function CommunityApp({
                   {/* Wer Discord noch nicht kennt, sieht hier den Weg hinein. */}
                   <section className="rb-discord-inline" aria-label="Discord">
                     <DiscordSteps summary="Verabreden im Discord: so kommst du rein." />
+                    <a
+                      className="do-button do-button-secondary"
+                      href={discordInvite}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Discord öffnen
+                      <span className="do-sr"> (neues Fenster)</span>
+                    </a>
                   </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
@@ -1323,37 +1341,39 @@ export default function CommunityApp({
                       </button>
                     </section>
                   )}
-                  <div className="filter-row">
-                    <label className="search-input">
-                      <Search size={18} aria-hidden="true" />
-                      <input
-                        type="search"
-                        aria-label="Call-Partner durchsuchen"
-                        placeholder="Name, Zielgruppe oder Thema suchen …"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                  {data.members.length > 0 && (
+                    <div className="filter-row">
+                      <label className="search-input">
+                        <Search size={18} aria-hidden="true" />
+                        <input
+                          type="search"
+                          aria-label="Call-Partner durchsuchen"
+                          placeholder="Name, Zielgruppe oder Thema suchen …"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                        />
+                      </label>
+                      <FieldSelect
+                        label="Call-Zeit filtern"
+                        value={filter}
+                        onChange={setFilter}
+                        options={[
+                          ALL_TIMES,
+                          "Vormittags",
+                          "Nachmittags",
+                          "Abends",
+                          "Flexibel",
+                        ]}
                       />
-                    </label>
-                    <FieldSelect
-                      label="Call-Zeit filtern"
-                      value={filter}
-                      onChange={setFilter}
-                      options={[
-                        "Alle",
-                        "Vormittags",
-                        "Nachmittags",
-                        "Abends",
-                        "Flexibel",
-                      ]}
-                    />
-                  </div>
+                    </div>
+                  )}
                   <div className="member-grid">
                     {data.profile.listed &&
                       memberCard({ id: "self", ...data.profile }, true)}
                     {data.members
                       .filter(
                         (m) =>
-                          (filter === "Alle" || m.time === filter) &&
+                          (filter === ALL_TIMES || m.time === filter) &&
                           `${m.name} ${m.niche} ${m.role} ${m.bio}`
                             .toLowerCase()
                             .includes(search.toLowerCase()),
@@ -1362,7 +1382,7 @@ export default function CommunityApp({
                   </div>
                   {!data.members.filter(
                     (m) =>
-                      (filter === "Alle" || m.time === filter) &&
+                      (filter === ALL_TIMES || m.time === filter) &&
                       `${m.name} ${m.niche} ${m.role} ${m.bio}`
                         .toLowerCase()
                         .includes(search.toLowerCase()),
@@ -1380,7 +1400,7 @@ export default function CommunityApp({
                           ? "Probiere ein anderes Thema oder eine andere Call-Zeit."
                           : data.profile.listed
                             ? "Sobald weitere Caller ihr Call-Profil zeigen, stehen sie hier."
-                            : "Noch hat niemand sein Call-Profil gezeigt. Mit deinem machst du den Anfang."
+                            : "Mit deinem Call-Profil machst du den Anfang."
                       }
                     />
                   )}
@@ -1390,12 +1410,6 @@ export default function CommunityApp({
                     demo={demo}
                     saving={saving}
                   />
-                  <DiscordNudge context="buddy" url={discordUrl} />
-                  <div className="bottom-note">
-                    <ShieldCheck size={17} />
-                    Deine Kontaktdaten bleiben bei dir. Ein Kontakt zu einem
-                    Call-Partner startet mit einer bewussten Anfrage.
-                  </div>
                 </>
               )}
 
@@ -1511,7 +1525,7 @@ export default function CommunityApp({
                       text={
                         sessionsOpen
                           ? "Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an. Den Raum im Discord legen wir dafür an."
-                          : "Sessions legst du als aktiver Caller an. Wie du das wirst, steht oben."
+                          : "Sessions legst du als aktiver Caller an: Call-Block, Roleplay oder ein kurzer Rückblick zu zweit."
                       }
                     >
                       {sessionsOpen && !data.sessions.length && (
@@ -1521,32 +1535,34 @@ export default function CommunityApp({
                       )}
                     </Empty>
                   )}
-                  <div className="session-principles">
-                    <div>
-                      <Headphones size={23} />
-                      <h3>Call-Block</h3>
-                      <p>
-                        Zu zweit oder im kleinen Kreis zusätzlich callen. Den
-                        Ablauf stimmt ihr selbst ab.
-                      </p>
+                  {sessionsOpen && (
+                    <div className="session-principles">
+                      <div>
+                        <Headphones size={23} />
+                        <h3>Call-Block</h3>
+                        <p>
+                          Zu zweit oder im kleinen Kreis zusätzlich callen. Den
+                          Ablauf stimmt ihr selbst ab.
+                        </p>
+                      </div>
+                      <div>
+                        <MessageCircle size={23} />
+                        <h3>Roleplay</h3>
+                        <p>
+                          Gespräche üben, Feedback bekommen und mit mehr
+                          Sicherheit starten.
+                        </p>
+                      </div>
+                      <div>
+                        <Sparkles size={23} />
+                        <h3>Rückblick</h3>
+                        <p>
+                          Kurzer Rückblick mit deinem Call-Partner: Was lief gut,
+                          was probiert ihr als Nächstes?
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <MessageCircle size={23} />
-                      <h3>Roleplay</h3>
-                      <p>
-                        Gespräche üben, Feedback bekommen und mit mehr
-                        Sicherheit starten.
-                      </p>
-                    </div>
-                    <div>
-                      <Sparkles size={23} />
-                      <h3>Rückblick</h3>
-                      <p>
-                        Kurzer Rückblick mit deinem Call-Partner: Was lief gut,
-                        was probiert ihr als Nächstes?
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </>
               )}
 
@@ -1591,7 +1607,7 @@ export default function CommunityApp({
                         <button
                           className={`btn secondary ${filter === "saved" ? "chosen" : ""}`}
                           onClick={() =>
-                            setFilter(filter === "saved" ? "Alle" : "saved")
+                            setFilter(filter === "saved" ? ALL_TIMES : "saved")
                           }
                         >
                           <Bookmark size={17} />
@@ -1674,22 +1690,24 @@ export default function CommunityApp({
                           text="Speichere einen Beitrag in deiner Merkliste oder passe die Suche an."
                         />
                       )}
-                      <section className="feedback-banner">
-                        <div>
-                          <Tag tone="green">AUS DER PRAXIS.</Tag>
-                          <h2>Feedback zu deinem Einstieg holen.</h2>
-                          <p>
-                            Bring deinen echten Gesprächseinstieg ins nächste
-                            Roleplay.
-                            <br />
-                            Gemeinsam findet ihr heraus, was verständlich ist
-                            und was noch hakt.
-                          </p>
-                        </div>
-                        <Link href={href("sessions")} className="btn primary">
-                          Feedback-Session finden
-                        </Link>
-                      </section>
+                      {sessionsOpen && (
+                        <section className="feedback-banner">
+                          <div>
+                            <Tag tone="green">AUS DER PRAXIS.</Tag>
+                            <h2>Feedback zu deinem Einstieg holen.</h2>
+                            <p>
+                              Bring deinen echten Gesprächseinstieg ins nächste
+                              Roleplay.
+                              <br />
+                              Gemeinsam findet ihr heraus, was verständlich ist
+                              und was noch hakt.
+                            </p>
+                          </div>
+                          <Link href={href("sessions")} className="btn primary">
+                            Feedback-Session finden
+                          </Link>
+                        </section>
+                      )}
                     </>
                   )}
                 </>

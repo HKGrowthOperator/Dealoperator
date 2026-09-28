@@ -6,7 +6,7 @@ import type { Viewer } from "./operator-shell";
 
 /**
  * Kontomenü im Kopf (nur angemeldet). Führt in den eigenen Bereich:
- * Mein Tag, Fortschritt, eigene Zahlen, Profil und Einstellungen.
+ * Mein Tag, Fortschritt, Tage, Profil. Das Passwort steht im Profil.
  */
 export default function AccountMenu({ viewer }: { viewer: Viewer }) {
   const id = useId();
@@ -66,16 +66,13 @@ export default function AccountMenu({ viewer }: { viewer: Viewer }) {
             Mein Tag
           </Link>
           <Link href="/heute?modus=eigen" onClick={close}>
-            Mein Fortschritt
+            Fortschritt
           </Link>
           <Link href="/zahlen?modus=eigen" onClick={close}>
-            Meine Zahlen
+            Tage
           </Link>
           <Link href="/profil?modus=eigen" onClick={close}>
-            Profil und Einstellungen
-          </Link>
-          <Link href="/passwort" onClick={close}>
-            {viewer.hasPassword ? "Passwort ändern" : "Passwort festlegen"}
+            Profil
           </Link>
           {viewer.team && (
             <Link href="/verwaltung" onClick={close}>

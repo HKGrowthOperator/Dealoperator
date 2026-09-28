@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "So funktioniert’s · Deal Operator",
   description:
-    "Wie der Tagesabschluss, die Abschluss-Serie, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
+    "Wie der Tagesabschluss, die Serie, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
 };
 
 const DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
@@ -65,8 +65,8 @@ export default async function Page() {
         <header className="hw-head">
           <h1>So funktioniert’s</h1>
           <p>
-            Deal Operator hält fest, was beim gemeinsamen Callen entsteht: deine Zahlen, deine
-            Learnings und was alle zusammen schaffen. Kostenfrei.
+            Deal Operator hält fest, was beim gemeinsamen Callen entsteht: deine Zahlen, was du
+            gelernt hast und was alle zusammen schaffen. Kostenfrei.
           </p>
           <nav className="hw-jump" aria-label="Auf dieser Seite">
             <a href="#dein-tag">Dein Tag</a>
@@ -98,13 +98,10 @@ export default async function Page() {
             </li>
             <li>
               <div className="hw-step-text">
-                <h3>Tag abschließen</h3>
+                <h3>Zahlen eintragen</h3>
                 <p>
                   Anwahlen, Settings und Closings eintragen, Energie wählen und zwei Fragen
                   beantworten: Was lief gut? Was machst du beim nächsten Calling-Tag besser?
-                </p>
-                <p className="hw-quiet">
-                  Ein Entwurf speichert sich automatisch und zählt erst nach dem Einreichen.
                 </p>
               </div>
               <div className="hw-visual hw-form" aria-hidden="true">
@@ -147,9 +144,6 @@ export default async function Page() {
 
         <section className="hw-section" id="was-zaehlt" aria-labelledby="hw-counts">
           <h2 id="hw-counts">Was wofür zählt</h2>
-          <p className="hw-lead">
-            Drei Dinge laufen nebeneinander. Jedes misst etwas anderes, keines ersetzt das andere.
-          </p>
           <div className="hw-systems">
             <article id="serie">
               <div className="hw-key">
@@ -157,7 +151,7 @@ export default async function Page() {
                 <span>am nächsten Calling-Tag</span>
               </div>
               <div>
-                <h3>Abschluss-Serie</h3>
+                <h3>Serie</h3>
                 <p>
                   Jeder rechtzeitige Tagesabschluss an einem Calling-Tag verlängert deine Serie,
                   auch mit 0 Anwahlen.
@@ -173,7 +167,7 @@ export default async function Page() {
                 <span>mit mindestens {ACTIVE_MIN_ATTEMPTS} Anwahlen</span>
               </div>
               <div>
-                <h3>Aktive Calling-Tage</h3>
+                <h3>Aktiver Caller</h3>
                 <p>
                   Damit wirst du Aktiver Caller: Sessions und Roleplay stehen dir offen, im
                   Discord trägst du die gleichnamige Rolle. Nach {ACTIVE_LOST_AFTER_IDLE}{" "}
@@ -191,8 +185,7 @@ export default async function Page() {
                 <p>
                   Aus allen deinen Tagen, getrennt je Kennzahl: Level 1 gibt es ab{" "}
                   {n(firstLevels[0])} Anwahlen, {n(firstLevels[1])} Settings,{" "}
-                  {n(firstLevels[2])} Closings oder dem ersten Deal. Dein Fortschritt steht in
-                  echten Einheiten, zum Beispiel „40 von 100 Anwahlen“.
+                  {n(firstLevels[2])} Closings oder dem ersten Deal.
                 </p>
               </div>
             </article>
@@ -240,7 +233,7 @@ export default async function Page() {
           <h2 id="hw-fair">Fair gezählt</h2>
           <ul className="hw-rules">
             <li>
-              <strong>Abschlüsse wiegen mehr als Anwahlen.</strong> Die Reihenfolge folgt dem
+              <strong>Closings wiegen mehr als Anwahlen.</strong> Die Reihenfolge folgt dem
               Gesamterfolg des Tages aus Anwahlen, vereinbarten Settings und Closings und
               gewonnenen Deals; die Zahlen selbst stehen in jeder Zeile.
             </li>
@@ -322,11 +315,6 @@ export default async function Page() {
             <ExternalLink size={16} aria-hidden="true" />
             <span className="do-sr">(neues Fenster)</span>
           </a>
-        </section>
-
-        <section className="hw-end" aria-label="Loslegen">
-          <p>{signedIn ? "Bereit für heute?" : "Kostenfrei, ohne Verpflichtung."}</p>
-          <Cta signedIn={signedIn} />
         </section>
       </main>
       <OperatorFooter discordUrl={discord} showAdmin={!!actor && isTeam(actor)} />

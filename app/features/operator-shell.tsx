@@ -111,10 +111,11 @@ export function OperatorHeader({
   useEffect(() => {
     const current = strip.current?.querySelector<HTMLElement>('[aria-current="page"]');
     if (current && strip.current && strip.current.scrollWidth > strip.current.clientWidth)
-      current.scrollIntoView({ inline: "center", block: "nearest" });
+      current.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [area]);
   // Abgemeldet entfallen die eigenen Bereiche; „Anmelden“ steht rechts im
-  // Kopf. Solange der Anmeldestand noch lädt, bleibt die angemeldete Leiste.
+  // Kopf, außer wo das Formular oder die Zeile „Schon registriert?“ schon
+  // steht. Solange der Anmeldestand noch lädt, bleibt die angemeldete Leiste.
   const areas = MAIN.filter((item) =>
     !("only" in item) ? true : viewer ? (item.only === "in") === signedIn : item.only === "in",
   );
@@ -172,9 +173,11 @@ export function OperatorHeader({
                     Kostenfrei starten
                   </Link>
                 )}
-                <Link className="do-button do-button-secondary" href="/anmelden">
-                  Anmelden
-                </Link>
+                {path !== "/anmelden" && path !== "/starten" && (
+                  <Link className="do-button do-button-secondary" href="/anmelden">
+                    Anmelden
+                  </Link>
+                )}
               </>
             )}
             {/* Die Hauptsache auf jeder Seite; wo eingetragen wird, nicht doppelt.
@@ -217,9 +220,6 @@ export function OperatorFooter({
           <OperatorWordmark />
         </Link>
         <nav aria-label="Weitere Seiten">
-          <Link href="/">Ergebnisse</Link>
-          <Link href="/tagesabschluss">Mein Tag</Link>
-          <Link href="/partner?modus=eigen">Call-Partner</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">
             Discord

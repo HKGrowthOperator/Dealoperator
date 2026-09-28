@@ -379,11 +379,10 @@ export default function PushSetup({
     <section id="erinnerungen" className="cm-card cm-push" aria-labelledby={`${uid}-title`}>
       <header className="cm-section-head">
         <div>
-          <h2 id={`${uid}-title`}>Push auf deinem Gerät</h2>
+          <h2 id={`${uid}-title`}>Erinnerungen</h2>
         </div>
         <p className="cm-muted">
-          Freiwillig. Deal Operator funktioniert auch ganz ohne Push. Mit Push erinnert dich Deal Operator auch
-          bei geschlossener Website.
+          Freiwillig. Deal Operator erinnert dich auch bei geschlossener Website.
         </p>
       </header>
 
