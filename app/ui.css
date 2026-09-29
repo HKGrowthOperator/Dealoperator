@@ -4431,3 +4431,36 @@ li[data-medal="gold"] .rb-bar i {
     grid-column: 1 / -1;
   }
 }
+
+/* Call-Partner: was die Person sucht und bei welchen Sessions sie dabei ist. */
+.member-label {
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.member-sessions {
+  display: grid;
+  gap: 2px;
+}
+.member-sessions > span {
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.member-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--do-blue);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 650;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}

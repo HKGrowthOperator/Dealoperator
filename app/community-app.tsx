@@ -884,6 +884,37 @@ export default function CommunityApp({
       </button>
     );
   }
+  /** Kommende Sessions, bei denen eine Person zugesagt hat. */
+  function sessionsOf(ownerId: string) {
+    const now = new Date();
+    return data.sessions
+      .filter((s) => !s.cancelled && sessionEnd(s) > now && s.roster?.some((p) => p.id === ownerId))
+      .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+      .slice(0, 3);
+  }
+  function memberSessions(ownerId: string) {
+    const list = sessionsOf(ownerId);
+    if (!list.length) return null;
+    return (
+      <div className="member-sessions">
+        <span>Dabei bei</span>
+        {list.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            className="member-session"
+            onClick={() => {
+              setMember(null);
+              setSession(s);
+            }}
+          >
+            <CalendarDays size={15} aria-hidden="true" />
+            {sessionDay(s.date)}, {s.time} Uhr · {sessionKindLabel(s.kind)}
+          </button>
+        ))}
+      </div>
+    );
+  }
   function memberCard(m: Member, own = false) {
     return (
       <article className="card member-card" key={m.id} data-own={own || undefined}>
@@ -899,7 +930,11 @@ export default function CommunityApp({
         </div>
         <h2>{m.name}</h2>
         <span className="member-role">{m.role}</span>
-        {m.bio && <p>{m.bio}</p>}
+        {m.bio && (
+          <p>
+            <span className="member-label">Sucht</span> {m.bio}
+          </p>
+        )}
         {m.latest && (
           <div className="member-stats">
             <span>
@@ -929,6 +964,7 @@ export default function CommunityApp({
             <Tag>{m.niche}</Tag>
           </div>
         )}
+        {memberSessions(own ? data.viewerId : m.id)}
         {(m.discordName || (own && discordLink?.link)) && (
           <p className="member-discord">
             Discord: <strong>{m.discordName || discordLink?.link?.name}</strong>
@@ -2042,6 +2078,7 @@ export default function CommunityApp({
                   Discord: <strong>{member.discordName}</strong>
                 </p>
               )}
+              {memberSessions(member.id)}
               {discordContact(member)}
               <button
                 className={`btn ${member.discord || member.discordName ? "secondary" : "primary"} full`}
@@ -2216,6 +2253,26 @@ export default function CommunityApp({
                   </div>
                 </div>
               )}
+              {!demo && data.viewerTeam && !session.cancelled && sessionEnd(session) > new Date() && (
+                <SessionGuests
+                  session={session}
+                  people={data.people ?? []}
+                  mutate={(action, value) => mutate(action, value)}
+                  saving={saving}
+                />
+              )}
+              {!demo &&
+                (data.viewerTeam || session.mine || session.owner === data.viewerId) &&
+                !session.cancelled &&
+                !(session.room && !session.roomManual) &&
+                sessionEnd(session) > new Date() && (
+                  <SessionRoomLink
+                    key={`${session.id}:${session.room ?? ""}`}
+                    session={session}
+                    mutate={(action, value) => mutate(action, value)}
+                    saving={saving}
+                  />
+                )}
               {(demo || session.mine || session.owner === data.viewerId) &&
                 !session.joined && (
                   <button
@@ -2253,26 +2310,6 @@ export default function CommunityApp({
                     </li>
                     <li data-done={session.room ? "" : undefined}>
                       <div>
-              {!demo && data.viewerTeam && !session.cancelled && sessionEnd(session) > new Date() && (
-                <SessionGuests
-                  session={session}
-                  people={data.people ?? []}
-                  mutate={(action, value) => mutate(action, value)}
-                  saving={saving}
-                />
-              )}
-              {!demo &&
-                (data.viewerTeam || session.mine || session.owner === data.viewerId) &&
-                !session.cancelled &&
-                !(session.room && !session.roomManual) &&
-                sessionEnd(session) > new Date() && (
-                  <SessionRoomLink
-                    key={`${session.id}:${session.room ?? ""}`}
-                    session={session}
-                    mutate={(action, value) => mutate(action, value)}
-                    saving={saving}
-                  />
-                )}
                         {session.room ? (
                           <>
                             <span>
