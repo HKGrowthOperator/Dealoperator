@@ -230,6 +230,22 @@ CREATE TABLE day_evidence(
 CREATE INDEX day_evidence_day ON day_evidence(day);
 -- Zugang durch das Team (Konto nachsehen, Adresse bestätigen): Funktionen auf
 -- auth.users kommen nur mit migrations/0006_team_access.sql, nicht hier.
+-- Eigene Bestätigungs- und Passwortmails (siehe migrations/0007): nur Hashes
+-- von Code und Link. account_set_password kommt nur mit der Migration.
+CREATE TABLE email_codes(
+  id text PRIMARY KEY,
+  email text NOT NULL,
+  purpose text NOT NULL CHECK (purpose IN ('confirm','reset')),
+  code_hash text NOT NULL,
+  link_hash text NOT NULL,
+  request text REFERENCES onboarding_requests(id),
+  attempts integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  mail_id text
+);
+CREATE INDEX email_codes_open ON email_codes(lower(email), purpose) WHERE used_at IS NULL;
 INSERT INTO events(day,title,partner,url,thanks,created_by)
 VALUES('2026-09-22','Akquise Day','akquise.de','https://akquise.de',
   'Danke an akquise.de für diesen Tag und an alle, die mitgezogen haben.','migration-0003')
