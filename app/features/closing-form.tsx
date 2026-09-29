@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
+import DayEvidence from "./day-evidence";
 import {
   CalendarDays,
   Check,
@@ -1311,6 +1312,8 @@ export default function ClosingForm({
             <div id={`${uid}-optional`} className="cm-counts md-counts" hidden={!showOptional}>
               {counts(OPTIONAL_COUNTS, false)}
             </div>
+            {/* Gesprächszeit und CRM-Screenshot: freiwillig, sofort gespeichert. */}
+            <DayEvidence day={form.day} />
           </fieldset>
 
           <fieldset className="cm-group">

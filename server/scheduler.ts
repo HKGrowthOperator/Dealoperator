@@ -13,6 +13,7 @@ import {
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
 import { applicantRecheck, dispatch, enqueue, teamEvent, type Recheck } from "./notify";
 import { markEligibleMembers, toClosings, toImported, ownClosings } from "./closing";
+import { pruneEvidence } from "./evidence";
 import { runDiscordRooms } from "./discord-sessions";
 import { isTeamMember } from "./roles";
 
@@ -230,7 +231,9 @@ export async function tick(db: Database, now = new Date()) {
   // Discord ist für Calls da: Session-Räume und Ränge, höchstens alle 15
   // Minuten. Tagesabschlüsse werden dort nicht mehr geteilt.
   const rooms = await runDiscordRooms(db, { now, auto: true }).catch((e: Error) => ({ error: e.message }));
-  return { ...plan, ...delivery, rooms };
+  // Alte Screenshots löschen (nach Migration 0005); nie den Takt aufhalten.
+  const pruned = await pruneEvidence(db, now).catch(() => 0);
+  return { ...plan, ...delivery, rooms, pruned };
 }
 
 // ---------------------------------------------------------------------------

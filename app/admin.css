@@ -1071,3 +1071,18 @@
     padding: var(--space-4);
   }
 }
+
+/* Monatsstand: Screenshot-Links je Person. */
+.adm-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 6px 0 0;
+  font-size: 13.5px;
+}
+.adm-shots a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+}

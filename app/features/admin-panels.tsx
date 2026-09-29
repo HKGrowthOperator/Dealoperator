@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Smartphone,
   Sparkles,
+  Trophy,
   UserSearch,
   UsersRound,
 } from "lucide-react";
@@ -43,6 +44,7 @@ import { DiscordPanel, NotificationsPanel } from "./admin-status";
 import { TeamPanel } from "./admin-team";
 import ResendConfirmation from "./resend-confirmation";
 import { MergePanel } from "./admin-merge";
+import { EvidencePanel } from "./admin-evidence";
 
 // Drei Gruppen: was heute zu entscheiden ist, Zahlen einspielen, Einstellungen.
 const GROUPS = [
@@ -59,6 +61,7 @@ const TABS = [
   { id: "faelle", group: "heute", label: "Prüffälle", icon: UserSearch, adminOnly: false },
   { id: "pausen", group: "heute", label: "Pausen", icon: CirclePause, adminOnly: false },
   { id: "zusammenfuehren", group: "heute", label: "Profile zusammenführen", icon: Merge, adminOnly: true },
+  { id: "monat", group: "heute", label: "Monatsstand", icon: Trophy, adminOnly: false },
   { id: "wins", group: "import", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
   { id: "csv", group: "import", label: "CSV-Import", icon: FileInput, adminOnly: true },
   { id: "events", group: "einstellungen", label: "Akquise Days", icon: Sparkles, adminOnly: true },
@@ -293,6 +296,7 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
               {tab === "zusammenfuehren" && (
                 <MergePanel participants={loaded.participants} onChanged={reload} />
               )}
+              {tab === "monat" && <EvidencePanel />}
               {tab === "wins" && <WinsImport onCommitted={reload} />}
               {tab === "faelle" && (
                 <ReviewCases

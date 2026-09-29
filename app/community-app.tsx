@@ -11,6 +11,7 @@ import {
   type Metric,
 } from "@/lib/kpis";
 import CommitmentDashboard from "./features/commitment-dashboard";
+import MonthStanding from "./features/month-standing";
 import RankProgress from "./features/rank-progress";
 import AccountSettings, { AccountAccess } from "./features/account-settings";
 import PushSetup from "./features/push-setup";
@@ -1080,6 +1081,7 @@ export default function CommunityApp({
                     </div>
                   </section>
                   <CommitmentDashboard />
+                  {!demo && <MonthStanding />}
                   {!demo && (
                     <ActiveCallerCard
                       compact

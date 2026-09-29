@@ -4464,3 +4464,136 @@ li[data-medal="gold"] .rb-bar i {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* Mein Tag: Gesprächszeit und CRM-Screenshot (nach Migration 0005). */
+.md-evidence-wrap {
+  display: grid;
+  gap: var(--space-3);
+}
+.md-evidence {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  background: var(--do-surface);
+}
+.md-evidence[hidden] {
+  display: none;
+}
+.md-evidence .cm-label {
+  margin: 0 0 var(--space-2);
+}
+.md-evidence-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.md-evidence-fields label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.cm-card .md-evidence-fields input[type="text"] {
+  width: 4.5rem;
+  min-height: 44px;
+  text-align: center;
+  font-size: var(--text-lead);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.md-evidence-shot {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.md-evidence-shot img {
+  display: block;
+  max-width: min(100%, 420px);
+  max-height: 320px;
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-m);
+  object-fit: contain;
+  background: var(--do-bg, #f6f8fb);
+}
+.md-evidence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-5);
+}
+.md-evidence-actions .do-link {
+  gap: 6px;
+  min-height: 44px;
+  font-size: var(--text-label);
+}
+.md-evidence-note,
+.md-evidence-status {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+
+/* Fortschritt: Monatsstand. */
+.ms-rows {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+.ms-rows > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--do-line);
+}
+.ms-rows > div:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+.ms-rows dt {
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.ms-rows dd {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.ms-rows strong {
+  font-size: var(--text-lead);
+  font-weight: 800;
+}
+.ms-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.ms-dots i {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--do-line);
+}
+.ms-dots i[data-on] {
+  background: var(--do-blue);
+}
+.ms-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: oklch(52% 0.14 150);
+  font-size: var(--text-label);
+  font-weight: 700;
+}
+.ms-note {
+  margin: var(--space-3) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
