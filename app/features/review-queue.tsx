@@ -25,6 +25,8 @@ type Request = {
   applicant_answer: string | null;
   /** Letzte belegte Bestätigungsmail (Übergabe an Supabase). */
   last_mail_at: string | null;
+  /** Vom Team freigeschaltet: das Postfach hat niemand nachgewiesen. */
+  team_confirmed?: boolean;
   owner: string | null;
   created_at: string;
   decided_at: string | null;
@@ -294,7 +296,13 @@ export default function ReviewQueue({
 
             <dl className="review-facts">
               <div>
-                <dt>{r.status === "awaiting_email" ? "E-Mail (noch nicht bestätigt)" : "Bestätigte E-Mail"}</dt>
+                <dt>
+                  {r.status === "awaiting_email"
+                    ? "E-Mail (noch nicht bestätigt)"
+                    : r.team_confirmed
+                      ? "E-Mail vom Team freigeschaltet (nicht per Mail bestätigt)"
+                      : "Bestätigte E-Mail"}
+                </dt>
                 <dd>{r.email}</dd>
               </div>
               <div>
@@ -304,19 +312,24 @@ export default function ReviewQueue({
               {r.participant_known_email && (
                 <div>
                   <dt>Bekannt aus Import</dt>
+                  {/* Gleiche Adresse zählt nur als Beleg, wenn sie per Mail bestätigt ist. */}
                   <dd
                     className={
-                      r.participant_known_email.toLowerCase() ===
+                      r.participant_known_email.toLowerCase() !==
                       r.email.toLowerCase()
-                        ? "match"
-                        : "mismatch"
+                        ? "mismatch"
+                        : r.team_confirmed || r.status === "awaiting_email"
+                          ? undefined
+                          : "match"
                     }
                   >
                     {r.participant_known_email}
-                    {r.participant_known_email.toLowerCase() ===
+                    {r.participant_known_email.toLowerCase() !==
                     r.email.toLowerCase()
-                      ? " · stimmt überein"
-                      : " · weicht ab"}
+                      ? " · weicht ab"
+                      : r.team_confirmed || r.status === "awaiting_email"
+                        ? " · gleiche Adresse, nicht per Mail bestätigt"
+                        : " · stimmt überein"}
                   </dd>
                 </div>
               )}

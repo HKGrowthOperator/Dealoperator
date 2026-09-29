@@ -116,6 +116,8 @@ export type DiscordStatus = {
 /** Registrierungen mit noch unbestätigter E-Mail. Keine Inbox-Einträge. */
 export type Unconfirmed = {
   count: number;
+  /** Admin und Migration 0006: „Freischalten“ ist möglich. */
+  canConfirm?: boolean;
   recent: {
     id: string;
     kind: "new" | "claim";
@@ -123,6 +125,8 @@ export type Unconfirmed = {
     since: string;
     /** Letzte belegte Bestätigungsmail. */
     lastMail: string | null;
+    /** Nur für Admins, zum Prüfen vor dem Freischalten. */
+    email?: string;
   }[];
 };
 export type TeamMember = {
@@ -161,6 +165,13 @@ export type AdminOverview = {
   cases: ReviewCase[];
   discord: DiscordStatus | null;
   team: TeamOverview | null;
+  /** Zugang anlegen (nur Admins): bereit erst mit Migration 0006. */
+  access?: TeamAccess | null;
+};
+export type TeamAccess = {
+  ready: boolean;
+  /** Personenprofile ohne Konto. */
+  profiles: { id: string; name: string }[];
 };
 export type Participant = {
   id: string;
@@ -215,9 +226,12 @@ export type WinsPreview = {
 
 export class AdminError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Formularfeld, an dem die Meldung erscheinen soll (vom Server). */
+  field?: string;
+  constructor(message: string, status: number, field?: string) {
     super(message);
     this.status = status;
+    this.field = field;
   }
 }
 
@@ -236,6 +250,7 @@ export async function adminPost<T = { ok: boolean }>(
     throw new AdminError(
       data?.error || "Die Aktion ist fehlgeschlagen. Bitte erneut versuchen.",
       response.status,
+      typeof data?.field === "string" ? data.field : undefined,
     );
   return data as T;
 }

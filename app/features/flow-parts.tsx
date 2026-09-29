@@ -819,6 +819,9 @@ export function EmailSent({
       </div>
       <p className="flow-small">
         Keine Mail da? Schau auch im Spam-Ordner nach.{" "}
+        {purpose === "new" || purpose === "claim" || purpose === "assign"
+          ? "Kommt nichts an, melde dich beim Team. Es kann dich freischalten; danach meldest du dich mit E-Mail und Passwort an. "
+          : ""}
         {codeEnabled ? "Link und Code gelten nur einmal." : "Der Link gilt nur einmal."}
       </p>
     </>

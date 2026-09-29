@@ -439,6 +439,15 @@
 .adm-waiting li span {
   color: var(--adm-muted);
 }
+.adm-waiting li .adm-waiting-email {
+  flex-basis: 100%;
+  min-width: 0;
+  color: #2c4466;
+  overflow-wrap: anywhere;
+}
+.adm-unlock-email {
+  overflow-wrap: anywhere;
+}
 
 /* Filter- und Zusammenfassungsleisten */
 .adm-filter,
@@ -1085,4 +1094,102 @@
   align-items: center;
   gap: 4px;
   min-height: 44px;
+}
+
+/* Zugang anlegen (nur Admins) */
+.adm-access-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c4466;
+}
+.adm-access-password {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.adm .adm-access-password input {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+.adm-access-password .btn {
+  flex: 0 0 auto;
+  min-height: 46px;
+}
+.adm-access-picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 13.5px;
+  color: #2c4466;
+}
+.adm-access-picked .btn {
+  min-height: 44px;
+}
+.adm-access-suggest {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.adm-access-suggest button {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0 13px;
+  border: 1px solid var(--do-line);
+  border-radius: 10px;
+  background: var(--do-surface);
+  color: #1b3a63;
+  font-size: 13.5px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.adm-access-done {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--do-line);
+}
+.adm .adm-access-message {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #cdd9ea;
+  border-radius: 10px;
+  background: var(--adm-soft);
+  color: #1b3a63;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.55;
+  resize: vertical;
+  white-space: pre-wrap;
+}
+/* Freischalten einer hängenden Registrierung, direkt im Eintrag */
+.adm-unlock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  flex-basis: 100%;
+}
+.adm-unlock .btn {
+  min-height: 44px;
+}
+.adm-unlock p {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #2c4466;
+  max-width: 65ch;
+}
+.adm-waiting li .adm-unlock p {
+  color: #2c4466;
 }

@@ -8,6 +8,7 @@ import {
   FileInput,
   Headphones,
   Inbox,
+  KeyRound,
   Merge,
   RefreshCw,
   ShieldCheck,
@@ -45,6 +46,7 @@ import { TeamPanel } from "./admin-team";
 import ResendConfirmation from "./resend-confirmation";
 import { MergePanel } from "./admin-merge";
 import { EvidencePanel } from "./admin-evidence";
+import { AccessPanel, ConfirmRegistration } from "./admin-access";
 
 // Drei Gruppen: was heute zu entscheiden ist, Zahlen einspielen, Einstellungen.
 const GROUPS = [
@@ -60,6 +62,7 @@ const TABS = [
   { id: "uebernahmen", group: "heute", label: "Übernahmen", icon: ShieldCheck, adminOnly: false },
   { id: "faelle", group: "heute", label: "Prüffälle", icon: UserSearch, adminOnly: false },
   { id: "pausen", group: "heute", label: "Pausen", icon: CirclePause, adminOnly: false },
+  { id: "zugang", group: "heute", label: "Zugang anlegen", icon: KeyRound, adminOnly: true },
   { id: "zusammenfuehren", group: "heute", label: "Profile zusammenführen", icon: Merge, adminOnly: true },
   { id: "monat", group: "heute", label: "Monatsstand", icon: Trophy, adminOnly: false },
   { id: "wins", group: "import", label: "Wins-Import", icon: ClipboardPaste, adminOnly: false },
@@ -293,6 +296,9 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
                   onGo={go}
                 />
               )}
+              {tab === "zugang" && overview.access && (
+                <AccessPanel access={overview.access} onChanged={reload} onInbox={() => go("inbox")} />
+              )}
               {tab === "zusammenfuehren" && (
                 <MergePanel participants={loaded.participants} onChanged={reload} />
               )}
@@ -462,6 +468,9 @@ function InboxPanel({
   const [kind, setKind] = useState<string>("alle");
   const [busy, setBusy] = useState<number | null>(null);
   const [error, setError] = useState("");
+  // Bleibt stehen, auch wenn der Eintrag nach dem Neuladen verschwindet.
+  const [unlocked, setUnlocked] = useState("");
+  const unlockedRef = useRef<HTMLDivElement>(null);
   const matching = items.filter((i) => kind === "alle" || i.kind === kind);
   const open = matching.filter((i) => !i.resolved);
   const done = matching.filter((i) => i.resolved);
@@ -585,6 +594,11 @@ function InboxPanel({
           </p>
         </div>
       </div>
+      {unlocked && !(unconfirmed && unconfirmed.count > 0) && (
+        <div ref={unlockedRef} tabIndex={-1}>
+          <Feedback success={unlocked} />
+        </div>
+      )}
       {unconfirmed && unconfirmed.count > 0 && (
         <details className="adm-waiting">
           <summary>
@@ -597,11 +611,17 @@ function InboxPanel({
               auf E-Mail-Bestätigung.
             </span>
           </summary>
+          {unlocked && (
+            <div ref={unlockedRef} tabIndex={-1}>
+              <Feedback success={unlocked} />
+            </div>
+          )}
           {unconfirmed.recent.length > 0 && (
             <ul>
               {unconfirmed.recent.map((entry) => (
                 <li key={entry.id}>
                   <strong>{entry.name}</strong>
+                  {entry.email && <span className="adm-waiting-email">{entry.email}</span>}
                   <span>
                     {entry.kind === "claim"
                       ? "möchte ein vorbereitetes Profil übernehmen"
@@ -609,6 +629,22 @@ function InboxPanel({
                     · seit {formatDateTime(entry.since)}
                   </span>
                   <ResendConfirmation id={entry.id} lastMailAt={entry.lastMail} onSent={onChanged} />
+                  {unconfirmed.canConfirm && (
+                    <ConfirmRegistration
+                      id={entry.id}
+                      name={entry.name}
+                      email={entry.email}
+                      onDone={async (message) => {
+                        setUnlocked(message);
+                        await onChanged();
+                        // Der Eintrag ist danach weg: die Meldung in den Blick holen.
+                        setTimeout(() => {
+                          unlockedRef.current?.focus();
+                          unlockedRef.current?.scrollIntoView({ block: "nearest" });
+                        }, 0);
+                      }}
+                    />
+                  )}
                 </li>
               ))}
             </ul>
@@ -618,6 +654,9 @@ function InboxPanel({
             Meldung ans Team, weil die Adresse vertippt oder fremd sein kann.
             Kam die Mail nicht an, schickt „Mail erneut senden“ eine neue an
             dieselbe Adresse.
+            {unconfirmed.canConfirm
+              ? " Kommt auch die nicht an und hat sich die Person bei euch gemeldet, bestätigt „Freischalten“ die Adresse ohne Mail; danach meldet sie sich mit ihrem eigenen Passwort an. Übernahmen gehen danach in eure Prüfung."
+              : ""}{" "}
             Gezählt werden die letzten 14 Tage
             {unconfirmed.recent.length < unconfirmed.count
               ? `, gezeigt die neuesten ${unconfirmed.recent.length}`
