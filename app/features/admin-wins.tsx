@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ClipboardPaste, RefreshCw, UserSearch } from "lucide-react";
 import { berlinDate, metricLabels, type Metric } from "@/lib/kpis";
 import { formatDay } from "@/lib/ranking-history";
@@ -425,8 +425,9 @@ export function ReviewCases({
             Meldungen, die sich nicht eindeutig einer Person, einem Tag oder
             einem Wert zuordnen ließen. Wähle Profil und Tag und übernimm die
             Werte direkt. „Als Alias zuordnen“ merkt sich den gemeldeten Namen
-            zusätzlich für künftige Importe. Verworfene Meldungen kommen beim
-            nächsten Einfügen nicht wieder.
+            zusätzlich für künftige Importe. Gehört der Name zu niemandem,
+            legst du mit „Neues Profil anlegen“ ein Profil an. Verworfene
+            Meldungen kommen beim nächsten Einfügen nicht wieder.
           </p>
         </div>
       </div>
@@ -505,31 +506,42 @@ function CaseCard({
   const [day, setDay] = useState(item.days[0] ?? item.day);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  // „Neues Profil anlegen“: Name aus der Meldung, bereinigt; vor dem
+  // Anlegen änderbar.
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState(item.suggestedName ?? "");
+  const nameId = useId();
   const values = Object.entries(item.values) as [Metric, number][];
   // Ältere Prüffälle ohne Art: wie bisher Name zuordnen oder verwerfen.
   const needsProfile = item.aliasable || !item.participantId;
   const name = participants.find((p) => p.id === target)?.name;
-  async function resolve(decision: "alias" | "apply" | "dismiss") {
+  async function resolve(decision: "alias" | "apply" | "dismiss" | "create") {
     setBusy(decision);
     setError("");
     try {
       const result = await adminPost<{ ok: boolean; message: string | null }>("resolveCase", {
         id: item.id,
         decision,
-        ...(decision !== "dismiss" && target ? { participantId: target } : {}),
+        ...((decision === "alias" || decision === "apply") && target
+          ? { participantId: target }
+          : {}),
+        ...(decision === "create" ? { name: newName } : {}),
         ...(decision !== "dismiss" && item.days.length ? { day } : {}),
       });
       onResolved(
         decision === "dismiss"
           ? `Verworfen: „${item.name_seen}“.`
-          : [
-              decision === "alias"
-                ? `Zugeordnet: „${item.name_seen}“ gehört jetzt zu ${name ?? "dem gewählten Profil"}.`
-                : `Entschieden für ${name ?? item.name_seen}.`,
-              result.message ?? "",
-            ]
-              .filter(Boolean)
-              .join(" "),
+          : decision === "create"
+            ? // Der Server nennt den angelegten Namen und was übernommen wurde.
+              (result.message ?? `Profil „${newName.trim()}“ angelegt.`)
+            : [
+                decision === "alias"
+                  ? `Zugeordnet: „${item.name_seen}“ gehört jetzt zu ${name ?? "dem gewählten Profil"}.`
+                  : `Entschieden für ${name ?? item.name_seen}.`,
+                result.message ?? "",
+              ]
+                .filter(Boolean)
+                .join(" "),
       );
     } catch (e) {
       setError((e as Error).message);
@@ -608,6 +620,16 @@ function CaseCard({
               {item.applicable ? "Als Alias zuordnen und übernehmen" : "Als Alias zuordnen"}
             </button>
           )}
+          {item.aliasable && !creating && (
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={busy !== ""}
+              onClick={() => setCreating(true)}
+            >
+              Neues Profil anlegen
+            </button>
+          )}
           {item.applicable && (
             <button
               className={item.aliasable ? "btn secondary" : "btn primary"}
@@ -625,6 +647,53 @@ function CaseCard({
             Verwerfen
           </button>
         </div>
+        {item.aliasable && creating && (
+          <form
+            className="adm-case-new"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void resolve("create");
+            }}
+          >
+            <label className="adm-field">
+              <span>Name für das neue Profil</span>
+              <input
+                aria-describedby={nameId}
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                maxLength={60}
+                autoComplete="off"
+                spellCheck={false}
+                autoFocus
+              />
+              <small id={nameId}>
+                So steht die Person in der Rangliste. Künftige Meldungen von
+                „{item.name_seen}“ landen automatisch in diesem Profil.
+                {item.applicable ? " Die Werte oben werden dabei übernommen." : ""}
+              </small>
+            </label>
+            <div className="adm-actions">
+              <button
+                type="submit"
+                className="btn primary"
+                disabled={busy !== "" || newName.trim().length < 2}
+              >
+                Profil anlegen
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={busy !== ""}
+                onClick={() => {
+                  setCreating(false);
+                  setError("");
+                }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </form>
+        )}
         <Feedback error={error} />
       </div>
     </li>

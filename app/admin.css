@@ -668,6 +668,12 @@
   margin-top: 12px;
   max-width: 560px;
 }
+/* „Neues Profil anlegen“ klappt unter den Entscheidungen auf. */
+.adm-case-new {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #e3eaf4;
+}
 .adm-days {
   display: flex;
   flex-wrap: wrap;

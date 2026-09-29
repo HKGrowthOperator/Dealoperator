@@ -13,6 +13,7 @@ import {
 } from "../lib/kpis";
 import { splitOrigin } from "../lib/joint-reports";
 import {
+  cleanDisplayName,
   conflictReason,
   metricLabel,
   normaliseName,
@@ -41,7 +42,8 @@ import {
  * Der eigene Tagesabschluss gewinnt, der Import füllt Lücken: Tage mit
  * eigenem Abschluss überschreibt der Import nie, auch nicht bei übernommenen
  * Profilen. Einen vom Import gefüllten Tag ersetzt der eigene Abschluss
- * später (server/closing.ts). Neue Profile legt der Import nie an.
+ * später (server/closing.ts). Neue Profile legt der Import nie an; das Team
+ * legt sie bei einem Prüffall an („create“ in resolveReviewCase).
  *
  * Unklare Meldungen werden Prüffälle. Sie tragen die gelesenen Werte, damit
  * das Team sie nach der Entscheidung direkt übernehmen kann.
@@ -679,15 +681,35 @@ export async function reviewCases(db: Database, actor: Actor) {
       // Ältere Prüffälle ohne gespeicherte Werte: nur zuordnen oder verwerfen.
       applicable: !!payload?.applicable && Object.keys(payload.values).length > 0,
       aliasable: payload ? payload.aliasable : !!r.name_seen,
+      // Vorschlag für „Neues Profil anlegen“; leer bei maskierten Nummern.
+      suggestedName: cleanDisplayName(r.name_seen as string),
     };
   });
 }
 
+/**
+ * Name eines neuen Profils, bereinigt wie der Vorschlag (cleanDisplayName).
+ * Gleiche Länge wie beim Anlegen eines eigenen Profils.
+ */
+const profileNameSchema = z
+  .string()
+  .max(200)
+  .transform(cleanDisplayName)
+  .pipe(
+    z
+      .string()
+      .min(2, "Bitte einen Namen für das neue Profil eingeben (mindestens zwei Zeichen).")
+      .max(60, "Der Name ist zu lang (höchstens 60 Zeichen).")
+      .refine((name) => normaliseName(name) !== "", "Bitte den Namen in lateinischen Buchstaben schreiben."),
+  );
+
 const resolveSchema = z
   .object({
     id: z.string().uuid(),
-    decision: z.enum(["alias", "apply", "dismiss"]),
+    decision: z.enum(["alias", "apply", "dismiss", "create"]),
     participantId: z.string().max(100).optional(),
+    /** Nur bei „create“: Anzeigename des neuen Profils. */
+    name: profileNameSchema.optional(),
     day: daySchema.optional(),
   })
   .strict();
@@ -735,10 +757,166 @@ async function applyCase(
   };
 }
 
+type Applied = { written: boolean; message: string };
+
+/**
+ * Werte übernehmen, ohne die Entscheidung selbst (Zuordnung, neues Profil)
+ * zu gefährden: lässt sich nichts übernehmen, bleibt der Rest bestehen und
+ * der Grund steht in der Meldung.
+ */
+async function applyKeeping(
+  tx: Database,
+  actor: Actor,
+  payload: CasePayload,
+  participantId: string,
+  day: string,
+): Promise<Applied> {
+  await tx.query("SAVEPOINT apply_case");
+  try {
+    const applied = await applyCase(tx, actor, payload, participantId, day);
+    await tx.query("RELEASE SAVEPOINT apply_case");
+    return applied;
+  } catch (e) {
+    if (!(e instanceof AppError)) throw e;
+    await tx.query("ROLLBACK TO SAVEPOINT apply_case");
+    return { written: false, message: e.message };
+  }
+}
+
+/** Alias für den gemeldeten Namen. Bei Telefonnummern ist name_seen maskiert; der Schlüssel steht im Prüffall. */
+const caseAlias = (nameSeen: string, payload: CasePayload | null) =>
+  payload?.aliasKey || normaliseName(nameSeen);
+
+/** Import-Schlüssel eines neuen Profils: „Jörg Groß“ → „jorg-gross“. */
+function profileSlug(name: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/ä/g, "a")
+    .replace(/ö/g, "o")
+    .replace(/ü/g, "u")
+    .replace(/ß/g, "ss")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/, "");
+  return slug || "profil";
+}
+
+/**
+ * Neues Profil für einen gemeldeten Namen, der zu keinem Profil gehört. Regel
+ * des Eigentümers: das gilt auch bei 0 Anwahlen oder nur einem Setting oder
+ * Closing. Nie ein zweites Profil zu einem vorhandenen Namen; dann wird der
+ * Name dem vorhandenen Profil zugeordnet („alias“).
+ */
+async function createProfile(tx: Database, actor: Actor, name: string, alias: string) {
+  const people = await directory(tx);
+  const holder = people.find((p) => (p.aliases || []).includes(alias));
+  if (holder)
+    throw new AppError(
+      `Dieser Name ist bereits dem Profil „${holder.name}“ zugeordnet. Bitte dieses Profil wählen und als Alias zuordnen.`,
+      409,
+    );
+  const wanted = normaliseName(name);
+  // Auch der gemeldete Name selbst: gibt es ihn inzwischen als Profil, gehört
+  // die Meldung dorthin.
+  const same = people.find((p) => [wanted, alias].includes(normaliseName(p.name)));
+  if (same)
+    throw new AppError(
+      `Es gibt schon ein Profil „${same.name}“. Bitte dieses Profil wählen und als Alias zuordnen.`,
+      409,
+    );
+  // Ein Alias gewinnt beim Import vor dem Namen: Meldungen unter diesem Namen
+  // landeten sonst beim anderen Profil.
+  const aliased = people.find((p) => (p.aliases || []).some((a) => normaliseName(a) === wanted));
+  if (aliased)
+    throw new AppError(
+      `„${name}“ ist schon als Name für das Profil „${aliased.name}“ hinterlegt. Bitte dieses Profil wählen und als Alias zuordnen.`,
+      409,
+    );
+  const base = `wins-${profileSlug(name)}`;
+  // Der Schlüssel enthält nur a-z, 0-9 und „-“: kein Platzhalter für LIKE.
+  const taken = new Set(
+    (
+      await tx.query("SELECT import_key FROM participants WHERE import_key=$1 OR import_key LIKE $2", [
+        base,
+        `${base}-%`,
+      ])
+    ).map((r) => r.import_key as string),
+  );
+  let key = base;
+  for (let n = 2; taken.has(key); n++) key = `${base}-${n}`;
+  const id = randomUUID();
+  // Wie neue Profile aus dem CSV-Import (commitImport): gemeldete Zahlen
+  // stehen immer in der Rangliste, das Profil ist für die Übernahme auffindbar.
+  await tx.query(
+    "INSERT INTO participants(id,import_key,name,public_consent,kind,searchable) VALUES($1,$2,$3,true,'person',true)",
+    [id, key, name],
+  );
+  await tx.query("INSERT INTO participant_aliases(alias,participant,created_by) VALUES($1,$2,$3)", [
+    alias,
+    id,
+    actor.userId,
+  ]);
+  return id;
+}
+
+/**
+ * Nach dem Anlegen: weitere offene Prüffälle desselben Absenders, die nur an
+ * der unbekannten Person hingen (einziger Prüfgrund, ein Tag, übernehmbare
+ * Werte), gleich mit übernehmen. Nur eine Meldung je Tag und nur für Tage, an
+ * denen das neue Profil noch keinen Stand hat; alles andere bleibt ein
+ * offener Prüffall für das Team.
+ */
+async function applySameSender(
+  tx: Database,
+  actor: Actor,
+  caseId: string,
+  alias: string,
+  participantId: string,
+) {
+  const rows = await tx.query(
+    "SELECT id,name_seen,reason FROM import_review_cases WHERE status='open' AND id<>$1 ORDER BY created_at FOR UPDATE",
+    [caseId],
+  );
+  const same = rows
+    .map((r) => ({ id: r.id as string, name_seen: r.name_seen as string, ...decodeReason(r.reason) }))
+    .filter((r) => (!r.payload || r.payload.aliasable) && caseAlias(r.name_seen, r.payload) === alias);
+  const only = same.filter(
+    (r) =>
+      r.payload?.kind === "person" &&
+      r.payload.applicable &&
+      Object.keys(r.payload.values).length > 0 &&
+      r.payload.days.length === 1 &&
+      r.reason === `Person „${r.name_seen}“ ist keinem Profil zugeordnet.`,
+  );
+  const perDay = new Map<string, number>();
+  for (const r of only) perDay.set(r.payload!.days[0], (perDay.get(r.payload!.days[0]) ?? 0) + 1);
+  const days: string[] = [];
+  for (const r of only) {
+    const day = r.payload!.days[0];
+    if (perDay.get(day) !== 1) continue;
+    const [known] = await tx.query("SELECT 1 FROM checkins WHERE participant=$1 AND day=$2", [participantId, day]);
+    if (known) continue;
+    if (!(await applyKeeping(tx, actor, r.payload!, participantId, day)).written) continue;
+    await tx.query("UPDATE import_review_cases SET status='resolved',resolved_by=$2,resolved_at=now() WHERE id=$1", [
+      r.id,
+      actor.userId,
+    ]);
+    days.push(day);
+  }
+  return { days: days.sort(), open: same.length - days.length };
+}
+
 /**
  * „alias“: Der gemeldete Name gehört zu diesem Profil; künftige Meldungen
  * werden direkt zugeordnet. Trägt der Prüffall übernehmbare Werte, werden sie
  * gleich mit übernommen.
+ * „create“: Der gemeldete Name gehört zu keinem Profil. Ein neues Profil
+ * entsteht (Name vom Team, vorgeschlagen aus dem gemeldeten Namen), der Name
+ * wird ihm zugeordnet, die Werte werden übernommen, ebenso weitere offene
+ * Meldungen desselben Absenders, die nur an der Person hingen.
  * „apply“: Die Werte für das erkannte oder gewählte Profil und den gewählten
  * Tag übernehmen (z. B. „Vortag oder heute?“, späterer niedrigerer Wert).
  * „dismiss“: nichts übernehmen. Dieselbe Meldung wird kein neuer Prüffall.
@@ -757,7 +935,10 @@ export async function resolveReviewCase(db: Database, actor: Actor, raw: unknown
     const day = v.day ?? payload?.days[0] ?? c.day;
     if (payload && !payload.days.includes(day))
       throw new AppError("Dieser Tag steht für diesen Prüffall nicht zur Wahl.");
-    let applied: { written: boolean; message: string } | null = null;
+    const values = payload?.applicable && Object.keys(payload.values).length ? payload : null;
+    let applied: Applied | null = null;
+    let message: string | null = null;
+    let created: string | null = null;
     if (v.decision === "alias") {
       if (!v.participantId) throw new AppError("Bitte das passende Profil wählen.");
       if (payload && !payload.aliasable)
@@ -766,8 +947,7 @@ export async function resolveReviewCase(db: Database, actor: Actor, raw: unknown
       if (!p) throw new AppError("Dieses Profil gibt es nicht.", 404);
       if (p.kind !== "person")
         throw new AppError("Eine gemeinsame Meldung ist kein Ziel für einen Namen.", 409);
-      // Bei Telefonnummern ist name_seen maskiert; der Schlüssel steht im Prüffall.
-      const alias = payload?.aliasKey || normaliseName(c.name_seen);
+      const alias = caseAlias(c.name_seen, payload);
       if (!alias) throw new AppError("Für diesen Prüffall gibt es keinen Namen zum Zuordnen.", 409);
       const [existing] = await tx.query("SELECT participant FROM participant_aliases WHERE alias=$1", [alias]);
       if (existing && existing.participant !== p.id)
@@ -776,29 +956,51 @@ export async function resolveReviewCase(db: Database, actor: Actor, raw: unknown
         "INSERT INTO participant_aliases(alias,participant,created_by) VALUES($1,$2,$3) ON CONFLICT(alias) DO NOTHING",
         [alias, p.id, actor.userId],
       );
-      if (payload?.applicable && Object.keys(payload.values).length) {
-        // Zuordnung bleibt, auch wenn sich die Werte nicht übernehmen lassen.
-        await tx.query("SAVEPOINT apply_case");
-        try {
-          applied = await applyCase(tx, actor, payload, p.id, day);
-          await tx.query("RELEASE SAVEPOINT apply_case");
-        } catch (e) {
-          if (!(e instanceof AppError)) throw e;
-          await tx.query("ROLLBACK TO SAVEPOINT apply_case");
-          applied = { written: false, message: e.message };
-        }
-      }
+      // Zuordnung bleibt, auch wenn sich die Werte nicht übernehmen lassen.
+      if (values) applied = await applyKeeping(tx, actor, values, p.id, day);
+      message = applied?.message ?? null;
+    } else if (v.decision === "create") {
+      if (payload && !payload.aliasable)
+        throw new AppError("Für diesen Prüffall gibt es keinen Namen zum Zuordnen.", 409);
+      const alias = caseAlias(c.name_seen, payload);
+      if (!alias) throw new AppError("Für diesen Prüffall gibt es keinen Namen zum Zuordnen.", 409);
+      if (!v.name) throw new AppError("Bitte einen Namen für das neue Profil eingeben.");
+      created = await createProfile(tx, actor, v.name, alias);
+      if (values) applied = await applyKeeping(tx, actor, values, created, day);
+      const more = await applySameSender(tx, actor, v.id, alias, created);
+      // Ohne geschriebenen Tag den Abgleich trotzdem anstoßen (neues Profil).
+      if (!applied?.written && !more.days.length) await outbox(tx, created);
+      message = [
+        `Profil „${v.name}“ angelegt.`,
+        applied?.message ??
+          (payload && Object.keys(payload.values).length
+            ? "Die Werte dieser Meldung sind nicht eindeutig und wurden nicht übernommen."
+            : ""),
+        more.days.length ? `Weitere Meldungen übernommen: ${more.days.map(shortDay).join(", ")}.` : "",
+        more.open === 1
+          ? "Ein weiterer Prüffall mit diesem Namen ist noch offen."
+          : more.open > 1
+            ? `${more.open} weitere Prüffälle mit diesem Namen sind noch offen.`
+            : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
     } else if (v.decision === "apply") {
-      if (!payload?.applicable || !Object.keys(payload.values).length)
-        throw new AppError("Dieser Prüffall enthält keine Werte, die sich so übernehmen lassen.", 409);
-      const participantId = v.participantId ?? payload.participantId;
+      if (!values) throw new AppError("Dieser Prüffall enthält keine Werte, die sich so übernehmen lassen.", 409);
+      const participantId = v.participantId ?? values.participantId;
       if (!participantId) throw new AppError("Bitte das passende Profil wählen.");
-      applied = await applyCase(tx, actor, payload, participantId, day);
+      applied = await applyCase(tx, actor, values, participantId, day);
+      message = applied.message;
     }
     await tx.query(
       "UPDATE import_review_cases SET status=$2,resolved_by=$3,resolved_at=now() WHERE id=$1",
       [v.id, v.decision === "dismiss" ? "dismissed" : "resolved", actor.userId],
     );
-    return { ok: true, written: !!applied?.written, message: applied?.message ?? null };
+    return {
+      ok: true,
+      written: !!applied?.written,
+      message,
+      ...(created ? { participantId: created } : {}),
+    };
   });
 }

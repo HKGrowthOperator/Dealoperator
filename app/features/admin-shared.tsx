@@ -101,6 +101,8 @@ export type ReviewCase = {
   participantId: string | null;
   applicable: boolean;
   aliasable: boolean;
+  /** Vorschlag für den Namen eines neuen Profils; leer bei maskierten Nummern. */
+  suggestedName: string;
 };
 export type DiscordPart = "link" | "posts" | "interactions" | "inventory" | "sessions" | "moderators" | "active";
 export type DiscordStatus = {

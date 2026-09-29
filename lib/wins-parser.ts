@@ -526,6 +526,28 @@ export function normaliseName(value: string) {
 }
 
 /**
+ * Anzeigename aus einem gemeldeten Absender, etwa als Vorschlag für ein neues
+ * Profil: ohne „~“ (so zeigt WhatsApp Absender, die nicht in den Kontakten
+ * stehen), ohne Emojis und Schmuckzeichen, Leerraum zusammengefasst.
+ * Zierschriften („𝐌𝐚𝐱“) werden zu normalen Buchstaben. Ohne Buchstaben
+ * (z. B. eine maskierte Telefonnummer) bleibt nichts übrig.
+ */
+export function cleanDisplayName(value: string) {
+  const cleaned = value
+    .normalize("NFKC")
+    // Emoji-Bausteine, die sonst als unsichtbare Zeichen übrig blieben:
+    // Variantenwähler, Verbinder, Tastenkappe, Tag-Zeichen.
+    .replace(/[\uFE00-\uFE0F\u200D\u20E3]|[\u{E0020}-\u{E007F}]/gu, "")
+    .replace(/[^\p{L}\p{M}\p{N}\s.'’&-]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    // Satzzeichen am Rand („- Max -“); ein Punkt am Ende bleibt („Alex B.“).
+    .replace(/^[\s.'’&-]+|[\s'’&-]+$/gu, "")
+    .trim();
+  return /\p{L}/u.test(cleaned) ? cleaned : "";
+}
+
+/**
  * Alias passt: normalisierter Name, oder bei Absendern, die WhatsApp als
  * Telefonnummer zeigt, ein Schlüssel statt der Nummer (key, vom Server).
  */
