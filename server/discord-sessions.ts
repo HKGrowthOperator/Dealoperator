@@ -6,6 +6,7 @@ import { activeDiscordUsers } from "./active-caller";
 import type { SessionRoom } from "./sessions";
 import { sessionEnd, sessionStart } from "../lib/session-rules";
 import { berlinDate } from "../lib/kpis";
+import { ROLEPLAY_ROOM } from "../lib/discord";
 
 /**
  * Website → Discord für Sessions und Team-Rollen.
@@ -23,6 +24,10 @@ import { berlinDate } from "../lib/kpis";
  * im Discord bleiben unberührt. Ist die Rolle „Aktiver Caller“ hinterlegt,
  * können Session-Räume nur mit ihr (oder als Moderator) betreten werden;
  * sehen können sie alle.
+ *
+ * Roleplay (seit 29.09.2026): läuft immer im festen Raum (ROLEPLAY_ROOM). Der
+ * Abgleich legt dafür keinen Sprachkanal an, nur ein Discord-Event mit dem
+ * festen Link als Ort; ein früher angelegter Kanal wird abgeräumt.
  *
  * Ohne Bot-Token und Server-ID passiert nichts, und die Website sagt das
  * ehrlich. Der Abgleich läuft per Knopf in der Verwaltung und zusätzlich alle
@@ -69,7 +74,10 @@ export function roomFor(s: StoredSession, config: Partial<DiscordConfig> = {}) {
   ]
     .join("\n")
     .slice(0, 1000);
+  const fixed = s.kind === "Roleplay";
   const desired = {
+    // Roleplay: kein eigener Kanal, das Event zeigt auf den festen Raum.
+    ...(fixed ? { location: ROLEPLAY_ROOM } : {}),
     channelName,
     userLimit: Math.min(99, Math.max(0, s.capacity)),
     name: s.title.slice(0, 100),
@@ -78,7 +86,7 @@ export function roomFor(s: StoredSession, config: Partial<DiscordConfig> = {}) {
     description,
     overwrites: roomOverwrites(config),
   };
-  return { ...desired, hash: createHash("sha256").update(JSON.stringify(desired)).digest("hex") };
+  return { ...desired, fixed, hash: createHash("sha256").update(JSON.stringify(desired)).digest("hex") };
 }
 
 const status = (error: unknown) => (error as { status?: number }).status;
@@ -123,6 +131,75 @@ async function removeQuietly(path: string, config: Config, fetcher?: typeof fetc
   }
 }
 
+/**
+ * Roleplay: kein eigener Kanal. Ein früher angelegter Kanal (samt seinem
+ * Event) wird abgeräumt; vor dem Start gibt es ein Event mit dem festen Raum
+ * als Ort. Liefert, ob sich im Discord etwas geändert hat.
+ */
+async function syncFixedRoom(
+  db: Database,
+  id: string,
+  room: SessionRoom,
+  want: ReturnType<typeof roomFor>,
+  config: Config,
+  fetcher: typeof fetch | undefined,
+  now: Date,
+  start: Date,
+) {
+  const guild = config.guildId;
+  if (room.hash === want.hash && !room.channelId && (room.eventId || start <= now)) return false;
+  let changed = false;
+  if (room.channelId) {
+    if (room.eventId) await removeQuietly(`/guilds/${guild}/scheduled-events/${room.eventId}`, config, fetcher);
+    await removeQuietly(`/channels/${room.channelId}`, config, fetcher);
+    room.channelId = undefined;
+    room.eventId = undefined;
+    room.eventUrl = undefined;
+    changed = true;
+  }
+  room.url = undefined;
+  if (start > now) {
+    const event = {
+      name: want.name,
+      description: want.description,
+      scheduled_start_time: want.start,
+      scheduled_end_time: want.end,
+      entity_metadata: { location: ROLEPLAY_ROOM },
+    };
+    if (room.eventId) {
+      try {
+        await discordFetch(
+          `/guilds/${guild}/scheduled-events/${room.eventId}`,
+          { method: "PATCH", token: config.botToken, body: JSON.stringify(event) },
+          fetcher,
+        );
+        changed = true;
+      } catch (error) {
+        if (status(error) !== 404) throw error;
+        room.eventId = undefined;
+      }
+    }
+    if (!room.eventId) {
+      const made = (await discordFetch(
+        `/guilds/${guild}/scheduled-events`,
+        {
+          method: "POST",
+          token: config.botToken,
+          // Externes Event (3): Ort ist der feste Link, kein Kanal.
+          body: JSON.stringify({ ...event, entity_type: 3, privacy_level: 2 }),
+        },
+        fetcher,
+      )) as { id: string };
+      room.eventId = made.id;
+      room.eventUrl = `https://discord.com/events/${guild}/${made.id}`;
+    }
+  }
+  room.hash = want.hash;
+  room.syncedAt = now.toISOString();
+  await saveRoom(db, id, room);
+  return changed;
+}
+
 export async function syncSessionRooms(db: Database, fetcher?: typeof fetch, now = new Date()) {
   const missing = discordMissing("sessions");
   if (missing.length) return { configured: false as const, missing };
@@ -153,6 +230,10 @@ export async function syncSessionRooms(db: Database, fetcher?: typeof fetch, now
       // Läuft gerade oder ist eben vorbei: nichts mehr verändern.
       if (end <= now) continue;
       const want = roomFor(s, config);
+      if (want.fixed) {
+        if (await syncFixedRoom(db, row.id, room, want, config, fetcher, now, start)) updated++;
+        continue;
+      }
       if (room.hash === want.hash && room.channelId && (room.eventId || start <= now)) continue;
       let changed = false;
       if (room.channelId) {
@@ -371,7 +452,8 @@ export async function sessionRoomStatus(db: Database, now = new Date()) {
   for (const row of rows) {
     const s = JSON.parse(row.data as string) as StoredSession;
     if (s.cancelled || sessionEnd(s) <= now) continue;
-    if (s.discord?.url && !s.discord.closed) withRoom++;
+    // Roleplay hat immer den festen Raum.
+    if (s.kind === "Roleplay" || (s.discord?.url && !s.discord.closed)) withRoom++;
     else waiting++;
   }
   const [last] = await db.query("SELECT value FROM app_settings WHERE key='discord-rooms'");

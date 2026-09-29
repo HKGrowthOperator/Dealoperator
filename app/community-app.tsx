@@ -16,6 +16,7 @@ import RankProgress from "./features/rank-progress";
 import AccountSettings, { AccountAccess } from "./features/account-settings";
 import PushSetup from "./features/push-setup";
 import DiscordLink from "./features/discord-link";
+import { ROLEPLAY_ROOM } from "@/lib/discord";
 import type { CommitmentSettings } from "@/lib/commitment";
 import BuddyInbox from "./features/buddy-inbox";
 import ExchangeBoard from "./features/exchange-board";
@@ -660,7 +661,9 @@ export default function CommunityApp({
       d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const esc = (v: string) =>
       v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, "\\$&");
-    const value = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Deal Operator//Sessions//DE\r\nBEGIN:VEVENT\r\nUID:${s.id}@aktivecaller\r\nDTSTAMP:${fmt(new Date())}\r\nDTSTART:${fmt(start)}\r\nDTEND:${fmt(end)}\r\nSUMMARY:${esc((demo ? "[DEMO] " : "") + s.title)}\r\nDESCRIPTION:${esc(demo ? "Fiktiver Beispieltermin. Keine echte Session." : s.kind + " mit " + s.host)}\r\n${s.room || s.url ? "URL:" + (s.room || s.url) + "\r\n" : ""}END:VEVENT\r\nEND:VCALENDAR`;
+    // Roleplay läuft immer im festen Raum, auch im Kalendereintrag.
+    const link = s.kind === "Roleplay" && !demo ? ROLEPLAY_ROOM : s.room || s.url;
+    const value = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Deal Operator//Sessions//DE\r\nBEGIN:VEVENT\r\nUID:${s.id}@aktivecaller\r\nDTSTAMP:${fmt(new Date())}\r\nDTSTART:${fmt(start)}\r\nDTEND:${fmt(end)}\r\nSUMMARY:${esc((demo ? "[DEMO] " : "") + s.title)}\r\nDESCRIPTION:${esc(demo ? "Fiktiver Beispieltermin. Keine echte Session." : s.kind + " mit " + s.host)}\r\n${link ? "URL:" + link + "\r\n" : ""}END:VEVENT\r\nEND:VCALENDAR`;
     const url = URL.createObjectURL(
       new Blob([value], { type: "text/calendar" }),
     );
@@ -2315,8 +2318,9 @@ export default function CommunityApp({
                         {session.room ? (
                           <>
                             <span>
-                              Zur Startzeit in den Raum dieser Session. Dort
-                              gibt es Sprache und einen eigenen Chat.
+                              {session.kind === "Roleplay"
+                                ? "Roleplay läuft immer im festen Roleplay-Raum im Discord. Geh zur Startzeit hinein."
+                                : "Zur Startzeit in den Raum dieser Session. Dort gibt es Sprache und einen eigenen Chat."}
                             </span>
                             <a
                               className="btn primary"
@@ -2325,7 +2329,9 @@ export default function CommunityApp({
                               rel="noopener noreferrer"
                             >
                               <Headphones size={17} />
-                              Zum Session-Raum im Discord
+                              {session.kind === "Roleplay"
+                                ? "Zum Roleplay-Raum im Discord"
+                                : "Zum Session-Raum im Discord"}
                             </a>
                             {session.roomEvent && (
                               <a
@@ -2373,8 +2379,9 @@ export default function CommunityApp({
                 </div>
               ) : (
                 <p className="hint">
-                  Treffpunkt ist ein eigener Raum im Discord. Nach deiner Zusage
-                  führen wir dich Schritt für Schritt hinein.
+                  {session.kind === "Roleplay"
+                    ? "Treffpunkt ist der feste Roleplay-Raum im Discord. Nach deiner Zusage führen wir dich Schritt für Schritt hinein."
+                    : "Treffpunkt ist ein eigener Raum im Discord. Nach deiner Zusage führen wir dich Schritt für Schritt hinein."}
                 </p>
               )}
             </div>

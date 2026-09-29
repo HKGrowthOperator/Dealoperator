@@ -12,6 +12,7 @@ import { teamRecipients } from "@/server/roles";
 import { discordDestination } from "@/server/discord";
 import { activeCallerFor } from "@/server/active-caller";
 import { ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
+import { sessionRoomOf } from "@/lib/discord";
 import { loadWorkflows, handleWorkflow } from "./workflows";
 import { database } from "@/server/database";
 import { loadOwnRecords } from "@/server/records";
@@ -216,10 +217,10 @@ export async function GET() {
         const guests: string[] = Array.isArray(rawGuests) ? rawGuests.filter((x: unknown) => typeof x === "string") : [];
         return {
         ...data,
-        // Nur der Link in den Discord-Raum, keine internen Kennungen. Ein vom
-        // Abgleich angelegter Raum geht vor; sonst der vom Team eingetragene Link.
-        room: discord?.url && !discord.closed ? discord.url : typeof roomUrl === "string" ? roomUrl : "",
-        roomManual: !(discord?.url && !discord.closed) && typeof roomUrl === "string" && !!roomUrl,
+        // Nur der Link in den Discord-Raum, keine internen Kennungen. Roleplay
+        // läuft immer im festen Raum; sonst geht ein vom Abgleich angelegter
+        // Raum vor dem vom Team eingetragenen Link.
+        ...sessionRoomOf(String(data.kind ?? ""), discord, roomUrl),
         guests: guests.map((g) => ({ id: g, name: guestName(g) })),
         roomEvent: discord?.eventUrl && !discord.closed ? discord.eventUrl : "",
         team: team.includes(r.owner),

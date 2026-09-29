@@ -111,7 +111,7 @@ test("the sync creates one voice channel and one event per session, links it, an
   const start = "2026-09-25T16:00:00.000Z";
   await db.query("INSERT INTO sessions(id,owner,data) VALUES('s1',$1,$2)", [
     alice,
-    JSON.stringify({ ...input(start), host: "Alice", url: "", cancelled: false }),
+    JSON.stringify({ ...input(start, { kind: "Call-Block" }), host: "Alice", url: "", cancelled: false }),
   ]);
   const d = fakeDiscord();
   const first = await syncSessionRooms(db, d.fetcher, now);
@@ -120,12 +120,12 @@ test("the sync creates one voice channel and one event per session, links it, an
   assert.equal(channel.body.type, 2);
   assert.equal(channel.body.parent_id, "cat1");
   assert.equal(channel.body.user_limit, 4);
-  assert.match(channel.body.name, /^Roleplay · Fr 25\.09\. 18:00 · Einwände üben$/);
+  assert.match(channel.body.name, /^Call-Block · Fr 25\.09\. 18:00 · Einwände üben$/);
   const event = d.calls.find((c) => c.path === "/guilds/g1/scheduled-events")!;
   assert.equal(event.body.entity_type, 2);
   assert.equal(event.body.channel_id, "id1");
   assert.equal(event.body.scheduled_start_time, start);
-  assert.match(event.body.description, /Roleplay mit Alice, 45 Minuten, 4 Plätze/);
+  assert.match(event.body.description, /Call-Block mit Alice, 45 Minuten, 4 Plätze/);
   assert.doesNotMatch(JSON.stringify(d.calls), /@|\+49/);
   const room = JSON.parse((await db.query("SELECT data FROM sessions WHERE id='s1'"))[0].data).discord;
   assert.equal(room.url, "https://discord.com/channels/g1/id1");
@@ -142,7 +142,7 @@ test("changes are pulled into Discord; a deleted channel is recreated; cancel an
   const start = "2026-09-25T16:00:00.000Z";
   await db.query("INSERT INTO sessions(id,owner,data) VALUES('s1',$1,$2)", [
     alice,
-    JSON.stringify({ ...input(start), host: "Alice", url: "", cancelled: false }),
+    JSON.stringify({ ...input(start, { kind: "Call-Block" }), host: "Alice", url: "", cancelled: false }),
   ]);
   const d = fakeDiscord();
   await syncSessionRooms(db, d.fetcher, now);
@@ -171,7 +171,7 @@ test("changes are pulled into Discord; a deleted channel is recreated; cancel an
   await db.query("INSERT INTO sessions(id,owner,data) VALUES('s2',$1,$2)", [
     alice,
     JSON.stringify({
-      ...input("2026-09-22T10:00:00.000Z"),
+      ...input("2026-09-22T10:00:00.000Z", { kind: "Call-Block" }),
       host: "Alice",
       discord: { channelId: "old", url: "https://discord.com/channels/g1/old" },
     }),
@@ -180,6 +180,43 @@ test("changes are pulled into Discord; a deleted channel is recreated; cancel an
   const past = await syncSessionRooms(db, p.fetcher, now);
   assert.equal(past.configured && past.closed, 1);
   assert.deepEqual(p.calls, [{ method: "DELETE", path: "/channels/old", body: null }]);
+});
+
+test("Roleplay bekommt keinen eigenen Kanal, nur ein Event mit dem festen Raum; ein alter Kanal wird abgeräumt", async () => {
+  const now = at("2026-09-23T18:00:00Z");
+  const start = "2026-09-25T16:00:00.000Z";
+  await db.query("INSERT INTO sessions(id,owner,data) VALUES('r1',$1,$2),('r2',$1,$3)", [
+    alice,
+    JSON.stringify({ ...input(start), host: "Alice", url: "", cancelled: false }),
+    JSON.stringify({
+      ...input(start),
+      host: "Alice",
+      discord: { channelId: "alt", eventId: "altev", url: "https://discord.com/channels/g1/alt", hash: "x" },
+    }),
+  ]);
+  const d = fakeDiscord();
+  await syncSessionRooms(db, d.fetcher, now);
+  assert.ok(!d.calls.some((c) => c.path === "/guilds/g1/channels"), "kein neuer Kanal");
+  assert.ok(d.calls.some((c) => c.method === "DELETE" && c.path === "/channels/alt"), "alter Kanal weg");
+  assert.ok(d.calls.some((c) => c.method === "DELETE" && c.path === "/guilds/g1/scheduled-events/altev"));
+  const events = d.calls.filter((c) => c.method === "POST" && c.path === "/guilds/g1/scheduled-events");
+  assert.equal(events.length, 2);
+  for (const e of events) {
+    assert.equal(e.body.entity_type, 3);
+    assert.equal(e.body.entity_metadata.location, "https://discord.gg/sp75ZrWahH");
+    assert.equal(e.body.channel_id, undefined);
+  }
+  for (const id of ["r1", "r2"]) {
+    const room = JSON.parse((await db.query("SELECT data FROM sessions WHERE id=$1", [id]))[0].data).discord;
+    assert.equal(room.url, undefined);
+    assert.equal(room.channelId, undefined);
+    assert.match(room.eventUrl, /^https:\/\/discord\.com\/events\/g1\//);
+  }
+  // Zweiter Lauf: nichts mehr zu tun.
+  const before = d.calls.length;
+  await syncSessionRooms(db, d.fetcher, now);
+  assert.equal(d.calls.length, before);
+  assert.deepEqual(await sessionRoomStatus(db, now), { withRoom: 2, waiting: 0, lastRun: null });
 });
 
 test("without bot token nothing happens and the status says what is missing", async () => {
