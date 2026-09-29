@@ -112,6 +112,27 @@ Mobil (360/390/430) und Desktop (1280) prüfen:
 16. Verwaltung › Prüffälle: bei unbekanntem Namen „Neues Profil anlegen“ mit vorgeschlagenem Namen; Werte werden übernommen, spätere Meldungen landen automatisch dort.
 17. Nach Migration 0005: unter Mein Tag „Gesprächszeit und CRM-Screenshot (freiwillig)“, sofort gespeichert; Bild nur für Person und Team; Fortschritt zeigt den Monatsstand, Verwaltung › Monatsstand die Liste mit Screenshots. Ohne Migration ist davon nichts zu sehen.
 
+## Zugang durch das Team und Roleplay-Raum (29.09.2026)
+
+Vor Migration 0006:
+
+1. Verwaltung als Admin: Reiter Heute › „Zugang anlegen“ zeigt nur den Hinweis auf Migration 0006; unter Team-Inbox › Unbestätigt gibt es kein „Freischalten“. Alles andere funktioniert wie bisher. Moderatoren sehen den Reiter nicht.
+
+Nach Migration 0006 (nur mit Testkonten, fiktive Namen):
+
+2. Zugang anlegen, neues Profil: Name, E-Mail, Passwort („Vorschlag“ erzeugt z. B. `Anker-Falke-4711`) → „Zugang anlegen“. Danach steht die Nachricht zum Kopieren da („Hi …, dein Zugang zu Deal Operator steht.“, Anmeldeadresse `/anmelden`, E-Mail, Passwort, Hinweis auf Profil) und darunter, dass Supabase zusätzlich eine Bestätigungsmail schickt. Mit E-Mail und Passwort anmelden: das neue Profil gehört dem Konto, Mein Tag öffnet das Formular. In der Team-Inbox steht „Zugang angelegt: …“ unter Erledigt, ohne Push.
+3. Zugang anlegen für ein Profil mit Historie: beim Tippen des Namens erscheint das Profil ohne Konto als Vorschlag; auswählen („Vorhandenes Profil: …“). Nach der Anmeldung sind die bisherigen Tage da. Denselben Namen ohne Auswahl anlegen: abgelehnt mit dem Hinweis, genau dieses Profil auszuwählen.
+4. Adresse mit bestehendem Zugang: abgelehnt („Für diese Adresse gibt es schon einen Zugang.“). Adresse mit unbestätigtem Konto (hängende Registrierung): abgelehnt mit dem Hinweis auf „Freischalten“, nichts wird bestätigt oder gebunden. Adresse mit bestätigtem Konto ohne Profil: kein neues Konto, über der Nachricht steht, dass das eingegebene Passwort nicht gesetzt wurde, die Nachricht sagt „das, das du bei der Registrierung gewählt hast“, Anmeldung mit dem eigenen Passwort klappt. Hat die Person unter der Adresse ein Profil zur Übernahme angefragt, wird ein anderes (oder neues) Profil abgelehnt mit dem Hinweis, genau dieses auszuwählen.
+4a. Nach dem Anlegen ist nur noch die Nachricht zu sehen (Fokus darauf). „Weiteren Zugang anlegen“ fragt vor dem Kopieren nach („Nachricht schon kopiert?“).
+5. Freischalten: Registrierung absenden, Mail nicht öffnen. Team-Inbox › Unbestätigt › „Freischalten“ → Rückfrage im Eintrag → „Jetzt freischalten“. Bei „neu“ meldet sich die Person mit E-Mail und Passwort an und legt ihr Profil an; bei einer Übernahme steht danach „Die Übernahme liegt jetzt bei euch zur Prüfung.“ und die Anfrage ist unter Übernahmen prüfbereit, freigegeben ist noch nichts. Dort steht „E-Mail vom Team freigeschaltet (nicht per Mail bestätigt)“, ein Importabgleich zeigt nur „gleiche Adresse, nicht per Mail bestätigt“ statt „stimmt überein“. Im Eintrag unter „Unbestätigt“ steht für Admins die Adresse, die Rückfrage nennt Name und Adresse. Es geht dabei keine Mail raus.
+6. Wartebildschirm nach dem Absenden (neu, Übernahme, Zuordnung): unter „Keine Mail da?“ steht, dass das Team freischalten kann. Nicht bei Anmeldelink und Passwort vergessen.
+7. Das gewählte Passwort steht in keiner Tabelle des Schemas `operator`, in keinem Log und in keiner Antwort der Schnittstelle.
+
+Roleplay:
+
+8. Jede Roleplay-Session zeigt als Raum `https://discord.gg/sp75ZrWahH`, auch wenn früher ein Hand-Link eingetragen war; das Feld für einen eigenen Link erscheint bei Roleplay nicht. Der Kalendereintrag enthält denselben Link. Call-Block und Reflexion behalten Abgleich-Raum oder Hand-Link.
+9. Mit eingerichtetem Discord-Abgleich: Roleplay bekommt keinen Sprachkanal, nur ein Discord-Event mit dem festen Link als Ort; ein früher angelegter Kanal wird abgeräumt.
+
 ## Betrieb vor dem öffentlichen Start
 
 Betreiber- und Datenschutzangaben, endgültige Domain, Versanddomain und Zustellbarkeit ergänzen. Sicherungen, Wiederherstellungsweg und tatsächliche Tariflimits festlegen. Fehlerlogs ohne Zugangsdaten und private Formulardaten halten. Der Discord-Bot ist eine eigene noch offene Integration, beschrieben in [DISCORD.md](DISCORD.md).

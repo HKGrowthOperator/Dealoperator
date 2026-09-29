@@ -30,6 +30,12 @@ Für eine bestehende Installation liegen die Nachträge unter `database/migratio
 
 4. `0005_day_evidence.sql` (vorbereitet am 29.09.2026, **noch nicht angewendet**, nur nach Freigabe) — neue, leere Tabelle `day_evidence` für freiwillige Gesprächszeit und CRM-Screenshots je Tag, mit RLS, Rechten und Serverpolicy für `operator_app`. Rein additiv. Hier ist die Reihenfolge egal: Der Code prüft selbst, ob die Tabelle da ist (`server/evidence.ts`, `to_regclass`), und blendet Gesprächszeit, Screenshot, Monatsstand und die Verwaltungsliste „Monatsstand“ bis dahin aus. `/api/ready` verlangt die Tabelle nicht. Nach dem Anwenden schaltet sich die Funktion innerhalb von fünf Minuten ohne neuen Build frei. Screenshots löscht der Takt nach 62 Tagen; die Gesprächszeit bleibt.
 
+5. `0006_team_access.sql` (vorbereitet am 29.09.2026, **noch nicht angewendet**, nur nach Freigabe durch Nick): Zugang durch das Team. Legt zwei Funktionen im Schema `operator` an, keine Tabellen:
+   - `operator.team_account_status(email)`: nur lesend. Liefert zu einer Adresse das Konto (`user_id`), ob die Adresse bestätigt ist, ob ein Passwort gesetzt ist und wann das Konto entstanden ist (`created_at`, damit ein Wiederholungsversuch ein vom Team selbst angelegtes Konto erkennt). Keine Zeile, wenn es kein Konto gibt. SSO-, anonyme und gelöschte Konten zählen nicht.
+   - `operator.team_confirm_account(email)`: setzt bei einem Konto mit Passwort `auth.users.email_confirmed_at` (und `updated_at`) sowie `email_verified` in der E-Mail-Identität. Ergebnis `missing`, `no_password` (dann ändert sich nichts), `already` oder `confirmed`.
+
+   Die Funktionen setzen **nie ein Passwort** und kein anderes Feld. Passwörter vergibt ausschließlich Supabase (Registrierung der Person selbst oder `signUp` beim Anlegen eines Zugangs durch einen Admin). Beide Funktionen laufen als `SECURITY DEFINER` mit festem Suchpfad; `PUBLIC`, `anon` und `authenticated` haben kein Ausführungsrecht, nur `operator_app`. Wer sie aufrufen darf (nur Admins), prüft der Server (`server/team-access.ts`). Ausführen als Projektadministrator (`postgres`, SQL-Editor), nie mit dem App-Zugang; die App hat weiterhin keinen `service_role`-Schlüssel und keine Rechte auf das Schema `auth`. Die Reihenfolge ist egal: Der Code prüft per `to_regprocedure`, ob beide Funktionen da sind, und zeigt „Zugang anlegen“ und „Freischalten“ bis dahin nur als Hinweis. Nach dem Anwenden schaltet sich beides innerhalb von fünf Minuten ohne neuen Build frei. Zurücknehmen: `DROP FUNCTION operator.team_confirm_account(text); DROP FUNCTION operator.team_account_status(text);`
+
 **Reihenfolge bei 0003:** erst die Migration anwenden, dann den Code ausrollen. `/api/ready` prüft ab dieser Version die neuen Tabellen, Spalten und Zählerrechte und meldet 503, solange die Migration fehlt. Der Erinnerungs-Takt pausiert in diesem Fall von selbst.
 
 ## 2. Coolify-Anwendung
@@ -113,7 +119,12 @@ Bei Problemen:
 
 - Build scheitert an CSS: vollständigen Git-Checkout, `vendor/` und Dockerignore prüfen.
 - Website läuft, Anmeldung gesperrt: vier Hauptvariablen, `/api/ready` und DB-Rechte prüfen.
-- E-Mail kommt nicht: SMTP-Absenderdomain, Supabase Auth-Logs und Versandlimits prüfen.
+- E-Mail kommt nicht (bei manchen Google-Postfächern seit September 2026 beobachtet). Die Maßnahmen, in dieser Reihenfolge:
+  1. Supabase-Vorlagen **Confirm sign up** und **Magic Link** auf die Fassungen in `deploy/` umstellen (4.5): Der Knopf zeigt dann auf die eigene Domain (`{{ .RedirectTo }}&token_hash={{ .TokenHash }}&type=email`) statt auf `supabase.co`, und die Mail enthält den Code (`{{ .Token }}`). Links auf eine fremde Domain sind ein häufiger Grund für Spam-Einstufung.
+  2. Danach in Coolify `AUTH_EMAIL_CODE=1` setzen und neu starten, damit die Website das Codefeld zeigt.
+  3. In Resend das Link-Tracking (und Öffnungs-Tracking) für die Domain der Auth-Mails ausschalten. Umgeschriebene Links verderben den Einmal-Link und wirken auf Filter verdächtig.
+  4. Im Resend-Log (Emails) je Adresse nachsehen, ob die Mail **zugestellt** (`delivered`), abgewiesen (`bounced`) oder als Spam gemeldet wurde. Solange dort kein Zustellnachweis steht, gilt eine Mail nur als angefordert. Zusätzlich Supabase Auth-Logs und Versandlimits prüfen.
+  5. Kommt trotzdem nichts an: Hat sich die Person beim Team gemeldet, schaltet ein Admin die hängende Registrierung unter Team-Inbox › Unbestätigt mit „Freischalten“ frei oder legt unter Heute › „Zugang anlegen“ einen Zugang an (beides erst nach Migration 0006).
 - Callback kehrt mit einem Fehler zurück (`fehler=abgelaufen|verwendet|browser|technik|link`): Ablaufzeit, neuere Mail an dieselbe Adresse, Browserwechsel bei alter Vorlage, Redirect Allow List und tatsächliche HTTPS-Domain prüfen. Die Kennung wird auf der Seite gelesen und aus der Adresse entfernt.
 - Eigene Zahlen fehlen nach Login: Konto, Profilzuordnung und Datenbank prüfen. Nicht neu importieren oder Profile löschen, um eine Zuordnung zu erzwingen.
 
