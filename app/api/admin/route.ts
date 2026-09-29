@@ -28,6 +28,7 @@ import { designateRole, setTeamRole, teamList } from "@/server/roles";
 import { resendConfirmationByTeam } from "@/server/onboarding";
 import { mergeParticipants, mergePreview } from "@/server/merge";
 import { resendSignupForTeam, signUpForTeam } from "@/server/email-auth";
+import { ownMailReady, sendEmailCode } from "@/server/email-code";
 import {
   accountlessProfiles,
   confirmRegistrationByTeam,
@@ -138,7 +139,20 @@ export async function POST(request: Request) {
         return json(await designateRole(db, actor, v));
       case "resendConfirmation":
         if (!authReady()) throw new AppError("Die Anmeldung ist noch nicht eingerichtet.", 503);
-        return json(await resendConfirmationByTeam(db, actor, v, resendSignupForTeam));
+        // Eigene Mail (Code und Link auf unserer Domain), sonst die von Supabase.
+        return json(
+          await resendConfirmationByTeam(db, actor, v, async (email, request) => {
+            if (await ownMailReady(db)) {
+              try {
+                await sendEmailCode(db, { email, purpose: "confirm", request });
+                return;
+              } catch {
+                /* weiter mit der Mail von Supabase */
+              }
+            }
+            await resendSignupForTeam(email, request);
+          }),
+        );
       case "confirmRegistration":
         return json(await confirmRegistrationByTeam(db, actor, v));
       case "createAccess":

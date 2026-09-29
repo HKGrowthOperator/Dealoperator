@@ -14,6 +14,17 @@ import {
   sendFailure,
   signInFailure,
 } from "@/server/email-auth";
+import {
+  accountOf,
+  confirmAccountIn,
+  ownMailReady,
+  peekLink,
+  redeemCode,
+  redeemLink,
+  sendEmailCode,
+  setPasswordIn,
+} from "@/server/email-code";
+import { bindConfirmedRequest } from "@/server/onboarding";
 
 const email = z
   .string()
@@ -21,6 +32,35 @@ const email = z
   .toLowerCase()
   .email("Bitte prüfe deine E-Mail-Adresse.")
   .max(254);
+const codeField = z
+  .string()
+  .trim()
+  .regex(/^[\d ]{6,12}$/, "Bitte gib den Code aus der Mail ein (nur Ziffern).");
+const linkKey = z.string().trim().min(20).max(120);
+const startNext = (next?: string) => `/start?next=${encodeURIComponent(safeNext(next || null))}`;
+const WRONG_CODE = "Dieser Code stimmt nicht. Prüfe die Ziffern; nur der Code aus der neuesten Mail gilt.";
+// Sechsstellige Codes: über den Tag höchstens 30 Versuche je Adresse, damit
+// Raten auch über Wochen aussichtslos bleibt.
+const DAY_LIMIT =
+  "Heute gab es für diese Adresse zu viele Codeversuche. Bitte versuche es morgen noch einmal oder melde dich beim Team.";
+const NO_CODE =
+  "Dieser Code gilt nicht mehr. Codes gelten 30 Minuten und nur einmal, und eine neue Mail ersetzt die vorige. Fordere einfach eine neue Mail an.";
+
+/**
+ * Nach einer mit eigenem Code oder Link bestätigten Adresse: die
+ * Registrierung aus der Mail an das Konto binden (wie nach dem Supabase-Link).
+ */
+async function bindAfterConfirm(
+  db: ReturnType<typeof database>,
+  confirmed: { userId: string; email: string; request: string | null },
+) {
+  if (!confirmed.request) return;
+  await bindConfirmedRequest(
+    db,
+    { userId: confirmed.userId, email: confirmed.email, admin: false },
+    confirmed.request,
+  ).catch(() => null);
+}
 
 /**
  * Für Kopf und Reiterleiste: angemeldet ja/nein, Rolle, und ob es ein Profil
@@ -47,8 +87,9 @@ export async function GET() {
 
 /**
  * Anmeldung. Der Normalfall ist E-Mail und Passwort, ohne Mail. Eine Mail
- * gibt es nur zum Bestätigen der Adresse bei der Registrierung und als
- * Anmeldelink, wenn das Passwort vergessen oder noch nie festgelegt wurde.
+ * gibt es nur zum Bestätigen der Adresse und wenn das Passwort vergessen
+ * wurde. Diese Mails schickt die App selbst (server/email-code.ts); nur
+ * solange das nicht eingerichtet ist, kommen sie von Supabase.
  */
 export async function POST(request: Request) {
   try {
@@ -94,9 +135,17 @@ export async function POST(request: Request) {
         email: v.email,
         password: v.password,
       });
+      // Passwort stimmt, nur die Adresse ist noch nicht bestätigt (die Mail
+      // kam nie an): eigene Mail mit Code schicken. Nach dem Code geht es
+      // mit demselben Passwort weiter, ganz ohne Team.
+      if (error?.code === "email_not_confirmed" && (await ownMailReady(db))) {
+        await sendEmailCode(db, { email: v.email, purpose: "confirm" });
+        await clearRateLimit(db, `verify:${v.email}`);
+        return json({ ok: false, confirm: true, resendAfter: RESEND_SECONDS });
+      }
       if (error) throw signInFailure(error);
       await clearRateLimit(db, `signin:${v.email}`);
-      return json({ ok: true, next: `/start?next=${encodeURIComponent(safeNext(v.next || null))}` });
+      return json({ ok: true, next: startNext(v.next) });
     }
 
     // Passwort festlegen oder ändern, nur mit bestehender Sitzung.
@@ -138,13 +187,93 @@ export async function POST(request: Request) {
         900,
         "Zu viele falsche Codes. Fordere eine neue Mail an; mit ihrem Code geht es sofort weiter. Der Link in der Mail funktioniert weiterhin.",
       );
+      await rateLimit(db, `verify-day:${v.email}`, 30, 86400, DAY_LIMIT);
+      // Eigener Code (Mail von Deal Operator): bestätigt die Adresse. Eine
+      // Sitzung entsteht danach mit dem eigenen Passwort (confirmed).
+      if (await ownMailReady(db)) {
+        const own = await redeemCode(db, { email: v.email, purpose: "confirm", code: v.code }, async (tx, c) => ({
+          ...(await confirmAccountIn(tx, c.email)),
+          email: c.email,
+          request: c.request,
+        }));
+        if (own.status === "ok") {
+          await bindAfterConfirm(db, own.value);
+          await clearRateLimit(db, `verify:${v.email}`);
+          return json({
+            ok: true,
+            confirmed: true,
+            next: `/anmelden?bestaetigt=1&next=${encodeURIComponent(safeNext(v.next || null))}`,
+          });
+        }
+        if (!emailCodeEnabled()) throw new AppError(own.status === "wrong" ? WRONG_CODE : NO_CODE, 400);
+      }
       const { error } = await client.auth.verifyOtp({
         email: v.email,
         token: v.code,
         type: "email",
       });
       if (error) throw codeFailure(error);
-      return json({ ok: true, next: `/start?next=${encodeURIComponent(safeNext(v.next || null))}` });
+      return json({ ok: true, next: startNext(v.next) });
+    }
+
+    // Neues Passwort mit dem Code aus der eigenen Mail „Passwort vergessen“.
+    // Danach ist man in diesem Browser angemeldet.
+    if (raw.action === "reset") {
+      const v = z
+        .object({ action: z.literal("reset"), email, code: codeField, password: passwordSchema, next: z.string().max(300).optional() })
+        .strict()
+        .parse(raw);
+      await rateLimit(
+        db,
+        `verify:${v.email}`,
+        10,
+        900,
+        "Zu viele falsche Codes. Fordere eine neue Mail an; mit ihrem Code geht es sofort weiter.",
+      );
+      await rateLimit(db, `verify-day:${v.email}`, 30, 86400, DAY_LIMIT);
+      if (!(await ownMailReady(db))) throw new AppError(NO_CODE, 400);
+      const own = await redeemCode(db, { email: v.email, purpose: "reset", code: v.code }, (tx, c) =>
+        setPasswordIn(tx, c.email, v.password),
+      );
+      if (own.status !== "ok") throw new AppError(own.status === "wrong" ? WRONG_CODE : NO_CODE, 400, undefined, "code");
+      await clearRateLimit(db, `verify:${v.email}`);
+      await clearRateLimit(db, `signin:${v.email}`);
+      const { error } = await client.auth.signInWithPassword({ email: v.email, password: v.password });
+      if (error) throw signInFailure(error);
+      return json({ ok: true, next: startNext(v.next) });
+    }
+
+    // Link aus der eigenen Mail (/bestaetigen): Bestätigung sofort einlösen,
+    // beim neuen Passwort erst nachsehen und nach dem Festlegen einlösen.
+    if (raw.action === "link") {
+      const v = z.object({ action: z.literal("link"), key: linkKey }).strict().parse(raw);
+      await rateLimit(db, "email-link", 300, 3600);
+      if (!(await ownMailReady(db))) throw new AppError("Dieser Link ist gerade nicht einlösbar. Bitte versuche es gleich noch einmal.", 503);
+      const found = await peekLink(db, v.key);
+      if (found.purpose === "reset") return json({ ok: true, purpose: "reset", email: found.email });
+      const confirmed = await redeemLink(db, v.key, "confirm", async (tx, c) => ({
+        ...(await confirmAccountIn(tx, c.email)),
+        email: c.email,
+        request: c.request,
+      }));
+      await bindAfterConfirm(db, confirmed);
+      return json({ ok: true, purpose: "confirm", email: confirmed.email });
+    }
+    if (raw.action === "resetLink") {
+      const v = z
+        .object({ action: z.literal("resetLink"), key: linkKey, password: passwordSchema, next: z.string().max(300).optional() })
+        .strict()
+        .parse(raw);
+      await rateLimit(db, "email-link", 300, 3600);
+      if (!(await ownMailReady(db))) throw new AppError("Dieser Link ist gerade nicht einlösbar. Bitte versuche es gleich noch einmal.", 503);
+      const done = await redeemLink(db, v.key, "reset", async (tx, c) => ({
+        ...(await setPasswordIn(tx, c.email, v.password)),
+        email: c.email,
+      }));
+      await clearRateLimit(db, `signin:${done.email}`);
+      const { error } = await client.auth.signInWithPassword({ email: done.email, password: v.password });
+      if (error) throw signInFailure(error);
+      return json({ ok: true, next: startNext(v.next) });
     }
 
     // Anmeldelink per Mail: für „Passwort vergessen oder noch keins“. Danach
@@ -167,6 +296,19 @@ export async function POST(request: Request) {
       "Du hast in kurzer Zeit mehrere Anmeldemails angefordert. Bitte nutze die letzte Mail oder warte, bis die Zeit abgelaufen ist.",
     );
     await rateLimit(db, "auth-global", 100, 3600);
+    // Eigene Mail mit Code und Link für ein neues Passwort, wenn möglich.
+    if (await ownMailReady(db)) {
+      if (!(await accountOf(db, v.email)))
+        throw new AppError(
+          "Für diese Adresse gibt es noch kein Konto. Registriere dich kostenfrei, das dauert eine Minute.",
+          404,
+          undefined,
+          "email",
+        );
+      await sendEmailCode(db, { email: v.email, purpose: "reset" });
+      await clearRateLimit(db, `verify:${v.email}`);
+      return json({ ok: true, resendAfter: RESEND_SECONDS, code: true, newPassword: true });
+    }
     const { error } = await client.auth.signInWithOtp({
       email: v.email,
       options: { emailRedirectTo: emailRedirect("/passwort"), shouldCreateUser: false },

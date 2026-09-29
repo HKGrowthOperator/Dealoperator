@@ -12,6 +12,7 @@ import {
   RESEND_SECONDS,
   sendFailure,
 } from "@/server/email-auth";
+import { ownMailReady, sendEmailCode } from "@/server/email-code";
 import {
   answerInfoRequest,
   browserRequestState,
@@ -21,11 +22,26 @@ import {
   profileForSelection,
   requestClaimSignedIn,
   requestForActor,
+  logRequestEvent,
   ONBOARDING_COOKIE,
   requestIdFromCookie,
   searchProfiles,
   startRequest,
 } from "@/server/onboarding";
+
+/**
+ * Eigene Bestätigungsmail für eine Registrierung. Scheitert sie (Resend nicht
+ * erreichbar, zu viele Mails), bleibt es bei der Mail von Supabase.
+ */
+async function sendOwn(db: ReturnType<typeof database>, email: string, request: string) {
+  try {
+    await sendEmailCode(db, { email, purpose: "confirm", request });
+  } catch {
+    return false;
+  }
+  await logRequestEvent(db, request, email, "mail_sent", "eigene Mail");
+  return true;
+}
 
 /**
  * Öffentlich, damit die Profilauswahl VOR der E-Mail-Eingabe möglich ist.
@@ -128,6 +144,15 @@ export async function POST(request: Request) {
         900,
         "Du hast in kurzer Zeit mehrere Bestätigungsmails angefordert. Bitte nutze die letzte Mail oder warte, bis die Zeit abgelaufen ist.",
       );
+      // Zuerst die eigene Mail (Code und Link auf unserer Domain). Nur wenn
+      // das nicht geht, noch einmal die Mail von Supabase.
+      if (await ownMailReady(db)) {
+        const own = await sendOwn(db, pending.email, id);
+        if (own) {
+          await clearRateLimit(db, `verify:${pending.email}`);
+          return json({ ok: true, resendAfter: RESEND_SECONDS, code: true });
+        }
+      }
       const client = await authClient();
       const { error } = await client.auth.resend({
         type: "signup",
@@ -197,12 +222,15 @@ export async function POST(request: Request) {
     // Beleg für „Mail geschickt“ (Übergabe an Supabase), und ein neuer Code
     // hebt die Sperre für Codeversuche auf.
     await markMailSent(db, created.id, created.email);
+    // Zusätzlich die eigene Mail mit Code und Link: sie kommt auch dort an,
+    // wo die Mail von Supabase im Spam landet. Beide bestätigen die Adresse.
+    const own = (await ownMailReady(db)) && (await sendOwn(db, created.email, created.id));
     await clearRateLimit(db, `verify:${created.email}`);
     return json({
       ok: true,
       resubmitted: created.resubmitted,
       resendAfter: RESEND_SECONDS,
-      code: emailCodeEnabled(),
+      code: own || emailCodeEnabled(),
     });
   } catch (e) {
     return errorResponse(e);
