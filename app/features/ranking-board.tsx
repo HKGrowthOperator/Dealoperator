@@ -58,6 +58,8 @@ import { PushPrompt } from "./push-setup";
 import DiscordSteps from "./discord-steps";
 import { takeSubmitted, type SubmittedNote } from "./submitted-note";
 import RankingHistory from "./ranking-history";
+import UpcomingSessions from "./upcoming-sessions";
+import type { PublicSession } from "@/server/sessions";
 
 const fmt = (v: number | null | undefined) =>
   v === null || v === undefined ? "–" : v.toLocaleString("de-DE");
@@ -189,8 +191,11 @@ export default function RankingBoard({
   onlyRanking = false,
   viewer = null,
   home = null,
+  sessions = [],
 }: {
   discordUrl?: string;
+  /** Kommende Sessions, für alle sichtbar. */
+  sessions?: PublicSession[];
   /** /ranking: nur Ergebnisse, ohne Einstieg und Erklärung. */
   onlyRanking?: boolean;
   /** Anmeldestand vom Server. */
@@ -768,6 +773,8 @@ export default function RankingBoard({
             }}
           />
         )}
+
+        {!onlyRanking && <UpcomingSessions sessions={sessions} signedIn={signedIn} />}
 
         {signedIn && home?.participant && <DiscordPanel url={discord} />}
 

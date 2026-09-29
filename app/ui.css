@@ -4344,3 +4344,90 @@ li[data-medal="gold"] .rb-bar i {
     display: none;
   }
 }
+
+/* Kommende Sessions auf der Startseite (für alle sichtbar). */
+.rb-sessions {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--do-line);
+  border-radius: var(--radius-l);
+  background: var(--do-surface);
+}
+.rb-sessions-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+.rb-sessions h2 {
+  margin: 0;
+  font-size: var(--text-lead);
+  font-weight: 800;
+}
+.rb-sessions-head .do-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-label);
+}
+.rb-sessions ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rb-sessions li {
+  display: grid;
+  grid-template-columns: 9.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--do-line);
+}
+.rb-sessions li:first-child {
+  border-top: 0;
+}
+.rb-sessions-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.rb-sessions-when strong {
+  color: var(--do-ink);
+}
+.rb-sessions-when svg {
+  color: var(--do-blue);
+}
+.rb-sessions-what {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.rb-sessions-what small {
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.rb-sessions-seats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 599px) {
+  .rb-sessions {
+    padding: var(--space-4);
+  }
+  .rb-sessions li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .rb-sessions-when {
+    grid-column: 1 / -1;
+  }
+}
