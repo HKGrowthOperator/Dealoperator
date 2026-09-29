@@ -28,6 +28,8 @@ Für eine bestehende Installation liegen die Nachträge unter `database/migratio
 
 `0002` ist am 22.09.2026, `0003` und `0004` (Team-Rollen) am 23.09.2026 auf der produktiven Datenbank angewendet worden. `0004` ist rein additiv: eine leere Tabelle `team_roles` mit RLS, Zugriff nur für `operator_app`. Auch hier gilt: erst die Migration, dann der Code, weil `/api/ready` die Tabelle prüft.
 
+4. `0005_day_evidence.sql` (vorbereitet am 29.09.2026, **noch nicht angewendet**, nur nach Freigabe) — neue, leere Tabelle `day_evidence` für freiwillige Gesprächszeit und CRM-Screenshots je Tag, mit RLS, Rechten und Serverpolicy für `operator_app`. Rein additiv. Hier ist die Reihenfolge egal: Der Code prüft selbst, ob die Tabelle da ist (`server/evidence.ts`, `to_regclass`), und blendet Gesprächszeit, Screenshot, Monatsstand und die Verwaltungsliste „Monatsstand“ bis dahin aus. `/api/ready` verlangt die Tabelle nicht. Nach dem Anwenden schaltet sich die Funktion innerhalb von fünf Minuten ohne neuen Build frei. Screenshots löscht der Takt nach 62 Tagen; die Gesprächszeit bleibt.
+
 **Reihenfolge bei 0003:** erst die Migration anwenden, dann den Code ausrollen. `/api/ready` prüft ab dieser Version die neuen Tabellen, Spalten und Zählerrechte und meldet 503, solange die Migration fehlt. Der Erinnerungs-Takt pausiert in diesem Fall von selbst.
 
 ## 2. Coolify-Anwendung

@@ -214,6 +214,20 @@ CREATE TABLE team_roles(
   granted_by text NOT NULL,
   granted_at timestamptz NOT NULL DEFAULT now()
 );
+-- Nachweis je Tag (siehe migrations/0005): Gesprächszeit und CRM-Screenshot.
+CREATE TABLE day_evidence(
+  participant text NOT NULL REFERENCES participants(id),
+  day text NOT NULL,
+  talk_minutes integer CHECK (talk_minutes BETWEEN 0 AND 1440),
+  image bytea CHECK (image IS NULL OR octet_length(image) <= 1500000),
+  image_type text CHECK (image_type IN ('image/jpeg','image/png','image/webp')),
+  image_at timestamptz,
+  updated_by text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(participant, day),
+  CHECK ((image IS NULL) = (image_type IS NULL))
+);
+CREATE INDEX day_evidence_day ON day_evidence(day);
 INSERT INTO events(day,title,partner,url,thanks,created_by)
 VALUES('2026-09-22','Akquise Day','akquise.de','https://akquise.de',
   'Danke an akquise.de für diesen Tag und an alle, die mitgezogen haben.','migration-0003')
