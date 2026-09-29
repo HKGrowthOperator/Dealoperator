@@ -78,6 +78,8 @@ export default function ReviewQueue({
   const [note, setNote] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState("");
+  // Rückmeldung nach einer Entscheidung, nur wenn ein Hinweis unterwegs ist.
+  const [notice, setNotice] = useState("");
   // Ablehnen braucht einen zweiten, bewussten Klick.
   const [confirmReject, setConfirmReject] = useState(false);
   // Zuordnungsanfragen ohne vorgewähltes Profil: das Team wählt es hier aus.
@@ -127,6 +129,7 @@ export default function ReviewQueue({
   async function decide(id: string, decision: "approve" | "reject" | "info") {
     setBusy(id + decision);
     setError("");
+    setNotice("");
     try {
       const r = await fetch("/api/operator", {
         method: "POST",
@@ -144,6 +147,11 @@ export default function ReviewQueue({
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
+      // Der Server nennt nur Wege, auf denen der Hinweis voraussichtlich
+      // ankommt (Gerät mit Push, E-Mail-Versand eingerichtet).
+      const reach = Array.isArray(d.notified) ? (d.notified as string[]) : [];
+      const ways = [reach.includes("push") && "Push", reach.includes("email") && "E-Mail"].filter(Boolean);
+      setNotice(ways.length ? `Die Person bekommt einen Hinweis per ${ways.join(" und ")}.` : "");
       setOpen("");
       setNote("");
       setReply("");
@@ -201,6 +209,11 @@ export default function ReviewQueue({
       {error && (
         <p className="form-error" role="alert">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p className="onboarding-hint" role="status">
+          <Check size={16} /> {notice}
         </p>
       )}
       {loading && (
@@ -375,8 +388,8 @@ export default function ReviewQueue({
                     />
                     <small>
                       Die Person sieht diese Nachricht auf ihrer Statusseite und
-                      kann dort auf eine Rückfrage antworten. Eine Benachrichtigung
-                      an die Person gibt es nicht.
+                      kann dort auf eine Rückfrage antworten. Per Push und E-Mail
+                      bekommt sie nur einen kurzen Hinweis, ohne diesen Text.
                     </small>
                   </label>
                   {r.kind === "claim" && !r.participant && (

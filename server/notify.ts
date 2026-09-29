@@ -223,13 +223,19 @@ export type NotificationInput = {
   url?: string;
   /** Nach diesem Zeitpunkt wird nicht mehr zugestellt (z. B. Frist vorbei). */
   notAfter?: Date | null;
+  /**
+   * Steht schon beim Anlegen fest, dass nicht zugestellt wird: gleich als
+   * „nicht gesendet“ mit diesem Grund anlegen. So greift kein Versand die
+   * Zeile zwischendurch auf.
+   */
+  skipped?: string;
 };
 
 /** Legt eine Meldung an, falls es sie noch nicht gibt. true = neu angelegt. */
 export async function enqueue(db: Database, n: NotificationInput): Promise<boolean> {
   const rows = await db.query(
-    `INSERT INTO notifications(dedupe_key,recipient,channel,kind,ref,title,body,url,not_after)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,
+    `INSERT INTO notifications(dedupe_key,recipient,channel,kind,ref,title,body,url,not_after,status,detail)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,
     [
       n.dedupeKey,
       n.recipient,
@@ -240,6 +246,8 @@ export async function enqueue(db: Database, n: NotificationInput): Promise<boole
       n.body,
       n.url || "/",
       n.notAfter ? n.notAfter.toISOString() : null,
+      n.skipped ? "skipped" : "pending",
+      (n.skipped ?? "").slice(0, 500),
     ],
   );
   return rows.length > 0;
@@ -374,6 +382,198 @@ export async function teamEvent(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Hinweise an die Person, die eine Profilübernahme angefragt hat
+
+/** Entscheidung des Teams bzw. Ausgang der Anfrage, über den die Person hört. */
+export type ApplicantDecision = "approve" | "info" | "reject" | "superseded";
+
+const APPLICANT_KIND = "applicant:";
+
+/**
+ * Feste Texte für Push und E-Mail an die anfragende Person. Die freie
+ * Nachricht des Teams steht bewusst nicht darin (weder im Push noch in der
+ * E-Mail): Sie kann alles enthalten und steht geschützt auf der Statusseite.
+ * Der Profilname ist öffentlich (Rangliste) und läuft durch `pushName`, damit
+ * nie Kontaktdaten im Text landen.
+ */
+export function applicantText(decision: ApplicantDecision, profile?: string | null) {
+  const name = pushName(profile, "");
+  switch (decision) {
+    case "approve":
+      return {
+        url: "/tagesabschluss",
+        push: {
+          title: "Dein Profil ist freigegeben",
+          body: `${name ? `„${name}“` : "Das Profil"} gehört jetzt zu deinem Konto. Trag deinen Tag ein.`,
+        },
+        email: {
+          title: "Dein Profil ist freigegeben",
+          body: `${name ? `„${name}“` : "Das Profil"} gehört jetzt zu deinem Konto bei Deal Operator. Deine bisherigen Zahlen sind da. Hier trägst du deinen Tag ein:`,
+        },
+      };
+    case "info":
+      return {
+        url: "/status",
+        push: {
+          title: "Rückfrage vom Team",
+          body: "Das Team hat eine Frage zu deiner Profilübernahme.",
+        },
+        email: {
+          title: "Rückfrage zu deiner Profilübernahme",
+          body: "Das Team von Deal Operator hat eine Frage zu deiner Profilübernahme. Du liest und beantwortest sie nach der Anmeldung auf deiner Statusseite:",
+        },
+      };
+    case "reject":
+      return {
+        url: "/status",
+        push: {
+          title: "Profilübernahme nicht freigegeben",
+          body: "Hier siehst du, wie es weitergeht.",
+        },
+        email: {
+          title: "Profilübernahme nicht freigegeben",
+          body: "Das Team von Deal Operator hat deine Profilübernahme nicht freigegeben. Die Nachricht vom Team und wie es weitergeht, siehst du nach der Anmeldung auf deiner Statusseite:",
+        },
+      };
+    case "superseded":
+      return {
+        url: "/status",
+        push: {
+          title: "Profil schon zugeordnet",
+          body: "Ein anderes Konto wurde dafür freigegeben. Hier siehst du, wie es weitergeht.",
+        },
+        email: {
+          title: "Profil schon zugeordnet",
+          body: "Das Profil, das du bei Deal Operator übernehmen wolltest, gehört inzwischen zu einem anderen Konto. Wie es für dich weitergeht, siehst du nach der Anmeldung auf deiner Statusseite:",
+        },
+      };
+  }
+}
+
+/**
+ * Die E-Mail geht nur an die Adresse der Anfrage und nur, wenn sie die
+ * bestätigte Anmeldeadresse des Kontos ist (`account_private.email`, aus der
+ * Sitzung übernommen). Liefert sonst den Grund.
+ */
+export function applicantAddressIssue(requestEmail: unknown, verifiedEmail: unknown) {
+  const request = String(requestEmail ?? "").trim().toLowerCase();
+  const verified = String(verifiedEmail ?? "").trim().toLowerCase();
+  if (!request || !verified || request !== verified)
+    return "Keine bestätigte Adresse: die Adresse der Anfrage ist nicht die Anmeldeadresse dieses Kontos.";
+  return null;
+}
+
+export type ApplicantNotice = {
+  /** ID der Anfrage (onboarding_requests.id). */
+  request: string;
+  /** Konto der anfragenden Person (onboarding_requests.owner). */
+  recipient: string;
+  decision: ApplicantDecision;
+  /**
+   * Kennung des Entscheidungsereignisses (ID aus onboarding_events bzw. bei
+   * einer Rückfrage die erste Frage der laufenden Runde). Eine Entscheidung
+   * ergibt je Kanal genau eine Meldung, auch bei Wiederholung oder Doppelklick.
+   */
+  event: string;
+  /** Adresse der Anfrage und bestätigte Adresse des Kontos vor der Entscheidung. */
+  email: string;
+  verifiedEmail: string | null;
+  profile?: string | null;
+};
+
+export type Reach = "push" | "email";
+
+async function hasUsableDevice(db: Database, owner: string) {
+  const [row] = await db.query(
+    `SELECT 1 FROM push_subscriptions WHERE ${USABLE_DEVICE} AND owner=$2 LIMIT 1`,
+    [await currentVapidKey(db), owner],
+  );
+  return !!row;
+}
+
+/**
+ * Legt Push und E-Mail für die anfragende Person an (je genau einmal je
+ * Entscheidung). Zugestellt wird im Takt (`dispatch`), vor dem Versand wird
+ * der Stand erneut geprüft (`applicantRecheck`).
+ * Liefert die Kanäle, die neu angelegt wurden und voraussichtlich ankommen:
+ * Push nur mit eingerichtetem Gerät, E-Mail nur mit Versand und bestätigter
+ * Adresse. Nur dann darf die Verwaltung sagen, dass die Person informiert wird.
+ */
+export async function notifyApplicant(db: Database, a: ApplicantNotice): Promise<Reach[]> {
+  const text = applicantText(a.decision, a.profile);
+  const base = {
+    recipient: a.recipient,
+    kind: `${APPLICANT_KIND}${a.decision}`,
+    ref: a.request,
+    url: text.url,
+    // Ein Hinweis, der zwei Tage lang nicht hinausging, kommt nicht mehr.
+    notAfter: new Date(Date.now() + 48 * 3600_000),
+  };
+  const key = (channel: Reach) => `${APPLICANT_KIND}${a.request}:${a.event}:${channel}`;
+  const reach: Reach[] = [];
+  const pushNew = await enqueue(db, {
+    ...base,
+    dedupeKey: key("push"),
+    channel: "push",
+    title: text.push.title,
+    body: text.push.body,
+  });
+  if (pushNew && (await hasUsableDevice(db, a.recipient))) reach.push("push");
+  const addressIssue = applicantAddressIssue(a.email, a.verifiedEmail);
+  const mailNew = await enqueue(db, {
+    ...base,
+    dedupeKey: key("email"),
+    channel: "email",
+    title: text.email.title,
+    body: text.email.body,
+    skipped: addressIssue ?? undefined,
+  });
+  if (mailNew && !addressIssue && !mailConfigIssues().length) reach.push("email");
+  return reach;
+}
+
+const EXPECTED_STATUS: Record<ApplicantDecision, string> = {
+  approve: "approved",
+  info: "info_needed",
+  reject: "rejected",
+  superseded: "superseded",
+};
+
+/**
+ * Vor dem Versand: gehört die Anfrage noch diesem Konto und steht sie noch so,
+ * wie der Hinweis sagt? Eine inzwischen beantwortete Rückfrage wird nicht
+ * mehr gemeldet. Liefert einen Grund zum Auslassen.
+ */
+export async function applicantRecheck(
+  db: Database,
+  n: { kind: string; recipient: string; ref: string },
+): Promise<string | null> {
+  const decision = n.kind.slice(APPLICANT_KIND.length) as ApplicantDecision;
+  const [r] = await db.query("SELECT owner,status FROM onboarding_requests WHERE id=$1", [n.ref]);
+  if (!r || r.owner !== n.recipient) return "Die Anfrage gehört nicht mehr zu diesem Konto.";
+  if (EXPECTED_STATUS[decision] && r.status !== EXPECTED_STATUS[decision])
+    return decision === "info"
+      ? "Die Rückfrage ist inzwischen beantwortet oder entschieden."
+      : "Die Anfrage hat sich inzwischen geändert.";
+  return null;
+}
+
+/** Adresse für die E-Mail an die anfragende Person, erneut geprüft beim Versand. */
+async function applicantMailAddress(
+  db: Database,
+  n: { recipient: string; ref: string },
+): Promise<{ to: string } | { skip: string }> {
+  const [r] = await db.query(
+    `SELECT r.email,r.owner,a.email AS verified FROM onboarding_requests r
+       LEFT JOIN account_private a ON a.owner=r.owner WHERE r.id=$1`,
+    [n.ref],
+  );
+  if (!r || r.owner !== n.recipient) return { skip: "Die Anfrage gehört nicht mehr zu diesem Konto." };
+  const issue = applicantAddressIssue(r.email, r.verified);
+  return issue ? { skip: issue } : { to: String(r.email) };
+}
+
 /**
  * Team-Konten (Admins, Moderatoren) bekommen die kurze E-Mail-Absicherung standardmäßig an
  * die bestätigte Adresse ihrer Sitzung. Legt die Einstellung beim ersten
@@ -474,14 +674,33 @@ export async function dispatch(
         continue;
       }
       if (n.channel === "email") {
-        const to = await teamMailAddress(db, n.recipient);
-        if (to === false) {
-          await finish("skipped", "E-Mail-Absicherung für dieses Konto ausgeschaltet.");
-          continue;
-        }
-        if (!to || mailConfigIssues().length) {
-          await defer(to ? mailConfigIssues().join(" ") : "Noch keine bestätigte Adresse für dieses Verwaltungskonto.");
-          continue;
+        const applicant = n.kind.startsWith(APPLICANT_KIND);
+        let to: string;
+        if (applicant) {
+          // Hinweis an die anfragende Person: nur an die bestätigte Adresse der
+          // Anfrage. Ohne eingerichteten Versand wird nicht gewartet, sondern
+          // mit Grund ausgelassen; als gesendet gilt nur, was Resend annimmt.
+          const address = await applicantMailAddress(db, n);
+          if ("skip" in address) {
+            await finish("skipped", address.skip);
+            continue;
+          }
+          if (mailConfigIssues().length) {
+            await finish("skipped", mailConfigIssues().join(" "));
+            continue;
+          }
+          to = address.to;
+        } else {
+          const team = await teamMailAddress(db, n.recipient);
+          if (team === false) {
+            await finish("skipped", "E-Mail-Absicherung für dieses Konto ausgeschaltet.");
+            continue;
+          }
+          if (!team || mailConfigIssues().length) {
+            await defer(team ? mailConfigIssues().join(" ") : "Noch keine bestätigte Adresse für dieses Verwaltungskonto.");
+            continue;
+          }
+          to = team;
         }
         const result = await sendMail({
           to,
@@ -492,7 +711,8 @@ export async function dispatch(
         if (result.status === "sent") {
           await finish("sent", "");
           sent++;
-        } else await defer(result.reason);
+        } else if (applicant) await finish("skipped", result.reason);
+        else await defer(result.reason);
         continue;
       }
       const outcome = await pushToOwner(db, n, send, now);

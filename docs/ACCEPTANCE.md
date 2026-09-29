@@ -61,6 +61,7 @@ Zwei ausdrücklich dafür angelegte Testkonten A und B verwenden. Soweit möglic
 | 20:30 ohne Abschluss (Calling-Tag, Push aktiv) | Genau eine Erinnerung; nach eingereichtem Abschluss keine |
 | Neue Registrierung über `/starten`, E-Mail bestätigt | Genau ein Inbox-Eintrag und ein Push je Admin und Moderator plus kurze E-Mail (sofern `RESEND_API_KEY`/`NOTIFY_FROM` gesetzt); späteres Anmelden löst nichts aus |
 | „Anmelden“ mit einer neuen Adresse | Link kommt an; nach Bestätigung Profileinrichtung unter `/start`, Team bekommt einen Hinweis |
+| Übernahme freigeben, Rückfrage stellen oder ablehnen | Die anfragende Person bekommt je Entscheidung genau einen Push (an ihre Geräte) und eine E-Mail (nur an die bestätigte Anmeldeadresse, sofern `RESEND_API_KEY`/`NOTIFY_FROM` gesetzt), ohne den Text des Teams; wer dasselbe Profil angefragt hatte, erfährt, dass es vergeben ist. Doppelklick oder nachgeschärfte Rückfrage: kein zweiter Hinweis |
 | Team-Inbox nach einem Hinweis | Je Kanal „übergeben“ nur nach Annahme durch Push-Dienst bzw. Resend; sonst „wartet“ mit Grund, „fehlgeschlagen“ oder „abgelaufen“ |
 | Wins-Text zweimal übernehmen | Zweites Mal „unverändert“, keine Doppelzählung |
 

@@ -19,6 +19,10 @@ const KIND_LABEL: Record<string, string> = {
   "team:answer": "Team: Antwort auf Rückfrage",
   "reminder:evening": "Abenderinnerung",
   "reminder:streak": "Serien-Warnung",
+  "applicant:approve": "Übernahme freigegeben",
+  "applicant:info": "Rückfrage zur Übernahme",
+  "applicant:reject": "Übernahme abgelehnt",
+  "applicant:superseded": "Übernahme: Profil anderweitig zugeordnet",
   test: "Testnachricht",
 };
 const STATUS: Record<string, { label: string; tone: Tone }> = {

@@ -1,5 +1,6 @@
 /**
- * Kurze Team-E-Mails als Absicherung zu Push-Meldungen.
+ * Kurze E-Mails: Team-Hinweise als Absicherung zu Push-Meldungen und Hinweise
+ * an Personen, über deren Profilübernahme das Team entschieden hat.
  *
  * Läuft über die Resend-HTTP-API mit einem eigenen Schlüssel aus der
  * Serverumgebung. Der bestehende Auth-Mailversand (Supabase → Resend-SMTP)
@@ -16,7 +17,7 @@ export type MailResult =
 export function mailConfigIssues(env = process.env): string[] {
   const issues: string[] = [];
   if (!env.RESEND_API_KEY?.trim())
-    issues.push("RESEND_API_KEY fehlt (eigener Resend-API-Schlüssel für Team-E-Mails).");
+    issues.push("RESEND_API_KEY fehlt (eigener Resend-API-Schlüssel für Hinweis-E-Mails).");
   if (!env.NOTIFY_FROM?.trim())
     issues.push(
       "NOTIFY_FROM fehlt (Absender auf einer in Resend verifizierten Domain, z. B. „Deal Operator <team@…>“).",

@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
 import { AppError, rateLimit, refusePersonalUse } from "./operator";
-import { teamEvent, teamPushText } from "./notify";
+import { notifyApplicant, teamEvent, teamPushText, type ApplicantNotice, type Reach } from "./notify";
 import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
 
@@ -407,6 +407,7 @@ export async function resendConfirmationByTeam(
   return { ok: true };
 }
 
+/** Hält ein Ereignis zur Anfrage fest und liefert seine ID. */
 async function log(
   tx: Database,
   request: string,
@@ -414,10 +415,11 @@ async function log(
   action: string,
   note: string,
 ) {
-  await tx.query(
-    "INSERT INTO onboarding_events(request,actor,action,note) VALUES($1,$2,$3,$4)",
+  const [row] = await tx.query(
+    "INSERT INTO onboarding_events(request,actor,action,note) VALUES($1,$2,$3,$4) RETURNING id",
     [request, actor, action, note],
   );
+  return String(row.id);
 }
 
 /**
@@ -675,11 +677,24 @@ export const decisionSchema = z
   })
   .strict();
 
+/** Bestätigte Anmeldeadresse eines Kontos, wie sie aus der Sitzung übernommen wurde. */
+async function verifiedAddress(db: Database, owner: string) {
+  const [row] = await db.query("SELECT email FROM account_private WHERE owner=$1", [owner]);
+  return (row?.email as string | null | undefined) ?? null;
+}
+
 /**
  * Entscheidung des Teams. Die Freigabe ist serverseitig und atomar: das Profil
  * bekommt genau einen Eigentümer, auch wenn zwei Administratoren gleichzeitig
  * entscheiden. Andere offene Anfragen für dasselbe Profil verlieren danach
  * jeden Zugriff.
+ *
+ * Die anfragende Person bekommt zu jeder Entscheidung einen kurzen Hinweis
+ * (Push und E-Mail), ebenso wer dasselbe Profil angefragt hatte und es durch
+ * die Freigabe nicht mehr bekommt. Die Hinweise entstehen erst, nachdem die
+ * Entscheidung gespeichert ist, und können sie nie aufhalten oder rückgängig
+ * machen. `notified` sagt, auf welchem Weg die entschiedene Person
+ * voraussichtlich erreicht wird.
  */
 export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
   if (!isTeam(actor))
@@ -690,7 +705,9 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
   // Eine Ablehnung erklärt sich: Die Person liest den Grund auf ihrer Statusseite.
   if (v.decision === "reject" && v.applicantMessage.length < 3)
     throw new AppError("Bitte schreib der Person kurz den Grund der Ablehnung ins Nachrichtenfeld.");
-  return db.transaction(async (tx) => {
+  let primary: ApplicantNotice | null = null;
+  const others: ApplicantNotice[] = [];
+  const result = await db.transaction(async (tx) => {
     // Feste Sperrreihenfolge: zuerst das Profil, dann die Anfrage. So können
     // sich zwei gleichzeitige Entscheidungen nicht gegenseitig blockieren.
     const [peek] = await tx.query(
@@ -714,6 +731,20 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
         "Diese Anfrage wurde bereits abschließend entschieden.",
         409,
       );
+    // Adresse vor der Entscheidung: Die Freigabe schreibt sie unten neu.
+    const verifiedEmail = request.owner ? await verifiedAddress(tx, request.owner) : null;
+    const notice = (decision: ApplicantNotice["decision"], event: string, profile?: string) => {
+      if (request.owner)
+        primary = {
+          request: request.id,
+          recipient: request.owner,
+          decision,
+          event,
+          email: request.email,
+          verifiedEmail,
+          profile,
+        };
+    };
 
     if (v.decision === "info") {
       await tx.query(
@@ -722,7 +753,17 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
          WHERE id=$1`,
         [request.id, v.internalNote, v.applicantMessage],
       );
-      await log(tx, request.id, actor.userId, "info_requested", v.internalNote);
+      const asked = await log(tx, request.id, actor.userId, "info_requested", v.internalNote);
+      // Ein Hinweis je Rückfrage-Runde: Schärft das Team die Frage nach, bevor
+      // die Person geantwortet hat, kommt kein zweiter.
+      const [round] = await tx.query(
+        `SELECT min(id) AS id FROM onboarding_events
+          WHERE request=$1 AND action='info_requested'
+            AND id > COALESCE((SELECT max(id) FROM onboarding_events
+                                WHERE request=$1 AND action='applicant_answered'),0)`,
+        [request.id],
+      );
+      notice("info", round?.id != null ? String(round.id) : asked);
       return { ok: true, status: "info_needed" };
     }
 
@@ -734,7 +775,7 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
          WHERE id=$1`,
         [request.id, v.internalNote, v.applicantMessage, actor.userId],
       );
-      await log(tx, request.id, actor.userId, "rejected", v.internalNote);
+      notice("reject", await log(tx, request.id, actor.userId, "rejected", v.internalNote));
       return { ok: true, status: "rejected" };
     }
 
@@ -829,9 +870,10 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     const role = await activateDesignation(tx, p.id, request.owner);
     if (role) await log(tx, request.id, actor.userId, "role_granted", role);
     // Konkurrierende offene Anfragen für dasselbe Profil sind damit erledigt.
-    await tx.query(
+    const superseded = await tx.query(
       `UPDATE onboarding_requests SET status='superseded',updated_at=now()
-       WHERE participant=$1 AND id<>$2 AND status IN (${OPEN_LIST})`,
+       WHERE participant=$1 AND id<>$2 AND status IN (${OPEN_LIST})
+       RETURNING id,owner,email`,
       [p.id, request.id],
     );
     // Ein noch offener Einladungscode darf nach der Freigabe nichts mehr tun.
@@ -850,9 +892,48 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
       [p.id],
     );
-    await log(tx, request.id, actor.userId, "approved", v.internalNote);
+    notice("approve", await log(tx, request.id, actor.userId, "approved", v.internalNote), p.name);
+    // Wer dasselbe Profil mit einem Konto angefragt hatte, erfährt, dass es
+    // vergeben ist. Unbestätigte Anfragen ohne Konto bekommen nichts.
+    for (const other of superseded)
+      if (other.owner && other.owner !== request.owner)
+        others.push({
+          request: other.id,
+          recipient: other.owner,
+          decision: "superseded",
+          // Endgültig: je Anfrage genau einmal.
+          event: "superseded",
+          email: other.email,
+          verifiedEmail: await verifiedAddress(tx, other.owner),
+        });
     return { ok: true, status: "approved", name: p.name, role };
   });
+  return { ...result, notified: await notifyAfterDecision(db, primary, others) };
+}
+
+/**
+ * Nach der gespeicherten Entscheidung: Hinweise an die anfragenden Personen.
+ * Scheitert das Anlegen, bleibt die Entscheidung bestehen; die Person sieht
+ * sie auf ihrer Statusseite. Liefert, wie die entschiedene Person
+ * voraussichtlich erreicht wird.
+ */
+async function notifyAfterDecision(
+  db: Database,
+  primary: ApplicantNotice | null,
+  others: ApplicantNotice[],
+): Promise<Reach[]> {
+  let reach: Reach[] = [];
+  for (const notice of [primary, ...others]) {
+    if (!notice) continue;
+    try {
+      const channels = await notifyApplicant(db, notice);
+      if (notice === primary) reach = channels;
+    } catch (error) {
+      // Nur die Meldung, keine Adressen oder Inhalte.
+      console.error("Hinweis zur Profilübernahme nicht angelegt:", (error as Error).message);
+    }
+  }
+  return reach;
 }
 
 /** Offene Übernahmeanfrage eines Kontos — blockiert ein zweites Profil. */

@@ -11,7 +11,7 @@ import {
   type CommitmentSettings,
 } from "../lib/commitment";
 import { approvedPauses, loadCommitmentSettings, trackingStart } from "./settings";
-import { dispatch, enqueue, teamEvent, type Recheck } from "./notify";
+import { applicantRecheck, dispatch, enqueue, teamEvent, type Recheck } from "./notify";
 import { markEligibleMembers, toClosings, toImported, ownClosings } from "./closing";
 import { runDiscordRooms } from "./discord-sessions";
 import { isTeamMember } from "./roles";
@@ -183,6 +183,8 @@ export const recheck: Recheck = async (db, n) => {
       return "Team-Pushs ausgeschaltet.";
     return null;
   }
+  // Entscheidung zur Profilübernahme an die anfragende Person.
+  if (n.kind.startsWith("applicant:")) return applicantRecheck(db, n);
   return null;
 };
 

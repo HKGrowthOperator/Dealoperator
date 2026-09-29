@@ -167,7 +167,9 @@ test("a question from the team can be answered and goes back into review", async
   assert.equal(queue.find((q) => q.id === r.id)?.applicant_answer, "Als Ali im Gruppenchat");
   // Die Antwort steht in der Inbox, löst aber keinen Team-Push aus.
   assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind='team:answer'"), 0);
-  assert.equal(await count("SELECT count(*) AS n FROM notifications"), 2);
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE kind LIKE 'team:%'"), 2);
+  // Die Rückfrage selbst meldet sich bei der Person (Push und E-Mail).
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE recipient='alice' AND kind='applicant:info'"), 2);
   // Die Freigabe bleibt beim Team.
   assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [p]))[0].owner, null);
 });
@@ -482,7 +484,7 @@ test("the waiting browser learns about a confirmation on another device, nobody 
 
 test("team pushes: named, linked to the entry, exactly once, only for registration and takeover", async () => {
   const pushes = () =>
-    db.query("SELECT kind,title,body,url FROM notifications WHERE channel='push' ORDER BY id");
+    db.query("SELECT kind,title,body,url FROM notifications WHERE channel='push' AND kind LIKE 'team:%' ORDER BY id");
   // Neue Registrierung: bestätigt, dann Neuladen, erneuter Link, späteres Anmelden.
   const reg = await startRequest(db, { kind: "new", email: bob.email, fullName: "Bob Beispiel", phone: "0170 7654321", phoneCountry: "DE" });
   await bindConfirmedRequest(db, bob, reg.id);
@@ -509,7 +511,7 @@ test("team pushes: named, linked to the entry, exactly once, only for registrati
     body: "Alice Beispiel möchte das Profil Alice B. übernehmen.",
     url: `/verwaltung?bereich=uebernahmen&anfrage=${claim.id}`,
   });
-  // Rückfrage und Antwort: kein weiterer Push.
+  // Rückfrage und Antwort: kein weiterer Team-Push (die Rückfrage geht an die Person).
   await decideRequest(db, admin, { id: claim.id, decision: "info", applicantMessage: "Unter welchem Namen callst du?" });
   await answerInfoRequest(db, alice, { message: "Als Ali" });
   const all = await pushes();
@@ -517,7 +519,7 @@ test("team pushes: named, linked to the entry, exactly once, only for registrati
   // Nie Kontaktdaten im Push, auch nicht in der E-Mail-Absicherung.
   const every = await db.query("SELECT title,body FROM notifications");
   for (const n of every) assert.doesNotMatch(`${n.title} ${n.body}`, /@|\+49|0170|1234567/);
-  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE channel='email'"), 2);
+  assert.equal(await count("SELECT count(*) AS n FROM notifications WHERE channel='email' AND kind LIKE 'team:%'"), 2);
 });
 
 test("a signed-in takeover pushes once with the requested profile; assignment requests say the profile is open", async () => {
