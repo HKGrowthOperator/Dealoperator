@@ -106,6 +106,11 @@ Mobil (360/390/430) und Desktop (1280) prüfen:
 10. Reflexionen gehören zu Mein Tag: Mit offenem Tag steht dort nur das eigene Formular (kein Kopfknopf „Zahlen eintragen“), nach dem Einreichen geht es zu den Ergebnissen. Mit eingereichtem oder übernommenem Tag steht unter Mein Tag oben der kurze Stand mit Zahlen und „Eintrag ansehen oder korrigieren“, darunter Serie und Level, dann „Was bei den anderen heute lief“ mit den Beiträgen, der eigene dabei. `/reflexionen` führt dorthin. Ohne Zugang zu den Beiträgen nennt die Liste, was fehlt, ohne Inhalte.
 11. Discord-Knöpfe sagen vor dem Klick, dass Discord geöffnet wird.
 12. Lange Namen umbrechen, Tastatur funktioniert (Tableiste weicht der Bildschirmtastatur), größere Schrift ohne seitliches Scrollen.
+13. Kommende Sessions stehen auf der Startseite für alle (Termin, Art, Host, belegte Plätze, keine Teilnehmernamen); abgemeldet führt „Anmelden und zusagen“ zu Sessions.
+14. Team im Session-Dialog: Person aus der Rangliste vormerken (auch ohne Konto) oder für einen neuen Namen ein Profil anlegen; Vorgemerkte zählen als Plätze und stehen unter „Dabei sind“. Wer vorgemerkt ist und später mit eigenem Konto zusagt, behält den Platz. Host oder Team können einen Discord-Link zum Raum eintragen (nur discord.gg/discord.com über https).
+15. Call-Partner: Karte zeigt „Sucht“, Zeit, Tage, Zielgruppe und die kommenden Sessions der Person; ein Tipp öffnet die Session zum Zusagen.
+16. Verwaltung › Prüffälle: bei unbekanntem Namen „Neues Profil anlegen“ mit vorgeschlagenem Namen; Werte werden übernommen, spätere Meldungen landen automatisch dort.
+17. Nach Migration 0005: unter Mein Tag „Gesprächszeit und CRM-Screenshot (freiwillig)“, sofort gespeichert; Bild nur für Person und Team; Fortschritt zeigt den Monatsstand, Verwaltung › Monatsstand die Liste mit Screenshots. Ohne Migration ist davon nichts zu sehen.
 
 ## Betrieb vor dem öffentlichen Start
 
