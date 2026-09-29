@@ -202,6 +202,28 @@ export async function mergeParticipants(db: Database, actor: Actor, raw: unknown
     await tx.query("UPDATE checkin_drafts SET participant=$1 WHERE participant=$2", [keep.id, absorb.id]);
     await tx.query("UPDATE pauses SET participant=$1 WHERE participant=$2", [keep.id, absorb.id]);
     await tx.query("UPDATE claim_tokens SET participant=$1 WHERE participant=$2", [keep.id, absorb.id]);
+    // Nachweise je Tag (Gesprächszeit, Screenshot, Migration 0005): der des
+    // behaltenen Profils hat Vorrang, die übrigen Tage wandern mit.
+    const [evidence] = await tx.query("SELECT to_regclass('operator.day_evidence') IS NOT NULL AS ok");
+    if (evidence?.ok) {
+      await tx.query(
+        `DELETE FROM day_evidence x WHERE x.participant=$2
+           AND EXISTS (SELECT 1 FROM day_evidence y WHERE y.participant=$1 AND y.day=x.day)`,
+        [keep.id, absorb.id],
+      );
+      await tx.query("UPDATE day_evidence SET participant=$1 WHERE participant=$2", [keep.id, absorb.id]);
+    }
+    // Vom Team vorgemerkte Teilnahme an Sessions: gilt danach für das
+    // behaltene Profil, ohne es doppelt aufzuführen.
+    const booked = await tx.query("SELECT id,data FROM sessions WHERE strpos(data,$1)>0 FOR UPDATE", [absorb.id]);
+    for (const session of booked) {
+      const data = JSON.parse(session.data as string);
+      if (!Array.isArray(data.guests) || !data.guests.includes(absorb.id)) continue;
+      const guests = [
+        ...new Set((data.guests as unknown[]).map((g) => (g === absorb.id ? keep.id : g))),
+      ];
+      await tx.query("UPDATE sessions SET data=$1 WHERE id=$2", [JSON.stringify({ ...data, guests }), session.id]);
+    }
     try {
       await tx.query("UPDATE onboarding_requests SET participant=$1 WHERE participant=$2", [
         keep.id,

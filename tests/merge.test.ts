@@ -23,7 +23,8 @@ before(async () => {
 beforeEach(async () => {
   await pg.exec(
     `TRUNCATE participants,checkins,checkin_revisions,checkin_drafts,participant_aliases,pauses,
-      discord_posts,sync_outbox,claim_tokens,onboarding_requests,team_inbox,notifications,account_private CASCADE`,
+      discord_posts,sync_outbox,claim_tokens,onboarding_requests,team_inbox,notifications,account_private,
+      day_evidence,sessions CASCADE`,
   );
 });
 after(async () => {
@@ -120,6 +121,29 @@ test("merging moves history, revisions, aliases and the account to the kept prof
   assert.equal(state.eligibility.participant?.id, "alt");
   assert.equal(state.closings.length, 3);
   assert.equal((await publicRanking(db, "2026-09-22", "2026-09-24")).length, 1);
+});
+
+test("evidence per day and session bookings follow the kept profile", async () => {
+  await twoProfiles();
+  const evidence = (participant: string, day: string, minutes: number) =>
+    db.query("INSERT INTO day_evidence(participant,day,talk_minutes,updated_by) VALUES($1,$2,$3,'flo')", [participant, day, minutes]);
+  await evidence("alt", "2026-09-22", 30);
+  await evidence("neu", "2026-09-22", 99);
+  await evidence("neu", "2026-09-24", 45);
+  const session = (id: string, guests: string[]) =>
+    db.query("INSERT INTO sessions(id,owner,data) VALUES($1,'admin',$2)", [id, JSON.stringify({ title: "Call", guests })]);
+  await session("s1", ["neu"]);
+  await session("s2", ["alt", "neu", "gast"]);
+  await session("s3", ["gast"]);
+  await mergeParticipants(db, admin, { keep: "alt", absorb: "neu" });
+  assert.deepEqual(
+    (await db.query("SELECT participant,day,talk_minutes FROM day_evidence ORDER BY day")).map((e) => `${e.participant}:${e.day}:${e.talk_minutes}`),
+    ["alt:2026-09-22:30", "alt:2026-09-24:45"],
+  );
+  const guests = Object.fromEntries(
+    (await db.query("SELECT id,data FROM sessions ORDER BY id")).map((r) => [r.id, JSON.parse(r.data).guests]),
+  );
+  assert.deepEqual(guests, { s1: ["alt"], s2: ["alt", "gast"], s3: ["gast"] });
 });
 
 test("an own closing replaces an imported day; between two closings the kept profile wins", async () => {
