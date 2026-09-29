@@ -2,6 +2,7 @@ import { emailCodeEnabled } from "./email-auth";
 import type { Database } from "./database";
 import { configurationIssues } from "./config";
 import { mailConfigIssues } from "./mailer";
+import { ownMailReady } from "./email-code";
 import { discordMissing } from "./discord-bridge";
 
 export const requiredTables = [
@@ -88,7 +89,9 @@ export async function readiness(
   };
   try {
     await inspectDatabase(db());
-    return { ready: true, configuration: true, database: true, services };
+    // Eigene Bestätigungs- und Passwortmails (Resend + Migration 0006/0007).
+    const ownMail = await ownMailReady(db(), env as NodeJS.ProcessEnv).catch(() => false);
+    return { ready: true, configuration: true, database: true, services: { ...services, ownMail } };
   } catch {
     return { ready: false, configuration: true, database: false, services };
   }
