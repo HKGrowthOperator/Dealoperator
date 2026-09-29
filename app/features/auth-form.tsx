@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { LoaderCircle, LogIn, Mail } from "lucide-react";
+import { CircleCheck, LoaderCircle, LogIn, Mail } from "lucide-react";
 import {
   call,
   EmailSent,
@@ -9,6 +9,7 @@ import {
   linkErrorText,
   PasswordField,
   RequestError,
+  type SentPurpose,
   takeLinkError,
   useCountdown,
   useStepHeading,
@@ -28,26 +29,37 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 /**
  * Anmeldung für bestehende Konten mit E-Mail und Passwort, ohne Mail. Der
- * Passwort-Manager kann beides speichern. Nur wer das Passwort vergessen oder
- * noch keins festgelegt hat, bekommt einmalig einen Anmeldelink und legt
- * danach eines fest. Das ursprüngliche Ziel (next) bleibt erhalten.
+ * Passwort-Manager kann beides speichern. Eine Mail gibt es nur, wenn die
+ * Adresse noch nicht bestätigt ist (Code, danach geht es mit demselben
+ * Passwort weiter) oder das Passwort vergessen wurde (Code und neues
+ * Passwort). Mit ownMail kommen diese Mails von der App selbst; sonst gibt es
+ * einen Anmeldelink von Supabase. Das ursprüngliche Ziel (next) bleibt.
  */
 export default function AuthForm({
   ready,
   next,
   error,
   codeEnabled,
+  ownMail = false,
+  confirmed = false,
 }: {
   ready: boolean;
   next: string;
   error: string;
   codeEnabled: boolean;
+  /** Mails mit Code kommen von der App selbst (server/email-code.ts). */
+  ownMail?: boolean;
+  /** Rückkehr nach bestätigter Adresse (?bestaetigt=1). */
+  confirmed?: boolean;
 }) {
   const id = useId();
   const [mode, setMode] = useState<"password" | "link">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [sentTo, setSentTo] = useState("");
+  // Wofür die Mail ging: Anmeldelink (Supabase), neues Passwort per Code
+  // oder Bestätigung der Adresse beim Anmelden.
+  const [sentFor, setSentFor] = useState<SentPurpose>("reset");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [message, setMessage] = useState(linkErrorText(error, codeEnabled));
@@ -112,15 +124,26 @@ export default function AuthForm({
     inFlight.current = true;
     setBusy(true);
     try {
-      const data = await call<{ next: string }>("/api/auth", {
+      const data = await call<{ next?: string; confirm?: boolean; resendAfter?: number }>("/api/auth", {
         action: "signin",
         email: address,
         password,
         next,
       });
+      // Passwort stimmt, die Adresse ist aber noch nicht bestätigt: Code aus
+      // der Mail eingeben, danach geht es mit demselben Passwort weiter.
+      if (data.confirm) {
+        setSentFor("signin");
+        setWaitFor(address);
+        setWait(data.resendAfter || 60);
+        setSentTo(address);
+        inFlight.current = false;
+        setBusy(false);
+        return;
+      }
       // Vollständiger Seitenwechsel: der Passwort-Manager bietet danach das
       // Speichern an, und die neue Sitzung gilt überall.
-      window.location.assign(data.next);
+      window.location.assign(data.next!);
     } catch (err) {
       const e = err as RequestError;
       if (e.field === "password") {
@@ -130,6 +153,45 @@ export default function AuthForm({
       else setMessage(e.message);
       inFlight.current = false;
       setBusy(false);
+    }
+  }
+
+  /**
+   * Nach dem Code (oder erneut senden): noch einmal mit dem Passwort aus
+   * diesem Formular anmelden. Ist die Adresse noch offen, schickt der Server
+   * eine neue Mail mit Code.
+   */
+  async function signInAgain(resend: boolean) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    if (resend) setResending(true);
+    setSendError("");
+    setResent(false);
+    try {
+      const data = await call<{ next?: string; confirm?: boolean; resendAfter?: number }>("/api/auth", {
+        action: "signin",
+        email: sentTo,
+        password,
+        next,
+      });
+      if (data.next) {
+        window.location.assign(data.next);
+        return;
+      }
+      setWaitFor(sentTo);
+      setWait(data.resendAfter || 60);
+      if (resend) setResent(true);
+      else setSendError("Deine Adresse ist noch nicht bestätigt. Gib den Code aus der neuesten Mail ein.");
+    } catch (err) {
+      const e = err as RequestError;
+      if (e.retryAfter) {
+        setWaitFor(sentTo);
+        setWait(e.retryAfter);
+      }
+      setSendError(e.message);
+    } finally {
+      inFlight.current = false;
+      setResending(false);
     }
   }
 
@@ -148,7 +210,11 @@ export default function AuthForm({
     setSendError("");
     setResent(false);
     try {
-      const data = await call<{ resendAfter?: number }>("/api/auth", { email: address, next });
+      const data = await call<{ resendAfter?: number; newPassword?: boolean }>("/api/auth", {
+        email: address,
+        next,
+      });
+      setSentFor(data.newPassword ? "newPassword" : "reset");
       setWaitFor(address);
       setWait(data.resendAfter || 60);
       setSentTo(address);
@@ -177,20 +243,32 @@ export default function AuthForm({
         <div className="flow-step" key="sent">
           <EmailSent
             email={sentTo}
-            purpose="reset"
-            codeEnabled={codeEnabled}
-            next="/passwort"
+            purpose={sentFor}
+            codeEnabled={codeEnabled || sentFor !== "reset"}
+            next={sentFor === "reset" ? "/passwort" : next}
             saved={false}
             resendIn={wait}
             resent={resent}
             resending={resending}
             error={sendError}
-            onResend={() => void sendLink(true)}
+            onResend={() => void (sentFor === "signin" ? signInAgain(true) : sendLink(true))}
+            onConfirmed={sentFor === "signin" ? () => signInAgain(false) : undefined}
             onChangeEmail={() => {
               focusInput.current = true;
               setSentTo("");
             }}
             headingRef={heading}
+            waiting={
+              sentFor === "signin" ? (
+                <p className="flow-body">
+                  Deine Adresse ist noch nicht bestätigt. Gib den Code aus der Mail ein oder tipp auf den
+                  Link darin. Danach bist du mit deinem Passwort direkt angemeldet.{" "}
+                  <button type="button" className="flow-link" onClick={() => void signInAgain(false)}>
+                    Schon per Link bestätigt? Jetzt anmelden
+                  </button>
+                </p>
+              ) : undefined
+            }
           />
         </div>
       </section>
@@ -205,8 +283,16 @@ export default function AuthForm({
         <p className="flow-lead">
           {mode === "password"
             ? `Mit E-Mail und Passwort. Du bleibst danach auf diesem Gerät angemeldet.${target ? ` Es geht direkt weiter ${target}.` : ""}`
-            : "Kein Problem, auch wenn du noch nie eins festgelegt hast. Wir schicken dir einmal einen Link, danach legst du ein Passwort fest."}
+            : ownMail
+              ? "Kein Problem, auch wenn du noch nie eins festgelegt hast. Wir schicken dir einen Code per Mail, damit legst du ein neues Passwort fest."
+              : "Kein Problem, auch wenn du noch nie eins festgelegt hast. Wir schicken dir einmal einen Link, danach legst du ein Passwort fest."}
         </p>
+        {confirmed && mode === "password" && !message && (
+          <p className="flow-waiting">
+            <CircleCheck size={18} aria-hidden="true" />
+            <span>E-Mail bestätigt. Melde dich jetzt mit deinem Passwort an.</span>
+          </p>
+        )}
         {!ready && (
           <div className="flow-notice">
             <strong>Die Anmeldung öffnet in Kürze.</strong>
@@ -220,7 +306,7 @@ export default function AuthForm({
             {message}
           </p>
         )}
-        {mode === "link" && <InAppHint codeEnabled={codeEnabled} />}
+        {mode === "link" && <InAppHint codeEnabled={codeEnabled || ownMail} />}
         <form
           className="flow-form"
           noValidate
@@ -280,7 +366,7 @@ export default function AuthForm({
             ) : (
               <Mail size={18} />
             )}
-            {mode === "password" ? "Anmelden" : "Link zum Passwort senden"}
+            {mode === "password" ? "Anmelden" : ownMail ? "Code senden" : "Link zum Passwort senden"}
             {mode === "link" && blocked && (
               <span className="flow-wait">
                 {" "}

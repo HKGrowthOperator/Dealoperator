@@ -205,6 +205,9 @@ export default function OnboardingStart({
   const passwordRef = useRef("");
   const passwordInput = useRef<HTMLInputElement>(null);
   const [confirmed, setConfirmed] = useState(false);
+  // Eigene Mail mit Code verschickt (Antwort des Servers): Codefeld zeigen,
+  // auch wenn die Supabase-Vorlage noch keinen Code enthält.
+  const [ownCode, setOwnCode] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
   const [resending, setResending] = useState(false);
@@ -402,7 +405,7 @@ export default function OnboardingStart({
       resend && sentWith ? sentWith : { mode: mode as Mode, profile: selected, contact };
     const email = using.contact.email.trim().toLowerCase();
     try {
-      const data = await call<{ resendAfter?: number; signedIn?: boolean; next?: string }>(
+      const data = await call<{ resendAfter?: number; signedIn?: boolean; next?: string; code?: boolean }>(
         "/api/onboarding",
         resend
           ? { action: "resend" }
@@ -416,6 +419,7 @@ export default function OnboardingStart({
         return;
       }
       passwordRef.current = resend ? passwordRef.current : password;
+      if (data.code) setOwnCode(true);
       setSentWith(using);
       setSentTo(email);
       setSaved(true);
@@ -584,9 +588,15 @@ export default function OnboardingStart({
             email={sentTo}
             purpose={sentWith?.mode ?? mode}
             profileName={(sentWith?.profile ?? selected)?.name}
-            codeEnabled={codeEnabled}
+            codeEnabled={codeEnabled || ownCode}
             next="/tagesabschluss"
             saved={saved}
+            onConfirmed={async () => {
+              // Adresse per Code bestätigt: mit dem Passwort aus diesem Tab
+              // anmelden, sonst das Passwortfeld zeigen.
+              setConfirmed(true);
+              if (passwordRef.current) await signIn(passwordRef.current);
+            }}
             resendIn={wait}
             resent={resent}
             resending={resending}

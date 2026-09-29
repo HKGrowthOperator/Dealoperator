@@ -5,6 +5,7 @@ import OnboardingStart, { type PendingStart } from "../features/onboarding-start
 import { authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { emailCodeEnabled, RESEND_SECONDS } from "@/server/email-auth";
+import { ownMailReady } from "@/server/email-code";
 import {
   ONBOARDING_COOKIE,
   pendingForBrowser,
@@ -89,13 +90,15 @@ export default async function Page({
     }
   }
 
+  // Eigene Mail mit Code (server/email-code.ts): Codefeld immer zeigen.
+  const ownMail = databaseReady() && (await ownMailReady(database()).catch(() => false));
   return (
     <div className="operator-site">
       <OperatorHeader />
       <main className="auth-layout">
         <OnboardingStart
           ready={authReady() && databaseReady()}
-          codeEnabled={emailCodeEnabled()}
+          codeEnabled={emailCodeEnabled() || ownMail}
           preselected={preselected}
           taken={taken}
           invite={invite}

@@ -637,7 +637,7 @@ export function InAppHint({ codeEnabled }: { codeEnabled: boolean }) {
   );
 }
 
-export type SentPurpose = "new" | "claim" | "assign" | "signin" | "reset";
+export type SentPurpose = "new" | "claim" | "assign" | "signin" | "reset" | "newPassword";
 
 const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
   new: () => "Danach legst du dein Profil an und trägst deinen ersten Tag ein.",
@@ -648,6 +648,8 @@ const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
   signin: () => "Danach bist du angemeldet und landest direkt dort, wo du hinwolltest.",
   reset: () =>
     "Danach legst du ein Passwort fest. Ab dann meldest du dich mit E-Mail und Passwort an, ganz ohne Mail.",
+  newPassword: () =>
+    "Mit dem Code legst du hier gleich dein neues Passwort fest und bist angemeldet. Ab dann geht es wieder mit E-Mail und Passwort.",
 };
 
 /**
@@ -671,9 +673,15 @@ export function EmailSent({
   onRestart,
   headingRef,
   waiting,
+  onConfirmed,
 }: {
   /** Hinweis oder Formular, solange auf die Bestätigung gewartet wird. */
   waiting?: React.ReactNode;
+  /**
+   * Adresse per Code bestätigt, aber noch keine Sitzung (eigene Mail): hier
+   * mit dem Passwort anmelden. Ohne Angabe geht es zur Anmeldung.
+   */
+  onConfirmed?: () => unknown;
   email: string;
   purpose: SentPurpose;
   profileName?: string;
@@ -694,8 +702,12 @@ export function EmailSent({
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [checking, setChecking] = useState(false);
+  const [password, setPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const inFlight = useRef(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+  const newPassword = purpose === "newPassword";
 
   async function verify(event: React.FormEvent) {
     event.preventDefault();
@@ -706,22 +718,40 @@ export function EmailSent({
       codeRef.current?.focus();
       return;
     }
+    if (newPassword && password.length < 8) {
+      setPasswordError(password ? "Bitte nimm mindestens 8 Zeichen." : "Bitte lege ein neues Passwort fest.");
+      passwordRef.current?.focus();
+      return;
+    }
     inFlight.current = true;
     setChecking(true);
     setCodeError("");
+    setPasswordError("");
     try {
-      const data = await call<{ next: string }>("/api/auth", {
-        action: "verify",
-        email,
-        code: digits,
-        next,
-      });
+      const data = await call<{ next: string; confirmed?: boolean }>(
+        "/api/auth",
+        newPassword
+          ? { action: "reset", email, code: digits, password, next }
+          : { action: "verify", email, code: digits, next },
+      );
+      if (data.confirmed && onConfirmed) {
+        await onConfirmed();
+        setChecking(false);
+        inFlight.current = false;
+        return;
+      }
       window.location.assign(data.next);
     } catch (e) {
-      setCodeError((e as Error).message);
+      const err = e as RequestError;
       setChecking(false);
       inFlight.current = false;
-      codeRef.current?.focus();
+      if (err.field === "password") {
+        setPasswordError(err.message);
+        passwordRef.current?.focus();
+      } else {
+        setCodeError(err.message);
+        codeRef.current?.focus();
+      }
     }
   }
 
@@ -743,9 +773,11 @@ export function EmailSent({
 
       {waiting ?? (
         <p className="flow-body">
-          {codeEnabled
-            ? "Tipp auf den Link in der Mail oder gib den Code aus der Mail hier ein. Beides klappt auch, wenn du die Mail auf einem anderen Gerät öffnest."
-            : "Tipp auf den Link in der Mail. Öffne ihn in diesem Browser; in einem anderen lässt er sich aus Sicherheitsgründen nicht einlösen."}
+          {newPassword
+            ? "Gib den Code aus der Mail und dein neues Passwort ein. Oder tipp auf den Link in der Mail; das klappt auch auf einem anderen Gerät."
+            : codeEnabled
+              ? "Tipp auf den Link in der Mail oder gib den Code aus der Mail hier ein. Beides klappt auch, wenn du die Mail auf einem anderen Gerät öffnest."
+              : "Tipp auf den Link in der Mail. Öffne ihn in diesem Browser; in einem anderen lässt er sich aus Sicherheitsgründen nicht einlösen."}
         </p>
       )}
 
@@ -772,9 +804,26 @@ export function EmailSent({
               </p>
             )}
           </div>
+          {newPassword && (
+            <>
+              <input type="hidden" name="email" autoComplete="username" value={email} readOnly />
+              <PasswordField
+                value={password}
+                onChange={(value) => {
+                  setPassword(value);
+                  setPasswordError("");
+                }}
+                error={passwordError}
+                autoComplete="new-password"
+                inputRef={passwordRef}
+                label="Neues Passwort"
+                note="Mindestens 8 Zeichen."
+              />
+            </>
+          )}
           <button className="btn primary full" disabled={checking}>
             {checking && <LoaderCircle className="spin" size={18} />}
-            Code bestätigen
+            {newPassword ? "Passwort speichern und anmelden" : "Code bestätigen"}
           </button>
         </form>
       )}
