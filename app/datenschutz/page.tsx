@@ -137,6 +137,15 @@ export default function Page() {
             Team; das Profil wird dann entfernt. Rechtsgrundlage ist Art. 6
             Abs. 1 lit. b DSGVO (Teilnahme an der Rangliste).
           </p>
+          <p>
+            Sobald der Betreiber sie freischaltet, kannst du zu einem Tag freiwillig die
+            Gesprächszeit laut deinem CRM und einen Screenshot (Anwahlen und Gesprächszeit)
+            speichern. Das Bild wird im Browser verkleinert und ohne Metadaten gespeichert.
+            Sehen können es nur du und das Team, es erscheint weder in der Rangliste noch im
+            Austausch. Decke Namen und Nummern deiner Kontakte vor dem Hochladen ab. Du kannst
+            den Screenshot jederzeit entfernen; nach 62 Tagen wird er automatisch gelöscht, die
+            Gesprächszeit bleibt. Daraus ergibt sich dein Monatsstand unter Fortschritt.
+          </p>
         </section>
 
         <section>
@@ -167,7 +176,13 @@ export default function Page() {
             deinem Discord-Profil und, falls du ihn im Call-Profil einträgst,
             deinen Discord-Namen, um dich anzuschreiben. Admins und
             Moderatoren sehen alle Call-Profile, auch nicht gezeigte, um
-            Call-Partner und Sessions zu vermitteln. Tagesabschlüsse,
+            Call-Partner und Sessions zu vermitteln. Kommende Sessions (Titel,
+            Format, Termin, Dauer, belegte Plätze und der Anzeigename der Person,
+            die sie anbietet) stehen öffentlich auf der Startseite; wer teilnimmt,
+            sehen nur angemeldete Mitglieder. Das Team kann Personen, die ihre
+            Teilnahme an anderer Stelle zugesagt haben, für eine Session
+            vormerken; dafür entsteht bei Bedarf ein Profil mit dem Anzeigenamen,
+            das die Person später übernehmen kann. Tagesabschlüsse,
             Reflexionen, Zahlen und Kontaktdaten werden <strong>nicht</strong>{" "}
             an Discord übertragen.
           </p>
