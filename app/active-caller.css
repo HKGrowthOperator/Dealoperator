@@ -191,3 +191,77 @@
   flex: none;
   margin-top: 2px;
 }
+
+/* Sessions: Team merkt Personen vor, Host oder Team trägt den Raum-Link ein. */
+.session-team {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #d5e1f3;
+  border-radius: 14px;
+  background: #fbfcff;
+}
+.session-team h3,
+.session-team > label,
+.session-guest-form > label {
+  margin: 0;
+  color: #10294b;
+  font-size: 15px;
+  font-weight: 700;
+}
+.session-guests {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.session-guests li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 15px;
+}
+.session-guests .text-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.session-guest-form {
+  display: grid;
+  gap: 8px;
+}
+.session-guest-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.session-guest-row input {
+  flex: 1 1 180px;
+  min-width: 0;
+  min-height: 44px;
+}
+.session-guest-row .btn {
+  min-height: 44px;
+}
+.session-guest-new {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f4f8ff;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.session-guest-new p,
+.session-team .hint {
+  margin: 0;
+}
+.session-guest-new .btn {
+  justify-self: start;
+  min-height: 44px;
+}

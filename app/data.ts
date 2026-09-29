@@ -69,7 +69,11 @@ export type Member = Profile & {
 export type Session = {
   startsAt?: string;
   cancelled?: boolean;
-  roster?: { id: string; name: string }[];
+  roster?: { id: string; name: string; guest?: boolean }[];
+  /** Vom Team vorgemerkte Profile (auch ohne Konto). */
+  guests?: { id: string; name: string }[];
+  /** Raum-Link vom Team oder Host, solange der Abgleich keinen Raum anlegt. */
+  roomManual?: boolean;
   mine?: boolean;
   id: string;
   title: string;
@@ -118,6 +122,8 @@ export type AppData = WorkflowData & {
   activeCaller?: ActiveCaller;
   /** Eigenes Profil in der Rangliste vorhanden: Name und Rolle kommen von dort. */
   ownProfile?: boolean;
+  /** Nur fürs Team: Profile der Rangliste zum Vormerken für Sessions. */
+  people?: { id: string; name: string }[];
 };
 export const emptyProfile: Profile = {
   name: "",

@@ -1,4 +1,12 @@
-import { cancelSession, createSession, editSession, toggleAttendance } from "@/server/sessions";
+import {
+  addSessionGuest,
+  cancelSession,
+  createSession,
+  editSession,
+  removeSessionGuest,
+  setSessionRoom,
+  toggleAttendance,
+} from "@/server/sessions";
 import { sessionRoomsReady } from "@/server/discord-sessions";
 import { teamRecipients } from "@/server/roles";
 import { discordDestination } from "@/server/discord";
@@ -125,6 +133,23 @@ export async function GET() {
       teamRecipients(database),
     ]);
     const active = await activeCallerFor(database, user.userId);
+    // Vom Team vorgemerkte Teilnehmer (Profile aus der Rangliste, auch ohne Konto).
+    const guestIds = [
+      ...new Set(
+        sessions.results.flatMap((r: any) => {
+          const g = JSON.parse(r.data).guests;
+          return Array.isArray(g) ? g.filter((x: unknown) => typeof x === "string") : [];
+        }),
+      ),
+    ] as string[];
+    const guestRows = guestIds.length
+      ? await database.query("SELECT id,name FROM participants WHERE id = ANY($1::text[])", [guestIds])
+      : [];
+    const guestName = (id: string) => (guestRows.find((g) => g.id === id)?.name as string) || "Caller";
+    // Fürs Team: Profile zum Vormerken (Name und Kennung, sonst nichts).
+    const people = isTeam(user)
+      ? await database.query("SELECT id,name FROM participants WHERE kind='person' ORDER BY lower(name)")
+      : [];
     // Name und Rolle gibt es nur einmal: aus dem eigenen Profil in der
     // Rangliste. Das Call-Profil ergänzt nur Zielgruppe, Zeit und Tage.
     const [own] = await database.query(
@@ -185,12 +210,17 @@ export async function GET() {
             };
           })(),
         })),
+      people: people.map((p) => ({ id: p.id as string, name: p.name as string })),
       sessions: sessions.results.map((r: any) => {
-        const { discord, ...data } = JSON.parse(r.data);
+        const { discord, guests: rawGuests, roomUrl, ...data } = JSON.parse(r.data);
+        const guests: string[] = Array.isArray(rawGuests) ? rawGuests.filter((x: unknown) => typeof x === "string") : [];
         return {
         ...data,
-        // Nur der Link in den Discord-Raum, keine internen Kennungen.
-        room: discord?.url && !discord.closed ? discord.url : "",
+        // Nur der Link in den Discord-Raum, keine internen Kennungen. Ein vom
+        // Abgleich angelegter Raum geht vor; sonst der vom Team eingetragene Link.
+        room: discord?.url && !discord.closed ? discord.url : typeof roomUrl === "string" ? roomUrl : "",
+        roomManual: !(discord?.url && !discord.closed) && typeof roomUrl === "string" && !!roomUrl,
+        guests: guests.map((g) => ({ id: g, name: guestName(g) })),
         roomEvent: discord?.eventUrl && !discord.closed ? discord.eventUrl : "",
         team: team.includes(r.owner),
         id: r.id,
@@ -207,8 +237,9 @@ export async function GET() {
               : x.owner === user.userId
                 ? "Du"
                 : "Caller",
-          })),
-        attendees: rsvps.results.filter((x: any) => x.session === r.id).length,
+          }))
+          .concat(guests.map((g) => ({ id: `p:${g}`, name: guestName(g), guest: true }))),
+        attendees: rsvps.results.filter((x: any) => x.session === r.id).length + guests.length,
         joined: rsvps.results.some(
           (x: any) => x.session === r.id && x.owner === user.userId,
         ),
@@ -303,6 +334,23 @@ export async function POST(request: Request) {
         const created = await createSession(database, id, JSON.parse(profile.data).name, value);
         return json({ ok: true, id: created.id });
       }
+    } else if (body.action === "sessionGuest") {
+      const value = z
+        .object({
+          id: s.min(1).max(100),
+          participant: s.min(1).max(100).optional(),
+          name: s.min(2).max(60).optional(),
+        })
+        .refine((v) => !!v.participant !== !!v.name)
+        .parse(body.value);
+      const added = await addSessionGuest(database, { userId: id, team: isTeam(user) }, value.id, value);
+      return json({ ok: true, ...added });
+    } else if (body.action === "removeSessionGuest") {
+      const value = z.object({ id: s.min(1).max(100), participant: s.min(1).max(100) }).parse(body.value);
+      await removeSessionGuest(database, { userId: id, team: isTeam(user) }, value.id, value.participant);
+    } else if (body.action === "sessionRoom") {
+      const value = z.object({ id: s.min(1).max(100), url: z.string().trim().max(300) }).parse(body.value);
+      await setSessionRoom(database, { userId: id, team: isTeam(user) }, value.id, value.url);
     } else if (body.action === "cancelSession") {
       const sid = s.min(1).parse(body.value);
       await cancelSession(database, { userId: id, team: isTeam(user) }, sid);

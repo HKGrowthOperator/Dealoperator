@@ -22,9 +22,11 @@ import ActiveCallerCard from "./features/active-caller-card";
 import {
   earliestSessionDay,
   SESSION_LEAD_HOURS,
+  sessionEnd,
   sessionLeadError,
 } from "@/lib/session-rules";
 import { ConfirmAction } from "./features/shared";
+import { SessionGuests, SessionRoomLink } from "./features/session-team";
 import { emptyWorkflows } from "./workflow-data";
 
 import {
@@ -2251,6 +2253,26 @@ export default function CommunityApp({
                     </li>
                     <li data-done={session.room ? "" : undefined}>
                       <div>
+              {!demo && data.viewerTeam && !session.cancelled && sessionEnd(session) > new Date() && (
+                <SessionGuests
+                  session={session}
+                  people={data.people ?? []}
+                  mutate={(action, value) => mutate(action, value)}
+                  saving={saving}
+                />
+              )}
+              {!demo &&
+                (data.viewerTeam || session.mine || session.owner === data.viewerId) &&
+                !session.cancelled &&
+                !(session.room && !session.roomManual) &&
+                sessionEnd(session) > new Date() && (
+                  <SessionRoomLink
+                    key={`${session.id}:${session.room ?? ""}`}
+                    session={session}
+                    mutate={(action, value) => mutate(action, value)}
+                    saving={saving}
+                  />
+                )}
                         {session.room ? (
                           <>
                             <span>
