@@ -68,6 +68,47 @@ export async function resendSignupForTeam(email: string, request: string) {
 }
 
 /**
+ * Konto für einen vom Team angelegten Zugang (server/team-access.ts). Eigener
+ * Client ohne Cookies wie beim Neuversand: keine Sitzung im Browser des Teams.
+ * Supabase schickt dabei die übliche Bestätigungsmail; bestätigt wird danach
+ * über die Datenbankfunktion aus Migration 0006. Liefert die Konto-ID. Das
+ * Passwort geht nur an Supabase und wird nirgends festgehalten.
+ */
+export async function signUpForTeam(email: string, password: string, name: string) {
+  const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { flowType: "pkce", persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const { data, error } = await client.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: emailRedirect("/"),
+      // Nur Anzeige in der Vorlage, nie für Rechte.
+      data: { has_password: true, onboarding_kind: "new", full_name: name },
+    },
+  });
+  if (error?.code === "weak_password" || error?.code === "same_password") throw passwordFailure(error);
+  if (error) throw teamSignUpFailure(error);
+  // Schon bestätigtes Konto: Supabase antwortet mit einem Nutzer ohne Identitäten.
+  if (!data.user?.id || (!data.session && (data.user.identities ?? []).length === 0))
+    throw new AppError("Für diese Adresse gibt es schon einen Zugang.", 409, undefined, "email");
+  return data.user.id;
+}
+
+/** Fehler beim Anlegen durch das Team: Texte für den Admin, nicht für die Person. */
+function teamSignUpFailure(error: AuthFailure) {
+  const code = error?.code || "";
+  const status = error?.status || 0;
+  if (status === 429 || code.startsWith("over_") || /rate limit|security purposes/i.test(error?.message || ""))
+    return new AppError("Supabase lässt gerade keine weiteren Konten zu. Bitte versuche es später noch einmal.", 429);
+  if (code === "email_address_invalid" || code === "validation_failed")
+    return new AppError("Bitte prüfe die E-Mail-Adresse.", 400, undefined, "email");
+  if (code === "signup_disabled")
+    return new AppError("In Supabase sind neue Konten gerade abgeschaltet. Bitte dort die Registrierung wieder erlauben.", 503);
+  return new AppError("Der Zugang ließ sich gerade nicht anlegen. Bitte versuche es gleich noch einmal.", 503);
+}
+
+/**
  * Passwort für die Anmeldung ohne Mail. Mindestens 8 Zeichen; mehr als 72
  * Byte schneidet das Hashverfahren ab, deshalb die Obergrenze.
  */
@@ -83,7 +124,7 @@ export function signInFailure(error: AuthFailure) {
   const status = error?.status || 0;
   if (code === "email_not_confirmed")
     return new AppError(
-      "Bitte bestätige zuerst deine E-Mail-Adresse über den Link aus der Mail.",
+      "Bitte bestätige zuerst deine E-Mail-Adresse über den Link aus der Mail. Kommt keine Mail an, melde dich beim Team; es kann dich freischalten.",
       409,
       undefined,
       "email",

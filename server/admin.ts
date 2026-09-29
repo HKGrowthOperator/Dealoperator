@@ -93,7 +93,7 @@ export async function teamInbox(db: Database, actor: Actor) {
 export async function unconfirmedRegistrations(db: Database, actor: Actor) {
   requireTeam(actor);
   const rows = await db.query(
-    `SELECT r.id,r.kind,r.full_name,r.created_at,r.updated_at,
+    `SELECT r.id,r.kind,r.full_name,r.email,r.created_at,r.updated_at,
             (SELECT max(e.created_at) FROM onboarding_events e
               WHERE e.request=r.id AND e.action='mail_sent') AS last_mail_at
        FROM onboarding_requests r
@@ -111,6 +111,8 @@ export async function unconfirmedRegistrations(db: Database, actor: Actor) {
       name: r.full_name as string,
       since: new Date(r.updated_at).toISOString(),
       lastMail: r.last_mail_at ? new Date(r.last_mail_at).toISOString() : null,
+      // Adresse nur für Admins: Sie prüfen sie vor dem Freischalten.
+      ...(actor.admin ? { email: r.email as string } : {}),
     })),
   };
 }

@@ -27,7 +27,13 @@ import { runDiscordRooms } from "@/server/discord-sessions";
 import { designateRole, setTeamRole, teamList } from "@/server/roles";
 import { resendConfirmationByTeam } from "@/server/onboarding";
 import { mergeParticipants, mergePreview } from "@/server/merge";
-import { resendSignupForTeam } from "@/server/email-auth";
+import { resendSignupForTeam, signUpForTeam } from "@/server/email-auth";
+import {
+  accountlessProfiles,
+  confirmRegistrationByTeam,
+  createAccessByTeam,
+  teamAccessReady,
+} from "@/server/team-access";
 import { authReady } from "@/server/auth";
 
 export const dynamic = "force-dynamic";
@@ -60,12 +66,18 @@ export async function GET() {
           notificationStatus(db),
           discordStatus(db),
           teamList(db, actor),
+          teamAccessReady(db),
         ])
+      : null;
+    // Zugang anlegen und Freischalten: nur Admins, erst mit Migration 0006.
+    const accessReady = !!adminOnly?.[4];
+    const access = adminOnly
+      ? { ready: accessReady, profiles: accessReady ? await accountlessProfiles(db, actor) : [] }
       : null;
     return json({
       role,
       inbox,
-      unconfirmed,
+      unconfirmed: { ...unconfirmed, canConfirm: accessReady },
       pauses,
       events,
       cases,
@@ -73,6 +85,7 @@ export async function GET() {
       notifications: adminOnly?.[1] ?? null,
       discord: adminOnly?.[2] ?? null,
       team: adminOnly?.[3] ?? null,
+      access,
     });
   } catch (e) {
     return errorResponse(e);
@@ -84,6 +97,9 @@ export async function POST(request: Request) {
     const actor = await admin();
     // Der Wins-Import nimmt auch den ganzen Gruppenverlauf an (bis 1 Mio. Zeichen).
     const raw = await body(request, 3_000_000);
+    // Zugang und Freischalten brauchen nur ein paar Felder.
+    if (["confirmRegistration", "createAccess"].includes(raw?.action) && JSON.stringify(raw).length > 4_000)
+      throw new AppError("Die Eingabe ist zu groß.", 413);
     const db = database();
     await rateLimit(db, `admin:${actor.userId}`, 60);
     const v = raw?.value;
@@ -123,6 +139,11 @@ export async function POST(request: Request) {
       case "resendConfirmation":
         if (!authReady()) throw new AppError("Die Anmeldung ist noch nicht eingerichtet.", 503);
         return json(await resendConfirmationByTeam(db, actor, v, resendSignupForTeam));
+      case "confirmRegistration":
+        return json(await confirmRegistrationByTeam(db, actor, v));
+      case "createAccess":
+        if (!authReady()) throw new AppError("Die Anmeldung ist noch nicht eingerichtet.", 503);
+        return json(await createAccessByTeam(db, actor, v, signUpForTeam));
       default:
         throw new AppError("Unbekannte Aktion.");
     }

@@ -408,7 +408,7 @@ export async function resendConfirmationByTeam(
 }
 
 /** Hält ein Ereignis zur Anfrage fest und liefert seine ID. */
-async function log(
+export async function logRequestEvent(
   tx: Database,
   request: string,
   actor: string,
@@ -421,6 +421,7 @@ async function log(
   );
   return String(row.id);
 }
+const log = logRequestEvent;
 
 /**
  * Schritt 2: Nach bestätigter E-Mail wird die offene Anfrage an das Konto
@@ -433,6 +434,12 @@ export async function bindConfirmedRequest(
   requestId: string | null | undefined,
   /** Nur eine Anfrage für genau dieses Profil binden (Anmeldung aus der Übernahme). */
   onlyParticipant?: string,
+  /**
+   * Vom Team freigeschaltet statt per Link bestätigt. Das Postfach hat dann
+   * niemand nachgewiesen; festgehalten wird es im selben Schritt, damit die
+   * Prüfung es sieht.
+   */
+  via?: { team: string },
 ) {
   // Bevorzugt wird die Anfrage aus DIESEM Browser (httpOnly-Cookie aus dem
   // Registrierungsschritt). Öffnet jemand den Link in einem anderen Browser,
@@ -507,7 +514,8 @@ export async function bindConfirmedRequest(
          updated_at=now()`,
       [actor.userId, actor.email, request.phone],
     );
-    await log(tx, request.id, actor.userId, "email_confirmed", "");
+    if (via) await log(tx, request.id, via.team, "team_confirmed", "");
+    else await log(tx, request.id, actor.userId, "email_confirmed", "");
     // Andere noch unbestätigte Anfragen dieser Adresse (anderer Weg, anderes
     // Profil) sind damit erledigt. Sie dürften sich sonst später an das Konto
     // hängen oder eine Zuordnung durch das Team blockieren.
@@ -535,8 +543,13 @@ export async function bindConfirmedRequest(
           : request.participant
             ? `Profilübernahme prüfbereit: ${request.full_name}`
             : `Zuordnung gesucht: ${request.full_name}`,
-      body:
-        request.kind !== "claim"
+      body: via
+        ? request.kind !== "claim"
+          ? "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Das eigene Profil kann jetzt angelegt werden."
+          : request.participant
+            ? "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Bitte die Übernahme besonders sorgfältig prüfen."
+            : "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte besonders sorgfältig prüfen."
+        : request.kind !== "claim"
           ? "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden."
           : request.participant
             ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
@@ -651,6 +664,8 @@ export async function reviewQueue(db: Database, actor: Actor) {
               ORDER BY e.created_at DESC LIMIT 1) AS applicant_answer,
             (SELECT max(e.created_at) FROM onboarding_events e
               WHERE e.request=r.id AND e.action='mail_sent') AS last_mail_at,
+            EXISTS(SELECT 1 FROM onboarding_events e
+              WHERE e.request=r.id AND e.action='team_confirmed') AS team_confirmed,
             (SELECT count(*) FROM onboarding_requests o
               WHERE o.participant=r.participant AND o.id<>r.id
                 AND o.status IN (${OPEN_LIST})) AS competing,
@@ -831,55 +846,13 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
         409,
       );
 
-    await tx.query(
-      "UPDATE participants SET owner=$2,claimed_at=now() WHERE id=$1",
-      [p.id, request.owner],
-    );
-    const [oldProfile] = await tx.query(
-      "SELECT data FROM profiles WHERE id=$1",
-      [request.owner],
-    );
-    const base = oldProfile
-      ? JSON.parse(oldProfile.data)
-      : {
-          niche: "",
-          time: "Flexibel",
-          bio: "",
-          goal: 200,
-          days: [1, 2, 3, 4, 5],
-          listed: false,
-          channel: "Discord",
-        };
-    await tx.query(
-      "INSERT INTO profiles(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
-      [
-        request.owner,
-        JSON.stringify({ ...base, name: p.name, role: p.role || "Sales" }),
-      ],
-    );
-    await tx.query(
-      `INSERT INTO account_private(owner,email,phone) VALUES($1,$2,$3)
-       ON CONFLICT(owner) DO UPDATE SET email=excluded.email,
-         phone=CASE WHEN account_private.phone='' THEN excluded.phone ELSE account_private.phone END,
-         updated_at=now()`,
-      [request.owner, request.email, request.phone],
-    );
-    // Eine für dieses Profil vorgemerkte Team-Rolle gilt ab jetzt, genau für
-    // das Konto, dessen Übernahme das Team gerade freigibt. Das ist die einzige
-    // Stelle, an der ein vorhandenes Profil einen Eigentümer bekommt.
-    const role = await activateDesignation(tx, p.id, request.owner);
-    if (role) await log(tx, request.id, actor.userId, "role_granted", role);
-    // Konkurrierende offene Anfragen für dasselbe Profil sind damit erledigt.
-    const superseded = await tx.query(
-      `UPDATE onboarding_requests SET status='superseded',updated_at=now()
-       WHERE participant=$1 AND id<>$2 AND status IN (${OPEN_LIST})
-       RETURNING id,owner,email`,
-      [p.id, request.id],
-    );
-    // Ein noch offener Einladungscode darf nach der Freigabe nichts mehr tun.
-    await tx.query(
-      "UPDATE claim_tokens SET used_at=now() WHERE participant=$1 AND used_at IS NULL",
-      [p.id],
+    const { role, superseded } = await assignProfile(
+      tx,
+      { id: p.id, name: p.name, role: p.role },
+      request.owner,
+      { email: request.email, phone: request.phone },
+      request.id,
+      actor.userId,
     );
     await tx.query(
       `UPDATE onboarding_requests
@@ -887,10 +860,6 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
            decided_by=$4,decided_at=now(),updated_at=now()
        WHERE id=$1`,
       [request.id, v.internalNote, v.applicantMessage, actor.userId],
-    );
-    await tx.query(
-      "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
-      [p.id],
     );
     notice("approve", await log(tx, request.id, actor.userId, "approved", v.internalNote), p.name);
     // Wer dasselbe Profil mit einem Konto angefragt hatte, erfährt, dass es
@@ -909,6 +878,65 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     return { ok: true, status: "approved", name: p.name, role };
   });
   return { ...result, notified: await notifyAfterDecision(db, primary, others) };
+}
+
+/**
+ * Ein freies Personenprofil einem Konto geben: Eigentümer, Profilangaben,
+ * private Kontaktdaten, vorgemerkte Rolle, konkurrierende Anfragen und
+ * Einladungscodes erledigen, Sync anstoßen. Gemeinsamer Kern der Freigabe
+ * (decideRequest) und des vom Team angelegten Zugangs (server/team-access.ts).
+ * Erwartet die Zeilensperre auf dem Profil; Prüfungen macht der Aufrufer.
+ */
+export async function assignProfile(
+  tx: Database,
+  p: { id: string; name: string; role?: string | null },
+  owner: string,
+  contact: { email: string; phone: string },
+  requestId: string,
+  actorId: string,
+) {
+  await tx.query("UPDATE participants SET owner=$2,claimed_at=now() WHERE id=$1", [p.id, owner]);
+  const [oldProfile] = await tx.query("SELECT data FROM profiles WHERE id=$1", [owner]);
+  const base = oldProfile
+    ? JSON.parse(oldProfile.data)
+    : {
+        niche: "",
+        time: "Flexibel",
+        bio: "",
+        goal: 200,
+        days: [1, 2, 3, 4, 5],
+        listed: false,
+        channel: "Discord",
+      };
+  await tx.query(
+    "INSERT INTO profiles(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+    [owner, JSON.stringify({ ...base, name: p.name, role: p.role || "Sales" })],
+  );
+  await tx.query(
+    `INSERT INTO account_private(owner,email,phone) VALUES($1,$2,$3)
+     ON CONFLICT(owner) DO UPDATE SET email=excluded.email,
+       phone=CASE WHEN account_private.phone='' THEN excluded.phone ELSE account_private.phone END,
+       updated_at=now()`,
+    [owner, contact.email, contact.phone],
+  );
+  // Eine für dieses Profil vorgemerkte Team-Rolle gilt ab jetzt, genau für
+  // dieses Konto. Nur hier bekommt ein vorhandenes Profil einen Eigentümer.
+  const role = await activateDesignation(tx, p.id, owner);
+  if (role) await log(tx, requestId, actorId, "role_granted", role);
+  // Konkurrierende offene Anfragen für dasselbe Profil sind damit erledigt.
+  const superseded = await tx.query(
+    `UPDATE onboarding_requests SET status='superseded',updated_at=now()
+     WHERE participant=$1 AND id<>$2 AND status IN (${OPEN_LIST})
+     RETURNING id,owner,email`,
+    [p.id, requestId],
+  );
+  // Ein noch offener Einladungscode darf danach nichts mehr tun.
+  await tx.query("UPDATE claim_tokens SET used_at=now() WHERE participant=$1 AND used_at IS NULL", [p.id]);
+  await tx.query(
+    "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
+    [p.id],
+  );
+  return { role, superseded };
 }
 
 /**
