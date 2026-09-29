@@ -228,6 +228,8 @@ CREATE TABLE day_evidence(
   CHECK ((image IS NULL) = (image_type IS NULL))
 );
 CREATE INDEX day_evidence_day ON day_evidence(day);
+-- Zugang durch das Team (Konto nachsehen, Adresse bestätigen): Funktionen auf
+-- auth.users kommen nur mit migrations/0006_team_access.sql, nicht hier.
 INSERT INTO events(day,title,partner,url,thanks,created_by)
 VALUES('2026-09-22','Akquise Day','akquise.de','https://akquise.de',
   'Danke an akquise.de für diesen Tag und an alle, die mitgezogen haben.','migration-0003')
