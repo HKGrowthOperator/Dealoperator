@@ -15,6 +15,7 @@ export const metadata = {
   title: "So funktioniert’s · Deal Operator",
   description:
     "Wie der Tagesabschluss, die Serie, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
+  alternates: { canonical: "/so-funktionierts" },
 };
 
 const DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];

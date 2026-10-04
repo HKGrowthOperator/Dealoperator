@@ -5,6 +5,7 @@ export const metadata: Metadata = {
   title: "Datenschutz · Deal Operator",
   description:
     "Welche Daten Deal Operator verarbeitet, auf welcher Grundlage und wer sie sieht.",
+  alternates: { canonical: "/datenschutz" },
 };
 
 /**

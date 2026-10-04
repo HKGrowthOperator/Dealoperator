@@ -5,7 +5,9 @@ import { database, databaseReady } from "@/server/database";
 import { emailCodeEnabled } from "@/server/email-auth";
 import { ownMailReady } from "@/server/email-code";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Anmelden · Deal Operator", alternates: { canonical: "/anmelden" } };
 
 /**
  * Anmeldung für bestehende Mitglieder. Bewusst getrennt vom Einstieg unter

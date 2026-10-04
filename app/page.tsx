@@ -3,7 +3,9 @@ import { viewerState } from "@/server/home";
 import { database, databaseReady } from "@/server/database";
 import { upcomingSessions, type PublicSession } from "@/server/sessions";
 import RankingBoard from "./features/ranking-board";
+import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { alternates: { canonical: "/" } };
 
 /**
  * Gemeinsame Startseite, auch nach der Anmeldung das Zentrum. Angemeldet
