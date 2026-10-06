@@ -49,7 +49,9 @@ import {
   type RankingEvent,
   type RankingMonth,
 } from "@/lib/ranking-history";
+import { isoWeekday } from "@/lib/commitment";
 import { DISCORD_INVITE } from "@/lib/discord";
+import { GAME_TEXT, flameState, weekStartOf } from "@/lib/game";
 import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
 import type { HomeState } from "@/server/home";
 import { OperatorHeader, OperatorFooter, type Viewer } from "./operator-shell";
@@ -57,6 +59,15 @@ import { dayState, earlierState, type DayState } from "./day-state";
 import { PushPrompt } from "./push-setup";
 import DiscordSteps from "./discord-steps";
 import { takeSubmitted, type SubmittedNote } from "./submitted-note";
+import { Flame as SeriesFlame } from "./game-parts";
+import {
+  CommunityGoal,
+  TodayRound,
+  communityWeekOf,
+  submittedRound,
+  todayPlan,
+  type CommunityWeekState,
+} from "./game-today";
 import RankingHistory from "./ranking-history";
 import UpcomingSessions from "./upcoming-sessions";
 import type { PublicSession } from "@/server/sessions";
@@ -223,7 +234,12 @@ export default function RankingBoard({
   const [shareMessage, setShareMessage] = useState("");
   const [eventList, setEventList] = useState<RankingEvent[] | null>(null);
   const [commitment, setCommitment] = useState<LoadedCommitment | null>(null);
+  // Gemeinsames Wochenziel; lädt im selben 20-s-Takt wie die Zahlen.
+  // undefined: noch nicht geladen (ein Platzhalter hält den Platz), null:
+  // keins (ohne Datenbank oder wenn schon der erste Abruf scheitert).
+  const [week, setWeek] = useState<CommunityWeekState | null | undefined>(undefined);
   const searchRef = useRef<HTMLInputElement>(null);
+  const flashTimer = useRef(0);
 
   const requestKey = latestMode
     ? "latest"
@@ -256,26 +272,49 @@ export default function RankingBoard({
   const ownId = home?.participant?.id ?? null;
   const own = ownId ? all.find((row) => row.id === ownId) : undefined;
   const periodLabel = monthly ? formatMonth(month) : formatDay(day);
-  // Rückkehr aus dem Formular: die Karte oben wird zur Bestätigung, die eigene
-  // Zeile leuchtet kurz auf. Die Notiz dazu gibt es genau einmal.
+  // Rückkehr aus dem Formular: die Karte oben wird zur Bilanz der Tagesrunde,
+  // danach wird die eigene Zeile kurz hinterlegt. Die Notiz gibt es genau einmal.
   const justSubmitted = params.get("eingereicht") === "1" && !!ownId;
   const noteDay = parsedDay.success ? parsedDay.data : today;
   const [note, setNote] = useState<SubmittedNote | null>(null);
+  // Gelesen heißt: es gab eine Notiz oder eben keine. Vorher bleibt die Bilanz unsichtbar.
+  const [noteRead, setNoteRead] = useState(false);
+  const startedAt = useRef(0);
   const flashed = useRef(false);
   useEffect(() => {
     if (!justSubmitted) return;
     // Erst nach dem Aufbau lesen: der Server kennt den Tab-Speicher nicht.
-    const timer = window.setTimeout(() => setNote(takeSubmitted(noteDay)), 0);
+    const timer = window.setTimeout(() => {
+      setNote(takeSubmitted(noteDay));
+      setNoteRead(true);
+      startedAt.current = performance.now();
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [justSubmitted, noteDay]);
   useEffect(() => {
-    if (!justSubmitted || loading || !own || flashed.current) return;
-    flashed.current = true;
-    const timer = window.setTimeout(() => showRow(own.id, false), 400);
+    if (!justSubmitted || !noteRead || loading || !own || flashed.current) return;
+    // Erst die Bilanz (bis 900 ms), dann die eigene Zeile hinterlegen: ohne
+    // Aufklappen und ohne Scrollen, damit die Bilanz sichtbar bleibt.
+    const wait = Math.max(0, 900 - (performance.now() - startedAt.current));
+    const timer = window.setTimeout(() => {
+      flashed.current = true;
+      flashRow(own.id);
+    }, wait);
     return () => window.clearTimeout(timer);
-    // showRow ändert sich nicht in der Sache; ein Aufleuchten je Rückkehr reicht.
+    // flashRow ändert sich nicht in der Sache; eine Hinterlegung je Rückkehr reicht.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [justSubmitted, loading, own?.id]);
+  }, [justSubmitted, noteRead, loading, own?.id]);
+  // Rückfall für die Zahlenzeile der Bilanz, wenn die Notiz keine Zahlen
+  // trägt: die eigene Zeile des eingereichten Tages; undefined, solange die
+  // Rangliste lädt (die Bilanz wartet dann unsichtbar).
+  const submittedNumbers =
+    !justSubmitted || monthly || day !== noteDay
+      ? null
+      : loading
+        ? undefined
+        : own
+          ? GAME_TEXT.numbersLine(own.counts) || null
+          : null;
   const newest = rows.reduce((latest, row) => (row.updatedAt > latest ? row.updatedAt : latest), "");
 
   const events = useMemo(() => withPermanentEvents(eventList), [eventList]);
@@ -303,9 +342,30 @@ export default function RankingBoard({
       : monthly
         ? `/api/ranking/month?month=${parsedMonth.data}`
         : `/api/ranking/month?month=${parsedDay.data!.slice(0, 7)}&day=${parsedDay.data}`;
+    // Gemeinsames Wochenziel: eigener, kleiner Abruf (60 s Zwischenspeicher
+    // auf dem Server). Ein Fehler lässt den letzten Stand stehen; ohne
+    // Datenbank (ready: false) entfällt der Block.
+    // Nur, wenn der gewählte Zeitraum in die laufende Woche fallen kann.
+    const weekRelevant =
+      latestMode ||
+      (monthly ? parsedMonth.data === today.slice(0, 7) : parsedDay.data! >= shiftDay(today, -6));
+    async function loadWeek() {
+      if (!weekRelevant) return;
+      try {
+        const response = await fetch("/api/ranking/week", { cache: "no-store", signal: controller.signal });
+        const payload = response.ok ? communityWeekOf(await response.json()) : undefined;
+        if (controller.signal.aborted) return;
+        // Ein Fehler lässt den letzten Stand stehen; gab es noch keinen, wird der Platz frei.
+        setWeek((last) => (payload !== undefined ? payload : (last ?? null)));
+      } catch {
+        // Ohne Wochenziel bleibt die Fläche wie bisher.
+        if (!controller.signal.aborted) setWeek((last) => last ?? null);
+      }
+    }
     async function load() {
       if (busy) return;
       busy = true;
+      void loadWeek();
       try {
         const response = await fetch(url, { cache: "no-store", signal: controller.signal });
         const payload = await response.json();
@@ -401,22 +461,40 @@ export default function RankingBoard({
     if (own) showRow(own.id);
   }
   /** Zeile öffnen, hinscrollen und kurz aufleuchten lassen. */
-  function showRow(id: string, scroll = true) {
+  function showRow(id: string) {
     setSearch("");
     setOpenId(id);
     window.setTimeout(() => {
       const row = document.getElementById(`rb-row-${id}`);
       if (!row) return;
       const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      if (scroll) row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
-      // Kurzes, ruhiges Aufleuchten der eigenen Zeile.
-      row.removeAttribute("data-flash");
-      void row.offsetWidth;
-      row.setAttribute("data-flash", "");
+      row.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+      flashRow(id);
     }, 0);
+  }
+  /**
+   * Zeile 1,4 s ruhig hinterlegen, ohne sie zu öffnen. Bei reduzierter
+   * Bewegung steht die Hinterlegung statisch (game-round.css), deshalb
+   * kommt das Attribut danach wieder weg.
+   */
+  function flashRow(id: string) {
+    const row = document.getElementById(`rb-row-${id}`);
+    if (!row) return;
+    row.removeAttribute("data-flash");
+    void row.offsetWidth;
+    row.setAttribute("data-flash", "");
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => row.removeAttribute("data-flash"), 1400);
   }
 
   const signedIn = viewer?.signedIn ?? !!home;
+  // Das gemeinsame Wochenziel gehört zur laufenden Woche: in der Tagesansicht
+  // nur für ihre Tage, in der Monatsansicht nur im laufenden Monat. Solange
+  // es lädt, steht ein Platzhalter derselben Höhe (wie bei den vier Werten).
+  const weekFrom = week?.weekStart ?? weekStartOf(today);
+  const weekShown =
+    week !== null &&
+    (monthly ? month === today.slice(0, 7) : day >= weekFrom && day <= shiftDay(weekFrom, 6));
   const KPI_ICON = { attempts: Phone, settingsBooked: CalendarCheck, closingsBooked: Handshake, people: UsersRound } as const;
   const kpis: { key: keyof typeof KPI_ICON; label: string; value: number | null; note: string }[] = [
     { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
@@ -451,7 +529,10 @@ export default function RankingBoard({
             home={home}
             submitted={justSubmitted}
             note={note}
+            noteRead={noteRead}
+            noteDay={noteDay}
             dayLabel={formatDay(day)}
+            numbers={submittedNumbers}
           />
         )}
 
@@ -578,6 +659,9 @@ export default function RankingBoard({
                 </div>
               ))}
             </div>
+          )}
+          {!error && weekShown && (
+            <CommunityGoal week={week ?? null} lastWeek={isoWeekday(today) <= 3} />
           )}
           {!error && !loading && (
             <p className="rb-kpi-foot">
@@ -812,55 +896,70 @@ const DAY_ICON = {
   draft: NotebookPen,
 } as const;
 /**
- * Mein Tag auf der Startseite: der eine nächste Schritt. Direkt nach dem
- * Einreichen wird die Karte zur Bestätigung: Tag, Folge für die Serie, eigener
- * Platz, einmal das Erinnerungs-Angebot. Danach „Reflexionen lesen“.
+ * Mein Tag auf der Startseite: der eine nächste Schritt. An Calling-Tagen
+ * steht unter dem Titel die Tagesrunde (Tagesmarke, Frist mit Serie, Woche)
+ * statt des Erklärsatzes. Direkt nach dem Einreichen wird die Karte zur
+ * Bilanz: Zahlen, Ringe, Serie, bis zu zwei Höhepunkte, „Als Nächstes“ und
+ * einmal das Erinnerungs-Angebot. Danach „Reflexionen lesen“.
  */
 function PersonalPanel({
   home,
   submitted,
   note,
+  noteRead,
+  noteDay,
   dayLabel,
+  numbers,
 }: {
   home: HomeState;
   /** Gerade eingereicht (Rückkehr aus dem Formular). */
   submitted: boolean;
   note: SubmittedNote | null;
+  /** Die Notiz ist gelesen (auch wenn es keine gab). */
+  noteRead: boolean;
+  /** Der eingereichte Tag laut Adresse. */
+  noteDay: string;
   dayLabel: string;
+  /** Zahlenzeile der Bilanz; undefined, solange die Rangliste lädt. */
+  numbers: string | null | undefined;
 }) {
   // Ein noch offener Calling-Tag davor hat Vorrang, solange heute offen ist:
   // dort läuft eine Frist. Ist heute eingereicht, zeigt Mein Tag beides.
-  const base =
-    (home.today?.status !== "done" ? earlierState(home) : null) ?? dayState(home);
-  const state: DayState = submitted
+  const earlier = home.today?.status !== "done" ? earlierState(home) : null;
+  const base = earlier ?? dayState(home);
+  const plan = !submitted && !earlier ? todayPlan(home) : null;
+  const result = submitted
+    ? submittedRound({ home, note, noteRead, noteDay, dayLabel, numbers })
+    : null;
+  // Nachtrag für einen anderen Tag als heute (nur direkt nach dem Einreichen).
+  const otherDay = submitted && (note?.day ?? noteDay) !== home.today?.day;
+  const state: DayState = result
     ? {
         icon: "circle-check",
         tone: "done",
-        title: note?.unchanged
-          ? "Keine Änderung nötig, dein Tag steht."
-          : note && note.day !== home.today?.day
-            ? `${dayLabel} ist drin.`
-            : "Dein Tag ist drin.",
-        text:
-          note?.effect ?? "Deine Zahlen zählen in der Rangliste und in der gemeinsamen Summe.",
+        title: result.title,
+        text: result.text ?? "",
         // Nachtrag an einem Tag, an dem heute noch offen ist: als Nächstes heute.
-        ...(note &&
-        note.day !== home.today?.day &&
-        (home.today?.status === "open" || home.today?.status === "draft")
+        ...(otherDay && (home.today?.status === "open" || home.today?.status === "draft")
           ? { href: "/tagesabschluss", action: "Heute eintragen" }
           : { href: "/tagesabschluss#andere", action: "Reflexionen lesen" }),
       }
-    : base;
+    : {
+        ...base,
+        title: plan?.title ?? base.title,
+        // Der Block ersetzt den Erklärsatz; Wiedereinstieg und erste Marke bringen ihren eigenen.
+        text: plan && plan.text !== undefined ? (plan.text ?? "") : base.text,
+      };
   const Icon = DAY_ICON[state.icon];
-  const correctHref =
-    note && note.day !== home.today?.day ? `/tagesabschluss?tag=${note.day}` : "/tagesabschluss";
+  const correctHref = otherDay ? `/tagesabschluss?tag=${note?.day ?? noteDay}` : "/tagesabschluss";
+  const round = plan || result?.rows;
   return (
     <section
       className="rb-me"
       data-tone={state.tone}
       data-submitted={submitted ? "" : undefined}
+      data-round={round ? "" : undefined}
       aria-labelledby="rb-me-title"
-      role={submitted ? "status" : undefined}
     >
       <span className="rb-me-icon" aria-hidden="true">
         <Icon size={22} />
@@ -868,16 +967,16 @@ function PersonalPanel({
       <div className="rb-me-text">
         <p className="rb-me-kicker">Mein Tag</p>
         <h2 id="rb-me-title">{state.title}</h2>
-        <p>{state.text}</p>
-        {submitted && note && note.levelUps.length > 0 && (
-          <p className="rb-me-level">
-            Neues Leistungslevel: {note.levelUps.join(", ")}.{" "}
-            <Link className="do-link" href="/heute?modus=eigen">
-              Mein Fortschritt
-            </Link>
-          </p>
-        )}
+        {state.text && <p>{state.text}</p>}
       </div>
+      {plan && <TodayRound mode="plan" plan={plan} />}
+      {result?.rows && <TodayRound mode="result" result={result} />}
+      {/* Einmal ein zusammengefasster Satz, sobald die Notiz gelesen ist. */}
+      {result && (
+        <p className="do-sr" role="status">
+          {noteRead ? result.announcement : ""}
+        </p>
+      )}
       <Link
         className={`do-button ${state.tone === "open" || state.tone === "draft" ? "do-button-primary" : "do-button-secondary"}`}
         href={state.href}
@@ -1163,10 +1262,10 @@ function CommitmentList({
     return (
       <div className="rb-empty">
         <p>
-          <strong>{search ? "Kein Name gefunden." : "Noch keine öffentlichen Serien."}</strong>{" "}
+          <strong>{search ? "Kein Name gefunden." : "Noch keine Serien."}</strong>{" "}
           {search
             ? "Prüfe die Schreibweise."
-            : "Hier erscheinen Personen, die ihren Tagesabschluss selbst einreichen und der öffentlichen Anzeige zugestimmt haben."}
+            : "Hier erscheinen Personen, die ihren Tagesabschluss selbst einreichen."}
         </p>
       </div>
     );
@@ -1195,7 +1294,11 @@ function CommitmentList({
               </small>
             </span>
             <span className="rb-value">
-              <strong>{fmt(row.streak.current)}</strong>
+              <strong className="gt-public-streak">
+                {/* Öffentlich nur die Länge: nie amber, nie pausiert. */}
+                <SeriesFlame state={flameState(row.streak, null, false)} size={16} />
+                {fmt(row.streak.current)}
+              </strong>
               <small>{row.streak.current === 1 ? "Tag Serie" : "Tage Serie"}</small>
             </span>
           </div>

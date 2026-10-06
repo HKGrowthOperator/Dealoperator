@@ -1,0 +1,171 @@
+/*
+ * Tagesrunde in der Karte „Mein Tag“ und gemeinsames Wochenziel in
+ * „Gemeinsam erreicht“ (app/features/game-today.tsx). Baut auf den Zeilen,
+ * Ringen und Balken aus game.css auf; hier nur Platz in der Karte, die
+ * Bilanz-Zeilen und die dunkle Fläche. Bewegung kommt ausschließlich aus
+ * game.css; hier nur die statische Fassung bei reduzierter Bewegung.
+ */
+
+/* ---- Platz in der Karte „Mein Tag“ --------------------------------------- */
+/* Handy: volle Kartenbreite unter dem Titel (gm-lines), darunter der Knopf.
+   Ab 600 px bleibt der Knopf rechts neben dem Titel, ab 900 px steht der
+   Block in der mittleren Spalte. */
+.rb-me[data-round] {
+  row-gap: var(--space-3);
+}
+@media (min-width: 600px) {
+  .rb-me[data-round] > .do-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+@media (min-width: 900px) {
+  .rb-me[data-round] > .gt-round {
+    grid-column: 2;
+    grid-row: 2;
+    /* Bezeichnung und Wert bleiben auf einen Blick lesbar. */
+    max-width: 36rem;
+  }
+}
+/* Vor dem Lesen der Notiz steht die Bilanz schon im Layout, nur unsichtbar. */
+.gt-round[data-pending] {
+  visibility: hidden;
+}
+
+/* ---- Zeilen -------------------------------------------------------------- */
+.gt-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.35;
+}
+.gt-num {
+  color: var(--do-ink);
+  font-size: var(--text-body);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* „Tagesmarke“ als Link: ruhig unterstrichen, Tippfläche unsichtbar 44 px hoch. */
+.gt-mark-link {
+  position: relative;
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--do-blue-line);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.gt-mark-link::after {
+  content: "";
+  position: absolute;
+  inset: -12px -6px;
+}
+.gt-mark-link:hover {
+  color: var(--do-blue);
+  text-decoration-color: currentColor;
+}
+.gt-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Woche: Bezeichnung und Stand in einer Zeile, der 6-px-Balken darunter. */
+.gt-week {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  padding: 6px 0 4px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.gt-week-icon {
+  color: var(--do-blue);
+}
+.gt-week > .gm-bar {
+  grid-column: 2 / -1;
+}
+
+/* ---- Bilanz -------------------------------------------------------------- */
+.gt-numbers {
+  min-height: 24px;
+  margin: 0 0 var(--space-1);
+  color: var(--do-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+/* Satz zur Serienfolge, bündig mit den Bezeichnungen (20 px Symbol + 8 px). */
+.gt-effect {
+  margin: 0 0 var(--space-1);
+  padding-left: 28px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.45;
+}
+.gt-highlights {
+  margin-top: var(--space-2);
+}
+.gt-next {
+  margin-top: var(--space-2);
+}
+.gt-next > .gm-bar {
+  max-width: 320px;
+}
+
+/* ---- Gemeinsames Wochenziel in „Gemeinsam erreicht“ ---------------------- */
+.gt-community {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid oklch(100% 0 0 / 0.12);
+}
+.gt-community-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  color: oklch(90% 0.035 255);
+  font-size: var(--text-label);
+  font-weight: 600;
+}
+.gt-community-head strong {
+  color: oklch(98% 0.01 255);
+  font-size: var(--text-body);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.gt-community-note {
+  margin: 0;
+  color: oklch(84% 0.03 255);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+.gt-community-last {
+  color: oklch(78% 0.03 255);
+}
+/* Beim Laden: Platz in Form des echten Texts, unsichtbar. */
+.gt-hold {
+  visibility: hidden;
+}
+
+/* ---- Öffentliche Serien-Rangliste: Flamme vor der Zahl ------------------- */
+.gt-public-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- Reduzierte Bewegung ------------------------------------------------- */
+/* Die eigene Ranglistenzeile wird statt aufzuleuchten 1,4 s ruhig hinterlegt
+   (das Attribut nimmt ranking-board.tsx danach wieder weg). */
+@media (prefers-reduced-motion: reduce) {
+  .rb .rb-list > li[data-flash] {
+    animation: none;
+    background-color: oklch(88% 0.08 258);
+  }
+}
