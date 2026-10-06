@@ -1,0 +1,218 @@
+/*
+ * Tagesrunde unter „Mein Fortschritt“ und „Meine Tage“ (community-app.tsx,
+ * personal-bests.tsx) sowie die Serie in DayProgress und im Dashboard.
+ * Die Bausteine selbst (Ring, Flamme, Etappenleiste, Tagesreihe, Balken,
+ * Pillen) kommen aus app/game.css; hier stehen nur Anordnung und Abstände.
+ * Stützt sich auf die Tokens aus ui.css. Keine eigene Bewegung.
+ */
+
+/* ---- Serie mit Flamme (DayProgress) -------------------------------------- */
+.gp-flame-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* ---- Kachel Serie mit Etappenleiste (commitment-dashboard.tsx) ----------- */
+/* Die Serie bekommt mehr Breite, damit die sechs Etappen lesbar bleiben. */
+.cm-stats.gp-stats {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+}
+/* .cm-stats dd span macht Spannen zu grauen Blöcken; Zahl und Flamme nicht. */
+.cm-stats dd .gp-streak-number {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: inherit;
+}
+.cm-stats dd .gp-streak-number .gm-flame {
+  display: inline-grid;
+}
+.gp-streak-tile .gm-etappen {
+  margin-top: var(--space-3);
+}
+.cm-stats > .gp-streak-tile > .gp-etappe-note {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  line-height: 1.5;
+}
+@media (max-width: 599px) {
+  /* Am Handy steht die Serie über die volle Breite, die beiden anderen darunter. */
+  .cm-stats.gp-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cm-stats > .gp-streak-tile {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ---- Diese Woche (/heute) ------------------------------------------------ */
+.gp-week-paused {
+  margin: 0 0 var(--space-4);
+  color: var(--do-ink-2);
+  font-size: var(--text-body);
+}
+/* Der Wochenziel-Balken ersetzt in der Kachel Anwahlen den Text „Wochenziel …“. */
+.ca-week-stats .gm-bar.gp-week-bar {
+  margin: var(--space-2) 0 2px;
+}
+.ca-week-stats:has(+ .gp-week-game) {
+  margin-bottom: var(--space-3);
+}
+.gp-week-game {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+}
+.gp-goal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+  font-variant-numeric: tabular-nums;
+}
+.gp-goal[data-reached] {
+  color: oklch(42% 0.12 150);
+  font-weight: 700;
+}
+.gp-goal svg {
+  flex: none;
+  color: var(--do-green);
+}
+/* Tagesmarke heute: eine Zeile, darunter die Erklärung zum Aufklappen (44 px). */
+.gp-mark {
+  display: grid;
+  min-width: 0;
+}
+.gp-mark-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  margin: 0;
+  color: var(--do-ink);
+  font-size: var(--text-body);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.gp-mark-how.cm-rules-note {
+  margin-top: 0;
+}
+/* Vorschlag zum Wochenziel mit X zum Ausblenden (44 px). */
+.gp-hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius-m);
+  background: var(--do-blue-soft);
+}
+.gp-hint p {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) 0;
+  color: var(--do-ink);
+  font-size: var(--text-label);
+  line-height: 1.5;
+}
+.gp-hint-close {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--do-ink-2);
+  cursor: pointer;
+}
+.gp-hint-close:hover {
+  color: var(--do-ink);
+  background: var(--do-surface);
+}
+.gp-hint-close:focus-visible {
+  outline: 2px solid var(--do-blue);
+  outline-offset: -2px;
+}
+
+/* ---- Deine Bestwerte (personal-bests.tsx) -------------------------------- */
+.gp-bests-empty {
+  margin: 0 0 var(--space-5);
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.gp-bests-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gp-bests-list li + li {
+  border-top: 1px solid var(--do-line);
+}
+.gp-best {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-2) 0;
+  color: var(--do-ink);
+  text-decoration: none;
+}
+.gp-best-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.gp-best-label {
+  font-size: var(--text-label);
+  font-weight: 700;
+  line-height: 1.35;
+}
+.gp-best-date {
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+  font-variant-numeric: tabular-nums;
+}
+.gp-best-value {
+  flex: none;
+  font-size: var(--text-lead);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.gp-best:hover .gp-best-label {
+  color: var(--do-blue);
+}
+.gp-best:focus-visible {
+  outline: 2px solid var(--do-blue);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+
+/* ---- Meine Tage (/zahlen) ------------------------------------------------ */
+.checkin-card-top > div:has(.gm-pill) {
+  flex-wrap: wrap;
+}
+/* Pille „Bestwert“ neben dem Wert; in schmalen Kacheln darunter. */
+.checkin-card-kpis dd.gp-kpi-best {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+}
+/* Transparenz: was nach der Frist erhöht wurde, zählt im Spiel nicht. */
+.gp-differs {
+  margin: var(--space-2) 0 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-meta);
+  line-height: 1.45;
+}

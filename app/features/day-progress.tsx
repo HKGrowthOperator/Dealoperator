@@ -3,12 +3,16 @@ import { useEffect, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { aggregate, emptyCounts, progress, type Counts } from "@/lib/kpis";
 import { focusTrack, levelCard } from "@/lib/levels";
+import { GAME_TEXT, flameState, nextEtappe } from "@/lib/game";
 import { CLOSING_CHANGED, fetchClosingState, type ClosingState } from "./closing-form";
+import { Flame } from "./game-parts";
+import "../game-progress.css";
 
 /**
- * Kompakter Stand unter dem Tagesabschluss: Abschluss-Serie und das
- * Leistungslevel, das als Nächstes erreichbar ist. Details stehen unter
- * „Mein Fortschritt“.
+ * Kompakter Stand unter dem Tagesabschluss: Serie mit Flamme und nächster
+ * Etappe, dazu das Leistungslevel, das als Nächstes erreichbar ist. Details
+ * stehen unter „Mein Fortschritt“. Bewusst ohne Tagesmarke: unter dem
+ * Formular gibt es keine Vorschau beim Eintippen.
  */
 export default function DayProgress({ initial }: { initial: ClosingState | null }) {
   const [state, setState] = useState<ClosingState | null>(initial);
@@ -27,6 +31,10 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
   }, [initial]);
   if (!state?.eligibility.participant) return null;
   const streak = state.summary?.streak ?? { current: 0, best: 0 };
+  // Flamme aus der Tagesrunde (privat, mit Gefahr und Pause); ohne sie nur
+  // nach der Länge, denn summary.atRisk meldet auch den offenen heutigen Tag.
+  const flame = state.game?.streak.flame ?? flameState(streak, null, false);
+  const next = nextEtappe(streak.current);
   const level = focusTrack(
     progress(
       aggregate(state.closings.map((c) => ({ ...emptyCounts(), ...c.counts }) as Counts)),
@@ -46,15 +54,17 @@ export default function DayProgress({ initial }: { initial: ClosingState | null 
     <section className="md-progress" aria-label="Mein Fortschritt kurz">
       <div>
         <span className="md-progress-label">Serie</span>
-        <strong>
-          {streak.current > 0
-            ? `${streak.current} ${streak.current === 1 ? "Tag" : "Tage"}`
-            : "Noch keine"}
+        <strong className="gp-flame-value">
+          <Flame state={flame} size={20} />
+          {streak.current > 0 ? GAME_TEXT.streakDays(streak.current) : "Noch keine"}
         </strong>
+        {/* Unterwegs die nächste Etappe; bei 0 und nach allen Etappen der Bestwert. */}
         <small>
-          {streak.current > 0
-            ? `Bestwert ${streak.best}`
-            : "Startet mit dem nächsten rechtzeitigen Tagesabschluss"}
+          {streak.current > 0 && next
+            ? GAME_TEXT.nextEtappeShort(next)
+            : streak.best > 0
+              ? `Bestwert ${streak.best}`
+              : "Startet mit dem nächsten rechtzeitigen Tagesabschluss"}
         </small>
       </div>
       <div>

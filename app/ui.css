@@ -2126,15 +2126,6 @@ li[data-open] .rb-chevron {
   border-left: 2px solid var(--do-green);
   transform: rotate(-45deg);
 }
-.md-level-up {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-s);
-  background: var(--do-surface);
-  font-weight: 700;
-}
-.md-level-up a {
-  color: var(--do-blue);
-}
 .md-confirm-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3878,13 +3869,6 @@ li[data-medal="gold"] .rb-bar i {
 .rb-me[data-submitted] {
   border-color: color-mix(in oklch, var(--do-green) 35%, var(--do-line));
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--do-green) 10%, transparent);
-}
-.rb-me-level {
-  margin: var(--space-2) 0 0;
-  font-size: var(--text-label);
-}
-.rb-me-level {
-  color: var(--do-ink-2);
 }
 .rb-me-push {
   grid-column: 1 / -1;

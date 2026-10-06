@@ -13,6 +13,14 @@ import {
 import CommitmentDashboard from "./features/commitment-dashboard";
 import MonthStanding from "./features/month-standing";
 import RankProgress from "./features/rank-progress";
+import PersonalBests from "./features/personal-bests";
+import { GameRing, Tagesreihe, Wochenbalken } from "./features/game-parts";
+import {
+  CLOSING_CHANGED,
+  fetchClosingState,
+  type ClosingState,
+} from "./features/closing-form";
+import { GAME_TEXT, type BestMetric, type WeekView } from "@/lib/game";
 import AccountSettings, { AccountAccess } from "./features/account-settings";
 import PushSetup from "./features/push-setup";
 import DiscordLink from "./features/discord-link";
@@ -55,6 +63,7 @@ import {
   Info,
   Lock,
   ArrowUpRight,
+  X,
 } from "lucide-react";
 import { OperatorHeader, OperatorFooter } from "./features/operator-shell";
 import AreaNav from "./features/area-nav";
@@ -98,6 +107,7 @@ import {
   type RecordDay,
   type Session,
 } from "./data";
+import "./game-progress.css";
 const dayNames = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 const blankData: AppData = {
   ...emptyWorkflows,
@@ -419,6 +429,62 @@ export default function CommunityApp({
       window.removeEventListener("focus", sync);
     };
   }, [demo, signedIn, saving, refresh]);
+  // Tagesrunde (lib/game.ts) für Fortschritt und Tage: Woche, Tagesmarke,
+  // Bestwerte und je Tag volle Runde. Sie kommt mit dem Stand des
+  // Tagesabschlusses, den die Serie darunter ohnehin braucht, und wird nach
+  // dem Einreichen und beim Zurückkehren aufgefrischt. Scheitert sie, bleibt
+  // „Diese Woche“ beim bisherigen Stand aus den eigenen Tagen.
+  const wantsGame =
+    !demo && signedIn && (initialView === "heute" || initialView === "zahlen");
+  const [closing, setClosing] = useState<ClosingState | null>(null);
+  const [closingSettled, setClosingSettled] = useState(false);
+  useEffect(() => {
+    if (!wantsGame) return;
+    const controller = new AbortController();
+    let pending = false;
+    const load = async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const fresh = await fetchClosingState(undefined, controller.signal);
+        if (!controller.signal.aborted) setClosing(fresh);
+      } catch {
+        // Ohne Tagesrunde gilt der bisherige Stand.
+      } finally {
+        pending = false;
+        if (!controller.signal.aborted) setClosingSettled(true);
+      }
+    };
+    void load();
+    window.addEventListener(CLOSING_CHANGED, load);
+    window.addEventListener("focus", load);
+    return () => {
+      controller.abort();
+      window.removeEventListener(CLOSING_CHANGED, load);
+      window.removeEventListener("focus", load);
+    };
+  }, [wantsGame]);
+  const game = closing?.game ?? null;
+  // Vorschlag zum Wochenziel: je Woche ausblendbar, gemerkt nur in diesem
+  // Browser. Ohne Speicher erscheint er beim nächsten Laden wieder.
+  const [hiddenHint, setHiddenHint] = useState<string | null>(null);
+  const hintKey = (weekFrom: string) => `do-wochenziel-hinweis-${weekFrom}`;
+  function hintHidden(weekFrom: string) {
+    if (hiddenHint === weekFrom) return true;
+    try {
+      return localStorage.getItem(hintKey(weekFrom)) === "1";
+    } catch {
+      return false;
+    }
+  }
+  function hideHint(weekFrom: string) {
+    setHiddenHint(weekFrom);
+    try {
+      localStorage.setItem(hintKey(weekFrom), "1");
+    } catch {
+      // Ohne Speicher bleibt der Hinweis nur für diesen Besuch weg.
+    }
+  }
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Navigation closes drafts belonging to the previous section.
     setSearch("");
@@ -654,6 +720,14 @@ export default function CommunityApp({
     ),
   );
   const metricTotal = (k: Metric) => (totals[k] === null ? "–" : totals[k]!);
+  // Mit der Tagesrunde zeigen die Kacheln „Diese Woche“ dieselben Summen wie
+  // der Wochenziel-Balken (Stand bis zur Frist), ohne sie wie bisher die Tage.
+  const week: WeekView | null = game?.week ?? null;
+  const gameDays = new Map(game?.days.map((d) => [d.day, d]) ?? []);
+  const weekTotal = (k: keyof WeekView["totals"]) => {
+    const value = week ? week.totals[k] : totals[k];
+    return value === null ? "–" : value.toLocaleString("de-DE");
+  };
   function downloadCalendar(s: Session) {
     const start = new Date(s.startsAt || `${s.date}T${s.time}`);
     const end = new Date(start.getTime() + s.minutes * 60000);
@@ -1003,6 +1077,133 @@ export default function CommunityApp({
       </article>
     );
   }
+  /**
+   * „Diese Woche“ unter Fortschritt: Kacheln, Wochenziel-Balken, Tagesmarke
+   * und Tagesreihe aus der Tagesrunde. Ohne sie (kein Profil, Fehler) wie
+   * bisher nur Kacheln und Säulen aus den eigenen Tagen.
+   */
+  function weekSection() {
+    const goal = week ? week.goal : data.profile.goal || null;
+    const attempts = week?.totals.attempts ?? 0;
+    // Eine ganz pausierte Woche ist nur ein Satz; gemeldete Zahlen bleiben sichtbar.
+    const paused = !!week?.paused;
+    const reported = !paused || Object.values(week!.totals).some((v) => v !== null);
+    const round = game?.round ?? null;
+    const suggestion =
+      week?.suggestion && goal && !paused && !hintHidden(week.from) ? week.suggestion : null;
+    return (
+      <section className="ca-section" aria-labelledby="ca-week">
+        <div className="ca-section-head">
+          <h2 id="ca-week">Diese Woche</h2>
+          <span>
+            {prettyDate(week?.from ?? dateKey(weekStart))} bis{" "}
+            {prettyDate(week?.to ?? dateKey(weekEnd))}
+          </span>
+        </div>
+        {paused && <p className="gp-week-paused">{GAME_TEXT.weekPaused}</p>}
+        {reported && (
+          <dl className="ca-week-stats">
+            <div>
+              <dt>Anwahlen</dt>
+              <dd>{weekTotal("attempts")}</dd>
+              {week && goal && !paused ? (
+                <>
+                  <Wochenbalken className="gp-week-bar" value={attempts} goal={goal} />
+                  <small>von {goal.toLocaleString("de-DE")}</small>
+                </>
+              ) : (
+                <small>
+                  {goal ? `Wochenziel ${goal.toLocaleString("de-DE")}` : GAME_TEXT.noGoal}
+                </small>
+              )}
+            </div>
+            <div>
+              <dt>Settings</dt>
+              <dd>{weekTotal("settingsBooked")}</dd>
+              <small>vereinbart</small>
+            </div>
+            <div>
+              <dt>Closings</dt>
+              <dd>{weekTotal("closingsBooked")}</dd>
+              <small>vereinbart</small>
+            </div>
+          </dl>
+        )}
+        {week && !paused && (
+          <div className="gp-week-game">
+            {goal !== null &&
+              (week.reached ? (
+                <p className="gp-goal" data-reached="">
+                  <CircleCheck size={18} aria-hidden="true" />
+                  {GAME_TEXT.weekReached(attempts, goal)}
+                </p>
+              ) : (
+                <p className="gp-goal">{GAME_TEXT.weekRemaining(week.remaining ?? goal)}</p>
+              ))}
+            {game?.mark && (
+              <div className="gp-mark">
+                <p className="gp-mark-line">
+                  {/* Ohne eingereichten Tag bleibt der Ring offen: ein Entwurf zählt nicht. */}
+                  <GameRing
+                    value={round?.attempts != null ? round.attempts / round.mark : 0}
+                    done={round?.markReached}
+                  />
+                  <span>{GAME_TEXT.markToday(game.mark.mark)}</span>
+                </p>
+                <details className="cm-rules-note gp-mark-how">
+                  <summary>{GAME_TEXT.markHowTitle}</summary>
+                  <p>{GAME_TEXT.markHowText}</p>
+                </details>
+              </div>
+            )}
+            {week.days.length > 0 && (
+              <Tagesreihe
+                className="gp-tagesreihe"
+                label="Calling-Tage dieser Woche"
+                days={week.days.map((d) => ({
+                  ...d,
+                  // Wie die Säulen: ein Tippen öffnet den Tag, künftige Tage nicht.
+                  href: d.day <= (game?.today ?? dateKey()) ? `/tagesabschluss?tag=${d.day}` : undefined,
+                }))}
+                note={GAME_TEXT.fullRounds(week.fullRounds)}
+              />
+            )}
+          </div>
+        )}
+        {!paused && (
+          <div className="ca-chart">
+            <p className="ca-chart-title">Anwahlen je Tag</p>
+            <MiniChart
+              start={week?.from ?? dateKey(weekStart)}
+              onSelect={(date) => openClosing(date)}
+              records={data.records}
+            />
+          </div>
+        )}
+        {suggestion && goal !== null && (
+          <div className="gp-hint">
+            <p>{GAME_TEXT.suggestion(goal, suggestion.value)}</p>
+            <button
+              type="button"
+              className="gp-hint-close"
+              aria-label="Hinweis ausblenden"
+              onClick={() => hideHint(week!.from)}
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
+        )}
+        <div className="ca-section-actions">
+          <Link className="do-button do-button-secondary" href={`${href("profil")}#wochenziel`}>
+            {goal ? GAME_TEXT.adjustGoal : GAME_TEXT.setGoal}
+          </Link>
+          <Link className="do-link" href={href("zahlen")}>
+            Alle Tage ansehen
+          </Link>
+        </div>
+      </section>
+    );
+  }
   const exchangeView = ["sessions", "wissen"].includes(initialView);
   return (
     <div className="operator-site">
@@ -1020,7 +1221,7 @@ export default function CommunityApp({
                 Anmelden
               </button>
             </Empty>
-          ) : loading ? (
+          ) : loading || (wantsGame && !closingSettled) ? (
             <div className="loading">
               <LoaderCircle className="spin" />
               Dein Bereich wird geladen …
@@ -1038,52 +1239,10 @@ export default function CommunityApp({
                   <PageHeading
                     title="Mein Fortschritt"
                   />
-                  <section className="ca-section" aria-labelledby="ca-week">
-                    <div className="ca-section-head">
-                      <h2 id="ca-week">Diese Woche</h2>
-                      <span>
-                        {prettyDate(dateKey(weekStart))} bis {prettyDate(dateKey(weekEnd))}
-                      </span>
-                    </div>
-                    <dl className="ca-week-stats">
-                      <div>
-                        <dt>Anwahlen</dt>
-                        <dd>{metricTotal("attempts")}</dd>
-                        <small>
-                          {data.profile.goal
-                            ? `Wochenziel ${data.profile.goal.toLocaleString("de-DE")}`
-                            : "Kein Wochenziel"}
-                        </small>
-                      </div>
-                      <div>
-                        <dt>Settings</dt>
-                        <dd>{metricTotal("settingsBooked")}</dd>
-                        <small>vereinbart</small>
-                      </div>
-                      <div>
-                        <dt>Closings</dt>
-                        <dd>{metricTotal("closingsBooked")}</dd>
-                        <small>vereinbart</small>
-                      </div>
-                    </dl>
-                    <div className="ca-chart">
-                      <p className="ca-chart-title">Anwahlen je Tag</p>
-                      <MiniChart
-                        start={dateKey(weekStart)}
-                        onSelect={(date) => openClosing(date)}
-                        records={data.records}
-                      />
-                    </div>
-                    <div className="ca-section-actions">
-                      <Link className="do-button do-button-secondary" href={`${href("profil")}#wochenziel`}>
-                        Wochenziel anpassen
-                      </Link>
-                      <Link className="do-link" href={href("zahlen")}>
-                        Alle Tage ansehen
-                      </Link>
-                    </div>
-                  </section>
-                  <CommitmentDashboard />
+                  {weekSection()}
+                  {game && <PersonalBests bests={game.bests} today={game.today} />}
+                  {/* Derselbe Stand wie oben; ohne ihn (Fehler) lädt die Serie selbst. */}
+                  <CommitmentDashboard initial={closing} />
                   {!demo && <MonthStanding />}
                   {!demo && (
                     <ActiveCallerCard
@@ -1135,6 +1294,13 @@ export default function CommunityApp({
                             const notes = [r.win, r.next, r.help].filter(
                               Boolean,
                             );
+                            // Tagesrunde dieses Tages: volle Runde, gehaltene
+                            // Bestwerte (erst ab der Karte „Deine Bestwerte“)
+                            // und was nach der Frist erhöht wurde. Nur privat.
+                            const gameDay = gameDays.get(r.date);
+                            const best = (k: string) =>
+                              !!game?.bests.show &&
+                              !!gameDay?.bestMetrics.includes(k as BestMetric);
                             return (
                               <li className="checkin-card" key={r.date}>
                                 <div className="checkin-card-top">
@@ -1142,6 +1308,11 @@ export default function CommunityApp({
                                     <strong>{prettyDate(r.date)}</strong>
                                     {r.date === dateKey() && (
                                       <Tag tone="green">Heute</Tag>
+                                    )}
+                                    {gameDay?.fullRound && (
+                                      <span className="gm-pill" data-tone="full">
+                                        {GAME_TEXT.fullRound}
+                                      </span>
                                     )}
                                   </div>
                                   <button
@@ -1155,10 +1326,24 @@ export default function CommunityApp({
                                   {metrics.map((k) => (
                                     <div key={k}>
                                       <dt>{shortMetricLabels[k]}</dt>
-                                      <dd>{c[k] ?? "–"}</dd>
+                                      <dd className={best(k) ? "gp-kpi-best" : undefined}>
+                                        {c[k] ?? "–"}
+                                        {best(k) && (
+                                          <span className="gm-pill" data-tone="best">
+                                            {GAME_TEXT.bestPill}
+                                          </span>
+                                        )}
+                                      </dd>
                                     </div>
                                   ))}
                                 </dl>
+                                {!!gameDay?.differs.length && (
+                                  <p className="gp-differs">
+                                    {gameDay.differs
+                                      .map((d) => GAME_TEXT.differs(d.metric, d.counted))
+                                      .join(" ")}
+                                  </p>
+                                )}
                                 <details className="checkin-card-more">
                                   <summary>
                                     {r.energy != null

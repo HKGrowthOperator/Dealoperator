@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Flame, Lock, TriangleAlert } from "lucide-react";
+import { Lock, TriangleAlert, Zap } from "lucide-react";
 import {
   ACTIVE_LOST_AFTER_IDLE,
   ACTIVE_MIN_ATTEMPTS,
@@ -17,7 +17,7 @@ const day = (value: string) =>
  * Rang „Aktiver Caller“: freigeschaltet mit 5 Calling-Tagen am Stück mit
  * mindestens 50 Anwahlen, weg nach 3 Calling-Tagen in Folge ohne Anwahlen.
  * Schaltet Sessions & Roleplay frei; im Discord gibt es dafür die gleichnamige
- * Rolle.
+ * Rolle. Das Symbol ist Zap: die Flamme gehört nur der Serie.
  */
 export default function ActiveCallerCard({
   state,
@@ -41,7 +41,7 @@ export default function ActiveCallerCard({
     return (
       <section className="ac-card" data-active="" data-compact={compact ? "" : undefined} aria-label="Aktiver Caller">
         <span className="ac-icon" aria-hidden="true">
-          <Flame size={22} />
+          <Zap size={22} />
         </span>
         <div>
           <strong>Du bist Aktiver Caller</strong>

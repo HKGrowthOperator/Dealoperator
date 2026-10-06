@@ -1327,6 +1327,8 @@ svg {
   font-size: 13px;
   color: #77869b;
   line-height: 1.35;
+  /* „durchgeführt“ trennt mit Bindestrich statt mitten im Wort. */
+  hyphens: auto;
   overflow-wrap: anywhere;
 }
 .checkin-card-kpis dd {

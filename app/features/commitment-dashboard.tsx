@@ -10,9 +10,11 @@ import {
   Undo2,
 } from "lucide-react";
 import type { DayStatus } from "@/lib/commitment";
+import { flameState, streakNote } from "@/lib/game";
 import {
   CLOSING_CHANGED,
   approvedPauses,
+  currentTime,
   fetchClosingState,
   formatFullDay,
   formatMoment,
@@ -22,12 +24,16 @@ import {
   type ClosingState,
   type PauseEntry,
 } from "./closing-form";
+import { EtappenLeiste, Flame } from "./game-parts";
 import "../commitment.css";
+import "../game-progress.css";
 
 /*
  * Dranbleiben sichtbar machen: Serien, aktive Tage, Monatskalender und
  * Pausen. Alle Werte kommen aus /api/closing und folgen denselben Regeln wie
- * Erinnerungen und Ranking. Wochenenden sind keine Pflicht-Tage.
+ * Erinnerungen und Ranking. Wochenenden sind keine Pflicht-Tage. Die Serie
+ * steht mit Flamme und Etappenleiste (lib/game.ts); die Regeln der Serie
+ * bleiben die aus summarize().
  */
 
 const STATUS: Record<DayStatus, { label: string; legend: string }> = {
@@ -181,6 +187,16 @@ export default function CommitmentDashboard({
       (d.status === "open" || d.status === "missed") &&
       (!data.firstClosableDay || d.day >= data.firstClosableDay),
   );
+  // Flamme aus der Tagesrunde (privat, mit Gefahr und Pause); ohne sie nur
+  // nach der Länge. Der Satz nennt die nächste Etappe; eine offene Frist steht
+  // darunter ohnehin als eigener Hinweis.
+  const flame = data.game?.streak.flame ?? flameState(summary.streak, null, false);
+  const etappeNote = streakNote(
+    { ...summary.streak, atRisk: null, paused: data.game?.streak.paused ?? false },
+    data.game?.todayStatus ?? null,
+    tz,
+    new Date(currentTime()),
+  );
   const workdays = settings.callingWeekdays
     .slice()
     .sort()
@@ -262,20 +278,20 @@ export default function CommitmentDashboard({
         </p>
       </details>
 
-      <dl className="cm-stats">
-        <div>
+      <dl className="cm-stats gp-stats">
+        <div className="gp-streak-tile">
           <dt>Serie</dt>
           <dd>
-            <strong>{summary.streak.current}</strong>
+            <span className="gp-streak-number">
+              <Flame state={flame} size={28} />
+              <strong>{summary.streak.current}</strong>
+            </span>
             <span>
               {summary.streak.current === 1 ? "Tag" : "Tage"}, Bestwert {summary.streak.best}
             </span>
           </dd>
-          <p>
-            {summary.streak.current > 0
-              ? "Rechtzeitige Abschlüsse in Folge."
-              : "Startet mit deinem nächsten rechtzeitigen Abschluss."}
-          </p>
+          <EtappenLeiste current={summary.streak.current} />
+          <p className="gp-etappe-note">{etappeNote}</p>
         </div>
         <div>
           <dt>Tage mit Anwahlen</dt>
