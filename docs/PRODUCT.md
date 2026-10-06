@@ -17,7 +17,13 @@ und eine kurze Reflexion.
 
 Die gemeinsame Startseite mit den Ergebnissen bleibt auch nach der Anmeldung
 das Zentrum. Der persönliche Bereich macht Zahlen und Reflexion leicht.
-Levels und Serien motivieren im Hintergrund.
+
+Seit 06.10.2026 (Tagesrunde) ist jeder Calling-Tag eine Runde: Serie (als
+Flamme) und Tagesmarke stehen sichtbar in der Karte „Mein Tag“ auf der
+Startseite, morgens als Auftrag, nach dem Einreichen als kurze Bilanz.
+Leistungslevel bleiben im Hintergrund. Das Spiel vergleicht jede Person nur
+mit sich selbst, in echten Einheiten; das gemeinsame Wochenziel zeigt, was
+alle zusammen schaffen.
 
 ## Persönlichkeit
 
@@ -33,7 +39,10 @@ Schwerpunkt und eine klare nächste Aktion. Kurze, konkrete Sätze.
 - Große Werbeblöcke vor den Ergebnissen, mehrere konkurrierende Aktionen.
 - Glas und Verläufe als Dekoration, verschachtelte Karten, Pfeile an jedem
   Button.
-- Erfundene Rekorde oder Erfolge.
+- Erfundene Rekorde oder Erfolge. Höhepunkte nur, wenn wirklich etwas
+  passiert ist, und nie für nachträgliches Hochkorrigieren.
+- Konfetti, Töne, Vibration, Dauerpuls; öffentliche Level, Abzeichen oder
+  Titel.
 
 ## Gestaltungsgrundsätze
 
@@ -45,7 +54,20 @@ Schwerpunkt und eine klare nächste Aktion. Kurze, konkrete Sätze.
 5. Unterscheidungen bleiben sichtbar: 0 ist eine Meldung, keine Meldung ist
    keine 0, gemeinsame Meldungen sind kein eigener Rang.
 6. Bewegung zeigt Zustände (Tag/Monat, Rangliste, Bestätigung), nie
-   Dekoration; reduzierte Bewegung wird respektiert.
+   Dekoration; reduzierte Bewegung wird respektiert. Nach dem Einreichen
+   gibt es eine kurze Abfolge von Zustandswechseln (Ringe schließen sich,
+   Serienzahl springt, Höhepunkte erscheinen), unter 1,3 s, nur transform,
+   opacity und stroke-dashoffset.
+7. Gold bleibt selten: Platz 1, die Pille „Bestwert“ und der geschaffte
+   gemeinsame Wochenziel-Balken. Die Flamme gehört nur der Serie und ist nie
+   Gold.
+
+## Begriffe
+
+Fest und überall gleich: Anwahlen, Rangliste, Serie, Etappe, Tagesmarke,
+volle Runde, Bestwert, Wochenziel, gemeinsames Wochenziel, Leistungslevel,
+Aktiver Caller. Nie „Punkte“, „XP“ oder „Erfahrungspunkte“, auch nicht für
+die Tagesreihe.
 
 ## Barrierefreiheit
 

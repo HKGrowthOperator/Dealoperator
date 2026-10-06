@@ -7,6 +7,7 @@ import { discordDestination } from "@/server/discord";
 import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commitment";
 import { ACTIVE_LOST_AFTER_IDLE, ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
 import { tracks } from "@/lib/kpis";
+import { ETAPPEN, GAME_LADDER, GAME_TEXT, MARK_START } from "@/lib/game";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import DiscordSteps from "../features/discord-steps";
 
@@ -14,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "So funktioniert’s · Deal Operator",
   description:
-    "Wie der Tagesabschluss, die Serie, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
+    "Wie Tagesabschluss, Tagesmarke, Serie, Wochenziel, Bestwerte, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
   alternates: { canonical: "/so-funktionierts" },
 };
 
@@ -33,6 +34,9 @@ function callingDays(days: number[]) {
 const clock = ({ hour, minute }: { hour: number; minute: number }) =>
   `${hour}:${String(minute).padStart(2, "0")} Uhr`;
 const n = (v: number) => v.toLocaleString("de-DE");
+/** „5, 10, 20, 40, 60 und 100“ */
+const listing = (values: readonly number[]) =>
+  `${values.slice(0, -1).map(n).join(", ")} und ${n(values.at(-1) ?? 0)}`;
 
 /**
  * So funktioniert’s: öffentlich lesbar. Alle Regeln (Calling-Tage, Frist,
@@ -146,6 +150,18 @@ export default async function Page() {
         <section className="hw-section" id="was-zaehlt" aria-labelledby="hw-counts">
           <h2 id="hw-counts">Was wofür zählt</h2>
           <div className="hw-systems">
+            <article id="tagesmarke">
+              <div className="hw-key">
+                <strong>
+                  {n(MARK_START)} bis {n(GAME_LADDER.at(-1) ?? MARK_START)}
+                </strong>
+                <span>Anwahlen, nach deinem üblichen Tag</span>
+              </div>
+              <div>
+                <h3>{GAME_TEXT.guideMarkTitle}</h3>
+                <p>{GAME_TEXT.guideMarkText}</p>
+              </div>
+            </article>
             <article id="serie">
               <div className="hw-key">
                 <strong>bis {deadline}</strong>
@@ -158,7 +174,38 @@ export default async function Page() {
                   auch mit 0 Anwahlen.
                   {weekdaysOnly ? ` Für Freitag bleibt also Zeit bis Montag, ${deadline}.` : ""}{" "}
                   Wochenenden und bestätigte Pausen unterbrechen die Serie nicht. Später
-                  eingereicht zählen deine Zahlen trotzdem, nur die Serie nicht.
+                  eingereicht zählen deine Zahlen trotzdem, nur die Serie nicht. Die Flamme zeigt
+                  deine Serie; Etappen erreichst du bei {listing(ETAPPEN)} Tagen.
+                </p>
+              </div>
+            </article>
+            <article id="wochenziel">
+              <div className="hw-key">
+                <strong>Mo bis So</strong>
+                <span>dein Ziel und das gemeinsame</span>
+              </div>
+              <div>
+                <h3>Wochenziel</h3>
+                <p>
+                  Dein Wochenziel in Anwahlen legst du im Profil fest. Unter Mein Fortschritt füllt
+                  sich der Balken mit allen Anwahlen der Woche, auch vom Wochenende, und je
+                  Calling-Tag siehst du, wo du eine volle Runde hattest.
+                </p>
+                <p>{GAME_TEXT.communityGuide}</p>
+              </div>
+            </article>
+            <article id="bestwerte">
+              <div className="hw-key">
+                <strong>ab Tag 6</strong>
+                <span>mit Meldung</span>
+              </div>
+              <div>
+                <h3>Bestwerte</h3>
+                <p>
+                  Deine meisten Anwahlen, Settings, Closings und Deals an einem Tag, dazu deine
+                  beste Woche und dein bester Monat in Anwahlen. Bei Gleichstand zählt der
+                  frühere Tag. Einen neuen Bestwert zeigt dir die Karte Mein Tag direkt nach dem
+                  Einreichen. Bestwerte siehst nur du.
                 </p>
               </div>
             </article>
@@ -204,8 +251,8 @@ export default async function Page() {
             <div>
               <dt>Alle</dt>
               <dd>
-                Anzeigename, Firma, Rolle und deine Zahlen in Rangliste und gemeinsamer Summe,
-                nur wenn du der öffentlichen Anzeige zustimmst.
+                Anzeigename, Firma, Rolle, deine gemeldeten Zahlen in Rangliste und gemeinsamer
+                Summe und deine Serie. Wer nicht mehr erscheinen möchte, wendet sich an das Team.
               </dd>
             </div>
             <div>
@@ -222,7 +269,10 @@ export default async function Page() {
             </div>
             <div>
               <dt>Nur du</dt>
-              <dd>Entwürfe, bis du sie einreichst.</dd>
+              <dd>
+                Entwürfe, bis du sie einreichst. Deine Tagesmarke, deine Bestwerte und dein Stand
+                zum Wochenziel.
+              </dd>
             </div>
           </dl>
           <Link className="do-link" href="/datenschutz">
@@ -264,9 +314,11 @@ export default async function Page() {
               <summary>Einen Tag nachtragen oder korrigieren</summary>
               <p>
                 Unter Mein Tag wählst du einen anderen Tag. Nachgetragene Zahlen zählen in der
-                Rangliste; für die Serie zählt nur, was rechtzeitig kam. Bei einer Korrektur gilt
-                die eingereichte Fassung, bis du die neue vollständig einreichst. Fehlen mehrere
-                Abschlüsse, fragt das Team kurz nach, ob alles passt.
+                Rangliste; für die Serie zählt nur, was rechtzeitig kam. Für Tagesmarke, Bestwerte
+                und Wochenziel zählt dein Stand bis zur Frist, bei einem Nachtrag deine erste
+                Einreichung: spätere Erhöhungen zählen dort nicht, Senkungen sofort. Bei einer
+                Korrektur gilt die eingereichte Fassung, bis du die neue vollständig einreichst.
+                Fehlen mehrere Abschlüsse, fragt das Team kurz nach, ob alles passt.
               </p>
             </details>
             <details>

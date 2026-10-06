@@ -6,11 +6,13 @@ import { ownClosings, toClosings, toImported } from "./closing";
 import { activeCallerForParticipant } from "./active-caller";
 
 /**
- * Öffentliche Dranbleiben-Rangliste: nur Serien und aktive Tage von Personen,
- * die der öffentlichen Anzeige zugestimmt und seit der Übernahme mindestens
- * einen Tagesabschluss eingereicht haben. Status, Pausen, Fehltage und
- * Prüfhinweise bleiben privat. Wer (noch) nichts eingereicht hat, erscheint
- * nicht — fehlend ist nicht null.
+ * Öffentliche Dranbleiben-Rangliste: nur Serien und aktive Tage von Personen
+ * mit eigenem Konto, die seit der Übernahme mindestens einen Tagesabschluss
+ * eingereicht haben. Eine Zustimmung zur Anzeige gibt es seit dem 24.09.2026
+ * nicht mehr (public_consent wird nirgends ausgewertet, START-IN-CLAUDE.md).
+ * Status, Gefahr für die Serie (atRisk), Pausen, Fehltage und Prüfhinweise
+ * bleiben privat; die Flamme der Rangliste entsteht nur aus streak.current.
+ * Wer (noch) nichts eingereicht hat, erscheint nicht — fehlend ist nicht null.
  */
 export async function commitmentRanking(
   db: Database,

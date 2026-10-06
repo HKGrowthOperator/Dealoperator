@@ -133,6 +133,27 @@ Roleplay:
 8. Jede Roleplay-Session zeigt als Raum `https://discord.gg/sp75ZrWahH`, auch wenn früher ein Hand-Link eingetragen war; das Feld für einen eigenen Link erscheint bei Roleplay nicht. Der Kalendereintrag enthält denselben Link. Call-Block und Reflexion behalten Abgleich-Raum oder Hand-Link.
 9. Mit eingerichtetem Discord-Abgleich: Roleplay bekommt keinen Sprachkanal, nur ein Discord-Event mit dem festen Link als Ort; ein früher angelegter Kanal wird abgeräumt.
 
+## Tagesrunde (06.10.2026)
+
+Ohne Migration. Mit Testkonten und fiktiven Zahlen, mobil (360/390/430) und Desktop (1280).
+
+| Prüfung | Erwartetes Ergebnis |
+| --- | --- |
+| Calling-Tag, Tag offen, Konto mit Freischaltung | Startseite „Mein Tag“: Zeile „Tagesmarke“ mit leerem Ring und z. B. „100 Anwahlen“, Zeile „Abschluss bis …“ mit Flamme und „Serie N“, mit Wochenziel die Zeile „Woche“ („312 von 500 Anwahlen“); „Tagesmarke“ führt zu `/so-funktionierts#tagesmarke`. Ein Entwurf zeigt keinen Fortschritt zur Marke |
+| Freier Tag, bestätigte Pause, Konto ohne Freischaltung | Keine Marke; an freien Tagen und in Pausen nur die Serienzeile, ohne Freischaltung kein Block |
+| Neues Konto mit weniger als 3 gemeldeten Calling-Tagen | „Deine erste Tagesmarke: 50 Anwahlen. …“ |
+| 3 Calling-Wochentage ohne Anwahlen, dann wieder da | „Willkommen zurück.“ mit Marke 50, am Folgetag noch 50, danach wieder nach Median; nach einer reinen Pause „Pause vorbei.“ |
+| Formular `/tagesabschluss` | Keine Marke, keine Ringe. 12 Settings bei 8 Anwahlen: „Kurz prüfen: …“ mit „Stimmt so“ (reicht ein) und „Korrigieren“ (Fokus aufs Feld); nichts geht an den Server |
+| Erstes Einreichen, Marke erreicht, rechtzeitig | `/?eingereicht=1`: „Volle Runde. Dein Tag ist drin.“, Ring schließt sich grün, Serie springt einmal, höchstens zwei Höhepunkte, dann „Als Nächstes“; die eigene Ranglistenzeile wird hinterlegt, nicht aufgeklappt. Bei „Bewegung reduzieren“ steht sofort der Endzustand; der Screenreader sagt einen Satz |
+| Korrektur oder unveränderte Fassung | Keine Höhepunkte; unverändert nur „Keine Änderung nötig, dein Tag steht.“ |
+| Nach der Frist nach oben korrigieren | Rangliste zeigt den neuen Wert; Tagesmarke, Bestwerte und Woche zählen den Stand bis zur Frist, unter Meine Tage steht „Nach der Frist erhöht: …“. Nach unten korrigiert gilt sofort der kleinere Wert |
+| Nach dem Einreichen anderes Gerät öffnen | Karte zeigt den Endzustand ohne Höhepunkte |
+| `/heute` und `/zahlen` | Wochenziel-Balken, „Tagesmarke heute“, Tagesreihe mit vollen Runden, „Deine Bestwerte“ ab dem sechsten Tag mit Meldung; unter Meine Tage die Pillen „Volle Runde“ und „Bestwert“ |
+| Rangliste › Serie | Flamme vor „N Tage Serie“, nie amber oder pausiert; Gefahr und Pausen bleiben privat |
+| Gemeinsames Wochenziel, auch abgemeldet | In „Gemeinsam erreicht“ (Tag der laufenden Woche, laufender Monat): „Gemeinsames Wochenziel“, „4.230 von 6.000 Anwahlen“, Balken, geschafft in Gold mit „Geschafft: …“; Montag bis Mittwoch die Vorwoche. `GET /api/ranking/week` enthält keine Namen und keine IDs |
+| Verwaltung › Einstellungen › Dranbleiben-Regeln | Karte „Gemeinsames Wochenziel“: Feld mit Hinweis und „Automatisch diese Woche: …“. 6000 speichern: gilt sofort ab dieser Woche; leer speichern: wieder automatisch; 400 oder 6,5: Meldung, nichts gespeichert. Konto ohne Team-Rolle: Aktion abgelehnt |
+| Sprache überall | Kein „Punkte“, „XP“, keine Wertungszahl und keine Gewichte; keine neue Push-Art, nichts im Discord |
+
 ## Betrieb vor dem öffentlichen Start
 
 Betreiber- und Datenschutzangaben, endgültige Domain, Versanddomain und Zustellbarkeit ergänzen. Sicherungen, Wiederherstellungsweg und tatsächliche Tariflimits festlegen. Fehlerlogs ohne Zugangsdaten und private Formulardaten halten. Der Discord-Bot ist eine eigene noch offene Integration, beschrieben in [DISCORD.md](DISCORD.md).
