@@ -10,6 +10,7 @@ Anbieter: HK Growth UG (haftungsbeschränkt), https://hk-growthoperator.de/
 ## Öffentliche Seiten
 
 - [Startseite](https://dealoperator.hk-growthoperator.de/): Ergebnisse, Rangliste, Einstieg
+- [Für wen](https://dealoperator.hk-growthoperator.de/fuer-wen): Sales-Community für Opener, Setter, Closer, Selbstständige und kleine Teams; Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste, Discord
 - [So funktioniert’s](https://dealoperator.hk-growthoperator.de/so-funktionierts): Tagesabschluss, Serie, aktive Calling-Tage, Leistungslevel, wer was sieht
 - [Mitmachen](https://dealoperator.hk-growthoperator.de/starten): Konto anlegen oder vorbereitetes Profil übernehmen
 - [Discord](https://discord.gg/NjkFJtBkZm): offizielle Runde

@@ -227,6 +227,7 @@ export function OperatorFooter({
           <OperatorWordmark />
         </Link>
         <nav aria-label="Weitere Seiten">
+          <Link href="/fuer-wen">Für wen</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">
             Discord
