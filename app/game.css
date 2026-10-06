@@ -1,0 +1,473 @@
+/*
+ * Tagesrunde (lib/game.ts, Bausteine in app/features/game-parts.tsx): Ring
+ * der Tagesmarke, Flamme der Serie, Etappenleiste, Tagesreihe, Wochenbalken,
+ * Serienzahl und die Zeilen für Karte und Bilanz. Lädt nach ui.css und stützt
+ * sich auf dessen Tokens und Animationen (md-confirm, md-mark).
+ *
+ * Bewegung nur über transform, opacity und stroke-dashoffset; jede Zeile steht
+ * von Anfang an im Layout. Kein Rot: eine verfehlte Marke bleibt blau. Gold
+ * nur für Bestwert und das geschaffte gemeinsame Wochenziel, nie für die
+ * Flamme. Verzögerungen kommen als --gm-delay aus den Bausteinen.
+ */
+
+/* ---- Ring der Tagesmarke ------------------------------------------------- */
+.gm-ring {
+  display: inline-block;
+  flex: none;
+  overflow: visible;
+  vertical-align: middle;
+}
+.gm-ring-track {
+  fill: none;
+  stroke: var(--do-blue-line);
+  stroke-width: 2;
+}
+.gm-ring[data-state="open"] .gm-ring-track {
+  stroke: var(--do-blue);
+  stroke-width: 1.5;
+}
+/* 54.98 ist der Umfang bei r = 8,75 (RING in game-parts.tsx). */
+.gm-ring-arc {
+  fill: none;
+  stroke: var(--do-blue);
+  stroke-width: 2.5;
+  stroke-dasharray: 54.98;
+}
+.gm-ring-done {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.gm-ring-done circle {
+  fill: var(--do-green);
+}
+.gm-ring-done path {
+  fill: none;
+  stroke: var(--do-surface);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.gm-ring[data-animate] .gm-ring-arc {
+  animation: gm-ring-fill 360ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+/* Erst schließt sich der Bogen, dann springt das Häkchen auf. */
+.gm-ring[data-animate] .gm-ring-done {
+  animation: md-mark 240ms var(--ease-out) calc(var(--gm-delay, 0ms) + 360ms) both;
+}
+@keyframes gm-ring-fill {
+  from {
+    stroke-dashoffset: 54.98;
+  }
+}
+
+/* ---- Flamme der Serie ---------------------------------------------------- */
+.gm-flame {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--gm-size, 20px);
+  height: var(--gm-size, 20px);
+  line-height: 0;
+  vertical-align: middle;
+}
+.gm-flame svg {
+  display: block;
+}
+.gm-flame[data-state="none"] {
+  color: var(--do-ink-3);
+}
+.gm-flame[data-state="short"],
+.gm-flame[data-state="glow"] {
+  color: var(--do-blue);
+}
+.gm-flame[data-state="short"] svg,
+.gm-flame[data-state="glow"] svg,
+.gm-flame[data-state="paused"] svg {
+  fill: currentColor;
+}
+/* Ruhender, weicher Schein ab 5 Tagen: statisch, kein Puls. */
+.gm-flame[data-state="glow"] svg {
+  filter: drop-shadow(0 0 calc(var(--gm-size, 20px) * 0.2) oklch(62% 0.2 258 / 0.45));
+}
+/* Ab 20 Tagen: Verlauf von Cyan zu Blau (Füllung über das SVG, nicht hier). */
+.gm-flame[data-state="long"] svg {
+  filter: drop-shadow(0 0 calc(var(--gm-size, 20px) * 0.2) oklch(78% 0.12 230 / 0.5));
+}
+.gm-flame-tip {
+  stop-color: var(--operator-cyan);
+}
+.gm-flame-base {
+  stop-color: var(--do-blue);
+}
+.gm-flame[data-state="risk"] {
+  color: var(--do-amber);
+}
+.gm-flame[data-state="risk"] svg {
+  fill: var(--do-amber-soft);
+}
+.gm-flame[data-state="paused"] {
+  color: var(--do-silver);
+}
+/* Einmaliger weicher Schein für eine gerade erreichte Etappe. */
+.gm-flame[data-celebrate]::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--gm-size, 20px) * -0.6);
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, oklch(78% 0.13 235 / 0.55), transparent);
+  opacity: 0;
+  pointer-events: none;
+  animation: gm-flame-glow 900ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+@keyframes gm-flame-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+/* ---- Etappenleiste ------------------------------------------------------- */
+.gm-etappen {
+  position: relative;
+  min-width: 0;
+}
+.gm-etappen ol {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gm-etappen li {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+}
+/* Von der Mitte der ersten bis zur Mitte der letzten Spalte, auf Höhe der Marken. */
+.gm-etappen-line {
+  position: absolute;
+  top: 5px;
+  left: calc(100% / 12);
+  right: calc(100% / 12);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--do-line);
+  overflow: hidden;
+}
+.gm-etappen-line i {
+  display: block;
+  height: 100%;
+  background: var(--do-blue);
+  transform: scaleX(var(--gm-share, 0));
+  transform-origin: left center;
+}
+.gm-etappen-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--do-surface);
+  box-shadow: inset 0 0 0 2px var(--do-line-strong);
+}
+.gm-etappen li[data-state="reached"] .gm-etappen-dot {
+  background: var(--do-blue);
+  box-shadow: none;
+}
+.gm-etappen li[data-state="next"] .gm-etappen-dot {
+  box-shadow: inset 0 0 0 2px var(--do-blue);
+}
+.gm-etappen-label {
+  color: var(--do-ink-3);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.gm-etappen li[data-state="reached"] .gm-etappen-label {
+  color: var(--do-ink-2);
+}
+.gm-etappen li[data-state="next"] .gm-etappen-label {
+  color: var(--do-blue-strong);
+  font-weight: 800;
+}
+
+/* ---- Tagesreihe ---------------------------------------------------------- */
+.gm-week {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
+}
+.gm-days {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* 44 px Tippfläche; nur bei mehr als fünf Calling-Tagen am schmalen Handy etwas enger. */
+.gm-days li {
+  display: flex;
+  flex: 0 1 44px;
+  min-width: 40px;
+}
+.gm-day {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  border-radius: var(--radius-s);
+  color: var(--do-ink-3);
+  text-decoration: none;
+}
+.gm-day-box {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-s);
+  background: var(--do-surface-2);
+  box-shadow: inset 0 0 0 1px var(--do-line-strong);
+  color: var(--do-surface);
+}
+.gm-day-name {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.gm-days li[data-state="full"] .gm-day-box {
+  background: var(--do-green);
+  box-shadow: none;
+}
+.gm-days li[data-state="submitted"] .gm-day-box,
+.gm-days li[data-state="imported"] .gm-day-box {
+  background: var(--do-surface);
+  box-shadow: inset 0 0 0 2px var(--do-blue);
+}
+.gm-days li[data-state="paused"] .gm-day-box {
+  background:
+    repeating-linear-gradient(135deg, oklch(49% 0.04 258 / 0.32) 0 1.5px, transparent 1.5px 5px),
+    var(--do-surface-2);
+}
+.gm-days li[data-today] .gm-day-box {
+  outline: 2px solid var(--do-ink-2);
+  outline-offset: 2px;
+}
+.gm-days li[data-today] .gm-day-name {
+  color: var(--do-ink);
+  font-weight: 800;
+}
+a.gm-day:hover .gm-day-name {
+  color: var(--do-blue);
+}
+.gm-week-note {
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+
+/* ---- Wochenbalken -------------------------------------------------------- */
+/* Spur und Höhe kommen von .lv-bar bzw. .lv-bar-small; Abstände setzt die Seite. */
+.gm-bar.lv-bar {
+  margin: 0;
+}
+.gm-bar i {
+  width: 100%;
+  transform: scaleX(var(--gm-share, 0));
+  transition:
+    transform 320ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+  animation: none;
+}
+.gm-bar[data-reached] i {
+  background: var(--do-green);
+}
+.gm-bar[data-animate] i {
+  animation: gm-bar-fill 320ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+/* Gemeinsames Wochenziel auf der dunklen Fläche „Gemeinsam erreicht“. */
+.gm-bar[data-tone="dark"] {
+  background: oklch(100% 0 0 / 0.14);
+}
+.gm-bar[data-tone="dark"] i {
+  background: var(--operator-cyan);
+}
+.gm-bar[data-tone="dark"][data-reached] i {
+  background: var(--do-gold);
+}
+@keyframes gm-bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* ---- Serienzahl ---------------------------------------------------------- */
+.gm-count {
+  display: inline-grid;
+  justify-items: start;
+  font-variant-numeric: tabular-nums;
+}
+.gm-count > * {
+  grid-area: 1 / 1;
+}
+.gm-count[data-animate] .gm-count-old {
+  animation: gm-count-out 280ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+.gm-count[data-animate] .gm-count-new {
+  animation: gm-count-in 280ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+@keyframes gm-count-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes gm-count-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* ---- Zeilen für Karte „Mein Tag“ und Bilanz ------------------------------ */
+/* Block über die volle Kartenbreite, je Zeile 36 px: Ring oder Flamme,
+   Bezeichnung (14 px), rechts der Wert (16 px, fett). */
+.gm-lines {
+  display: grid;
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.gm-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 36px;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.gm-line-value {
+  margin-left: auto;
+  color: var(--do-ink);
+  font-size: var(--text-body);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gm-line > .gm-bar {
+  flex: 1 1 auto;
+  min-width: 48px;
+}
+/* Höhepunkte: je Zeile mindestens 44 px, Symbol 20 px in einer 32-px-Medaille. */
+.gm-highlights {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.gm-highlight {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: 44px;
+}
+.gm-highlight strong {
+  display: block;
+  font-size: var(--text-body);
+  font-weight: 800;
+  line-height: 1.3;
+}
+.gm-highlight small {
+  display: block;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+.gm-medal {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--do-blue-soft);
+  color: var(--do-blue);
+}
+.gm-medal[data-tone="green"] {
+  background: var(--do-green-soft);
+  color: var(--do-green);
+}
+.gm-medal[data-tone="gold"] {
+  background: var(--do-gold-soft);
+  color: oklch(42% 0.09 75);
+}
+/* „Als Nächstes“: eine Zeile, beim Wochenziel mit kleinem Balken darunter. */
+.gm-next {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--do-ink-2);
+  font-size: var(--text-label);
+}
+/* Pillen „Volle Runde“ und „Bestwert“ neben Datum oder Wert. */
+.gm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  background: var(--do-blue-soft);
+  color: var(--do-blue-strong);
+  font-size: var(--text-meta);
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+/* Eigene Zeile über dem Satz, damit der Umbruch am Handy sauber bleibt. */
+.gm-pill-line {
+  margin: 0 0 4px;
+}
+.gm-pill[data-tone="full"] {
+  background: var(--do-green-soft);
+  color: oklch(42% 0.12 150);
+}
+.gm-pill[data-tone="best"] {
+  background: var(--do-gold-soft);
+  color: oklch(42% 0.09 75);
+}
+/* Abfolge der Bilanz: Zeile blendet ein, Medaille springt auf; Zeitpunkt über --gm-delay. */
+.gm-reveal {
+  animation: md-confirm 360ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+.gm-pop {
+  animation: md-mark 420ms var(--ease-out) var(--gm-delay, 0ms) both;
+}
+
+/* ---- Reduzierte Bewegung: sofort der Endzustand -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .gm-ring *,
+  .gm-flame::after,
+  .gm-bar i,
+  .gm-count > *,
+  .gm-reveal,
+  .gm-pop {
+    animation: none !important;
+    transition: none !important;
+  }
+  .gm-count-old,
+  .gm-flame::after {
+    display: none;
+  }
+}

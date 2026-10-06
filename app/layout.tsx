@@ -5,6 +5,7 @@ import "./operator-brand.css";
 import "./operator-glass.css";
 import "./ranking.css";
 import "./ui.css";
+import "./game.css";
 
 const TITLE = "Deal Operator – Kostenfreie Sales-Community fürs gemeinsame Callen";
 const DESCRIPTION =
