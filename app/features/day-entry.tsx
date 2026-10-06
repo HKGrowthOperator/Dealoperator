@@ -6,7 +6,8 @@ import { rememberSubmitted } from "./submitted-note";
 /**
  * Das Formular unter Mein Tag. Nach dem Einreichen geht es ohne Umweg zu den
  * Ergebnissen des Tages, mit der eigenen Zeile markiert; die Bestätigung
- * steht dort. Korrekturen und Nachträge laufen über dasselbe Formular.
+ * samt Tagesbilanz vom Server steht dort. Korrekturen und Nachträge laufen
+ * über dasselbe Formular.
  */
 export default function DayEntry({
   day,
@@ -29,7 +30,8 @@ export default function DayEntry({
           day: submittedDay,
           unchanged: confirmation.unchanged,
           effect: confirmationEffect(confirmation),
-          levelUps: confirmation.levelUps,
+          counts: confirmation.counts,
+          game: confirmation.game,
           settings,
         });
         router.push(

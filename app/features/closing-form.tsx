@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Trash2,
 } from "lucide-react";
-import { aggregate, emptyCounts, metricLabels, progress, type Counts } from "@/lib/kpis";
+import { metricLabels } from "@/lib/kpis";
 import {
   deadlineFor,
   isDueDay,
@@ -28,6 +28,10 @@ import {
   type DayStatus,
   type Pause,
 } from "@/lib/commitment";
+// Aus der Tagesrunde nur die Ehrlichkeitsfrage: im Formular bewusst keine
+// Marke und keine Ringe (tests/game.test.ts prüft das).
+import { plausibilityHint } from "@/lib/game";
+import type { closingState, SubmitClosingResult } from "@/server/closing";
 import "../commitment.css";
 
 /*
@@ -37,6 +41,10 @@ import "../commitment.css";
  * und bleibt privat; gezählt wird erst, was vollständig eingereicht ist. Bei
  * einer Korrektur bleibt die eingereichte Fassung gültig, bis die neue
  * vollständig eingereicht ist. Die Regeln selbst prüft der Server.
+ *
+ * Wirken die Zahlen unplausibel (mehr Settings als Anwahlen, ein starker
+ * Ausreißer), fragt das Formular vor dem Einreichen einmal nach. Die Frage
+ * bleibt auf dem Gerät und hält nichts auf: „Stimmt so“ reicht unverändert ein.
  */
 
 // ---------------------------------------------------------------------------
@@ -155,6 +163,12 @@ export type ClosingState = {
    * dem ersten eigenen Abschluss). Dann entfällt der Abschnitt dazu.
    */
   visibilityConfirmed: boolean;
+  /**
+   * Tagesrunde (lib/game.ts gameView): Marke, Serie, Woche, Bestwerte und je
+   * Tag die volle Runde. Für Mein Tag, Fortschritt und Tage; das Formular
+   * selbst liest sie nicht. null ohne eigenes Profil oder wenn sie scheitert.
+   */
+  game?: Awaited<ReturnType<typeof closingState>>["game"];
 };
 
 // ---------------------------------------------------------------------------
@@ -483,23 +497,20 @@ export type Confirmation = {
   status: DayStatus;
   /** Aktuelle Abschluss-Serie nach dem Einreichen, falls bekannt. */
   streak: number | null;
-  /** Neu erreichte Leistungslevel, z. B. „Anwahlen auf Level 2“. Nur echte Sprünge. */
-  levelUps: string[];
+  /**
+   * Die eingereichten Zahlen. Die Bilanz auf der Startseite baut daraus ihre
+   * Zahlenzeile sofort, ohne auf die Rangliste zu warten.
+   */
+  counts: Partial<Record<CountKey, number | null>>;
+  /**
+   * Tagesbilanz vom Server (Runde, Serie vorher und nachher, Höhepunkte wie
+   * ein neues Leistungslevel, „Als Nächstes“). Gezeigt wird sie auf der
+   * Startseite, nicht hier. null, wenn der Server keine mitschickt.
+   */
+  game: SubmitClosingResult["game"];
 };
-
-/** Leistungslevel aus allen eigenen Tagesständen (auch übernommenen). */
-function levelsOf(state: ClosingState) {
-  return progress(
-    aggregate(state.closings.map((c) => ({ ...emptyCounts(), ...c.counts }) as Counts)),
-  );
-}
-function levelUps(before: ClosingState, after: ClosingState) {
-  const old = new Map(levelsOf(before).map((t) => [t.id, t.level]));
-  return levelsOf(after)
-    .filter((t) => t.level > (old.get(t.id) ?? 0))
-    .map((t) => `${t.label} auf Level ${t.level}`);
-}
 type FieldKey = CountKey | "energy" | "win" | "next" | "acknowledged";
+type Hint = NonNullable<ReturnType<typeof plausibilityHint>>;
 
 const emptyValues = (): Values => ({
   counts: Object.fromEntries(COUNT_KEYS.map((k) => [k, ""])) as Record<CountKey, string>,
@@ -553,6 +564,28 @@ function toNumber(raw: string): number | null {
   const n = Number(raw);
   return Number.isSafeInteger(n) && n <= 100000 ? n : null;
 }
+
+/**
+ * Ehrlichkeitsfrage zu den eingetippten Zahlen, verglichen mit den eigenen
+ * früheren Tagen (aktuelle Werte genügen für einen Hinweis). Sie darf das
+ * Einreichen nie verhindern: Scheitert sie, gibt es eben keine Frage.
+ */
+function hintFor(state: ClosingState, form: FormState): Hint | null {
+  try {
+    return plausibilityHint(
+      {
+        attempts: toNumber(form.values.counts.attempts),
+        settingsBooked: toNumber(form.values.counts.settingsBooked),
+      },
+      state.closings,
+      form.day,
+    );
+  } catch {
+    return null;
+  }
+}
+/** „Stimmt so“ gilt für genau diese Zahlen an genau diesem Tag. */
+const hintKey = (day: string, hint: Hint) => `${day}|${hint.text}`;
 
 function draftPayload(form: FormState) {
   const v = form.values;
@@ -644,7 +677,7 @@ export default function ClosingForm({
   initial?: ClosingState | null;
   /** Den gewählten Tag in der Adresszeile mitführen (?tag=…). */
   syncUrl?: boolean;
-  /** Nach erfolgreichem Einreichen, mit der Bestätigung (Tag, Folge, Serie, Level). */
+  /** Nach erfolgreichem Einreichen, mit der Bestätigung (Tag, Folge, Serie, Bilanz). */
   onSubmitted?: (
     day: string,
     confirmation: Confirmation,
@@ -670,12 +703,17 @@ export default function ClosingForm({
   const [showOptional, setShowOptional] = useState(false);
   // Die Tagesauswahl erscheint erst auf Wunsch: meistens geht es um heute.
   const [pickDay, setPickDay] = useState(false);
+  // Ehrlichkeitsfrage: steht nach dem ersten Tippen auf Einreichen an der
+  // Stelle des Hauptknopfs, bis sie bestätigt ist oder nicht mehr zutrifft.
+  const [asking, setAsking] = useState(false);
+  const [hintConfirmed, setHintConfirmed] = useState<string | null>(null);
 
   const timer = useRef<number | null>(null);
   const pending = useRef<FormState | null>(null);
   const generation = useRef(0);
   const lastRequest = useRef<{ hash: string; key: string } | null>(null);
   const confirmRef = useRef<HTMLDivElement | null>(null);
+  const hintRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const fresh = await fetchClosingState(undefined, signal);
@@ -853,6 +891,9 @@ export default function ClosingForm({
     }
     if (field) setTouched((t) => (t.has(field) ? t : new Set(t).add(field)));
     setConfirmation(null);
+    // Neu prüfen: Trifft die Frage nicht mehr zu, steht wieder der Hauptknopf;
+    // beim nächsten Einreichen wird erneut gefragt.
+    if (asking && state && !hintFor(state, next)) setAsking(false);
   }
   const blur = (field: FieldKey) =>
     setTouched((t) => (t.has(field) ? t : new Set(t).add(field)));
@@ -875,6 +916,8 @@ export default function ClosingForm({
     setConflict(false);
     setConfirmDiscard(false);
     setConfirmation(null);
+    setAsking(false);
+    setHintConfirmed(null);
     setDraftStatus({ kind: "idle" });
     lastRequest.current = null;
     if (syncUrl)
@@ -897,6 +940,7 @@ export default function ClosingForm({
       );
       setConflict(false);
       setServerError("");
+      setAsking(false);
       setDraftStatus({ kind: "idle" });
       lastRequest.current = null;
     } catch (e) {
@@ -918,6 +962,7 @@ export default function ClosingForm({
       setForm(formFor(fresh, form.day));
       setAttempted(false);
       setTouched(new Set());
+      setAsking(false);
       setDraftStatus({ kind: "idle" });
       setConfirmDiscard(false);
       setServerError("");
@@ -928,8 +973,13 @@ export default function ClosingForm({
     }
   }
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    void send(false);
+  }
+
+  /** Einreichen; `confirmed`: die Ehrlichkeitsfrage ist mit „Stimmt so“ beantwortet. */
+  async function send(confirmed: boolean) {
     if (!form || !state) return;
     setAttempted(true);
     setServerError("");
@@ -943,6 +993,16 @@ export default function ClosingForm({
       return;
     }
     if (!canSubmit) return;
+    // Ehrlichkeitsfrage, nur auf dem Gerät: nichts geht an den Server, nichts
+    // wird gespeichert. Einmal mit „Stimmt so“ bestätigt, fragt sie für
+    // dieselben Zahlen nicht noch einmal.
+    const question = confirmed ? null : hintFor(state, form);
+    if (question && hintKey(form.day, question) !== hintConfirmed) {
+      setAsking(true);
+      window.setTimeout(() => hintRef.current?.focus(), 0);
+      return;
+    }
+    setAsking(false);
     // Laufendes automatisches Speichern ist ab hier überholt.
     generation.current++;
     pending.current = null;
@@ -968,10 +1028,10 @@ export default function ClosingForm({
     setBusy(true);
     setConflict(false);
     try {
-      const result = await postJson<{ ok: boolean; revision: number; unchanged?: boolean }>(
-        "/api/closing",
-        { action: "submit", value: { ...value, idempotencyKey: key } },
-      );
+      const result = await postJson<SubmitClosingResult>("/api/closing", {
+        action: "submit",
+        value: { ...value, idempotencyKey: key },
+      });
       lastRequest.current = null;
       let fresh: ClosingState | null = null;
       try {
@@ -987,12 +1047,16 @@ export default function ClosingForm({
           ? formFor(fresh, form.day)
           : { ...form, baseRevision: result.revision, dirty: false, acknowledged: false, draftAt: null },
       );
+      // Status und Serie aus dem frischen Stand; klappt das Neuladen nicht,
+      // aus der Bilanz des Servers (dasselbe summarize()).
+      const game = result.game ?? null;
       const confirmation: Confirmation = {
         day: form.day,
         unchanged: !!result.unchanged,
-        status: fresh ? statusOf(fresh, form.day) : "free",
-        streak: fresh?.summary?.streak.current ?? null,
-        levelUps: fresh ? levelUps(state, fresh) : [],
+        status: fresh ? statusOf(fresh, form.day) : (game?.status ?? "free"),
+        streak: fresh?.summary?.streak.current ?? game?.streak.after.current ?? null,
+        counts: value.counts,
+        game,
       };
       setConfirmation(confirmation);
       setAttempted(false);
@@ -1023,6 +1087,10 @@ export default function ClosingForm({
       return { tone: "error", text: `Entwurf nicht gespeichert: ${s.message}` };
     return null;
   })();
+
+  // Die Ehrlichkeitsfrage, neu geprüft mit jedem geänderten Wert.
+  const hint = asking ? hintFor(state, form) : null;
+  const question = hint && hintKey(form.day, hint) !== hintConfirmed ? hint : null;
 
   // Stand des Tages in einem Wort: eingereicht, Entwurf, unvollständig, offen.
   const incomplete = attempted && Object.keys(errors).length > 0;
@@ -1098,7 +1166,7 @@ export default function ClosingForm({
             required={required}
             aria-required={required}
             aria-invalid={!!error}
-            aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`}
+            aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}${question?.field === k ? ` ${uid}-question` : ""}`}
             placeholder={required ? "Zahl" : ""}
             value={form.values.counts[k]}
             disabled={!canDraft || busy}
@@ -1237,12 +1305,6 @@ export default function ClosingForm({
                 Deine Reflexion steht unter Mein Tag bei den anderen, mit deinen Zahlen.
               </li>
             </ul>
-          )}
-          {confirmed.levelUps.length > 0 && (
-            <p className="md-level-up">
-              Neues Leistungslevel: {confirmed.levelUps.join(", ")}.{" "}
-              <Link href="/heute?modus=eigen">Mein Fortschritt</Link>
-            </p>
           )}
           <div className="md-confirm-actions">
             <Link className="do-button do-button-primary" href="/">
@@ -1459,18 +1521,61 @@ export default function ClosingForm({
                 Einreichen geht, sobald oben alles erledigt ist.
               </p>
             )}
-            <button
-              type="submit"
-              className="do-button do-button-primary md-submit-button"
-              disabled={busy || !canSubmit || conflict}
-            >
-              {busy ? (
-                <LoaderCircle className="spin" size={17} aria-hidden="true" />
-              ) : (
-                <Check size={17} aria-hidden="true" />
-              )}
-              {submitted ? "Korrektur einreichen" : "Tagesabschluss einreichen"}
-            </button>
+            {question ? (
+              // Ehrlichkeitsfrage an der Stelle des Hauptknopfs, ohne Symbol
+              // davor: so stehen beide Knöpfe ab 360 px nebeneinander.
+              <div
+                ref={hintRef}
+                className="cm-alert warn"
+                role="group"
+                aria-labelledby={`${uid}-question`}
+                tabIndex={-1}
+              >
+                <div>
+                  <p id={`${uid}-question`}>{question.text}</p>
+                  <div className="cm-actions">
+                    <button
+                      type="button"
+                      className="do-button do-button-primary"
+                      disabled={busy || conflict}
+                      onClick={() => {
+                        setHintConfirmed(hintKey(form.day, question));
+                        void send(true);
+                      }}
+                    >
+                      {question.confirm}
+                    </button>
+                    <button
+                      type="button"
+                      className="do-button do-button-secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        const field = document.getElementById(`${uid}-${question.field}`);
+                        if (field instanceof HTMLInputElement) {
+                          field.focus();
+                          field.select();
+                        }
+                      }}
+                    >
+                      {question.correct}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="submit"
+                className="do-button do-button-primary md-submit-button"
+                disabled={busy || !canSubmit || conflict}
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={17} aria-hidden="true" />
+                ) : (
+                  <Check size={17} aria-hidden="true" />
+                )}
+                {submitted ? "Korrektur einreichen" : "Tagesabschluss einreichen"}
+              </button>
+            )}
           </div>
         </form>
       ) : null}

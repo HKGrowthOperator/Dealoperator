@@ -15,6 +15,8 @@ export type TodayStatus = "open" | "draft" | "done" | "imported";
  * zu den Ergebnissen. Ist der Tag eingereicht oder übernommen, steht oben der
  * kurze Stand mit dem Weg zur Korrektur und darunter, was bei den anderen
  * lief. An Tagen ohne Calling-Pflicht geht es auch ohne eigenen Eintrag weiter.
+ * War der Tag eine volle Runde (Marke erreicht, rechtzeitig eingereicht),
+ * steht das vorn am Stand; die Höhepunkte zeigt nur die Startseite.
  */
 export default function DayView({
   closing,
@@ -25,7 +27,10 @@ export default function DayView({
   summary,
   progress,
 }: {
-  /** Vorgeladener Stand des Tagesabschlusses (das Formular lädt sonst selbst). */
+  /**
+   * Vorgeladener Stand des Tagesabschlusses (das Formular lädt sonst selbst).
+   * Steht der Tag schon, liefert ihn die Seite für die Pille „Volle Runde“ mit.
+   */
   closing: ClosingState | null;
   /** Vorgeladene Beiträge, wenn der eigene Tag schon steht. */
   feed: ReflectionFeedData | null;
@@ -43,6 +48,12 @@ export default function DayView({
   const [skipped, setSkipped] = useState(false);
   const pending = status !== "done" && status !== "imported" && !skipped;
 
+  // Volle Runde aus der Tagesrunde (closingState().game, von der Seite
+  // vorgeladen). Fehlt der Stand, entfällt nur die Pille; kein eigener Abruf,
+  // den lädt DayProgress schon. Übernommene Tage sind nie eine volle Runde.
+  const fullRound =
+    status === "done" && closing?.game?.days.some((d) => d.day === today && d.fullRound) === true;
+
   if (pending)
     return (
       <>
@@ -55,7 +66,8 @@ export default function DayView({
               day,
               unchanged: confirmation.unchanged,
               effect: confirmationEffect(confirmation),
-              levelUps: confirmation.levelUps,
+              counts: confirmation.counts,
+              game: confirmation.game,
               settings,
             });
             // Direkt dorthin, wo der Tag zählt: die Ergebnisse, eigene Zeile markiert.
@@ -81,6 +93,13 @@ export default function DayView({
         <section className="rf-done" role="status">
           <CircleCheck size={20} aria-hidden="true" />
           <div>
+            {fullRound && (
+              <div className="gm-pill-line">
+                <span className="gm-pill" data-tone="full">
+                  Volle Runde<span className="cm-sr">.</span>
+                </span>
+              </div>
+            )}
             <strong>Dein Tag ist drin{summary ? `: ${summary}.` : "."}</strong>
             <p>
               <Link href={`/tagesabschluss?tag=${today}`}>
