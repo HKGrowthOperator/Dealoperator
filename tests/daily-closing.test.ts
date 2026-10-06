@@ -26,8 +26,15 @@ import { commitWins, previewWins, resolveReviewCase } from "../server/wins-impor
 import { decidePause } from "../server/admin";
 import { noteConfirmedAccount } from "../server/onboarding";
 import { syncDiscord } from "../server/discord-sync";
-import { berlinDate } from "../lib/kpis";
-import { defaultCommitmentSettings, zonedTime } from "../lib/commitment";
+import { berlinDate, emptyCounts } from "../lib/kpis";
+import {
+  addDays,
+  defaultCommitmentSettings,
+  isDueDay,
+  previousDueDay,
+  zonedTime,
+} from "../lib/commitment";
+import { homeState } from "../server/home";
 
 // Fiktive Konten; keine echten Kontaktdaten.
 const admin = { userId: "admin", email: "admin@example.invalid", admin: true };
@@ -545,4 +552,181 @@ test("a confirmed registration is only information: the inbox entry starts resol
   );
   const [open] = await db.query("SELECT resolved_at FROM team_inbox WHERE dedupe_key='pause:x'");
   assert.equal(open.resolved_at, null);
+});
+
+// ---------------------------------------------------------------------------
+// Tagesrunde: die Bilanz kommt mit der Antwort von submitClosing.
+
+const TZ = "Europe/Berlin";
+const S = defaultCommitmentSettings;
+/** Der jüngste Calling-Tag bis heute. Seine Frist läuft noch, egal an welchem Wochentag. */
+const openDay = () => (isDueDay(today(), S) ? today() : previousDueDay(today(), S)!);
+/** n Calling-Tage vor `day`, der früheste zuerst. */
+function dueDaysBefore(day: string, n: number) {
+  const out: string[] = [];
+  for (let d = previousDueDay(day, S); out.length < n; d = previousDueDay(d!, S)) out.unshift(d!);
+  return out;
+}
+const fullCounts = (c: Record<string, number | null>) => JSON.stringify({ ...emptyCounts(), ...c });
+/** Ein früherer eigener Abschluss mit Fassung, eingereicht um `at` (sonst 20:00 am Tag selbst). */
+async function pastClosing(participant: string, day: string, c: Record<string, number | null>, at = zonedTime(day, 20, 0, TZ)) {
+  await db.query(
+    `INSERT INTO checkins(participant,day,counts,reflection,revision,source,origin,first_submitted_at,submitted_at,shared,calls_documented_at)
+     VALUES($1,$2,$3::jsonb,'{}',1,'website','closing',$4,$4,true,$5)`,
+    [participant, day, fullCounts(c), at.toISOString(), (c.attempts ?? 0) > 0 ? at.toISOString() : null],
+  );
+  await db.query(
+    "INSERT INTO checkin_revisions(participant,day,revision,counts,actor,source,created_at) VALUES($1,$2,1,$3::jsonb,'test','website',$4)",
+    [participant, day, fullCounts(c), at.toISOString()],
+  );
+}
+async function startsOn(participant: string, day: string) {
+  await db.query("UPDATE participants SET eligible_since=$2 WHERE id=$1", [
+    participant,
+    zonedTime(day, 8, 0, TZ).toISOString(),
+  ]);
+}
+
+test("first submission: game with round, streak before and after, at most two highlights in fixed order", async () => {
+  const id = await member(alice, "Alice");
+  const day = openDay();
+  const history = dueDaysBefore(day, 4);
+  await startsOn(id, history[0]);
+  // Ein großer übernommener Tag vor über 60 Tagen: kein neuer Bestwert möglich,
+  // nicht in der Basis der Marke, und die Anwahlen springen kein Level.
+  await db.query(
+    "INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,$3::jsonb,'owner-import','import')",
+    [id, addDays(day, -70), fullCounts({ attempts: 6000 })],
+  );
+  for (const d of history) await pastClosing(id, d, { attempts: 40, settingsBooked: 1, closingsBooked: 0 });
+  const value = closing({ day, counts: { attempts: 40, settingsBooked: 1, closingsBooked: 0 } });
+  const result = await submitClosing(db, alice, value);
+  assert.equal(result.revision, 1);
+  const game = result.game!;
+  assert.equal(game.day, day);
+  assert.equal(game.status, "called");
+  assert.deepEqual(game.round, { mark: 50, attempts: 40, markReached: false, onTime: true, full: false, imported: false });
+  assert.deepEqual(game.streak, { before: { current: 4, best: 4 }, after: { current: 5, best: 5 } });
+  // Etappe vor Leistungslevel; der Monatsplatz käme erst danach und fällt weg.
+  assert.deepEqual(
+    game.highlights,
+    [
+      { kind: "etappe", title: "5 Tage Serie.", detail: "Eine ganze Calling-Woche, jeder Tag rechtzeitig. So lang wie nie." },
+      { kind: "level", title: "Neues Leistungslevel: Settings auf Level 1.", detail: "" },
+    ],
+  );
+  assert.deepEqual(game.nextStep, { kind: "etappe", text: "Als Nächstes: Etappe 10 Tage Serie, noch 5 rechtzeitige Abschlüsse.", etappe: 10 });
+
+  // Wiederholung mit gleichem Schlüssel: dieselbe Antwort samt Bilanz.
+  assert.deepEqual(await submitClosing(db, alice, value), result);
+
+  // Korrektur: Marke, Serie und Folge, aber keine Höhepunkte, auch wenn sie
+  // einen Bestwert und ein Level überschreiten würde.
+  const corrected = closing({ day, expectedRevision: 1, counts: { attempts: 9000, settingsBooked: 1, closingsBooked: 0 } });
+  const correction = await submitClosing(db, alice, corrected);
+  assert.equal(correction.revision, 2);
+  assert.deepEqual(correction.game!.highlights, []);
+  assert.equal(correction.game!.round?.markReached, true);
+  assert.deepEqual(correction.game!.streak.after, { current: 5, best: 5 });
+
+  // Unverändert: keine neue Fassung, keine Höhepunkte, Stand wie gehabt.
+  const unchanged = await submitClosing(db, alice, { ...corrected, expectedRevision: 2, idempotencyKey: randomUUID() });
+  assert.equal(unchanged.unchanged, true);
+  assert.equal(unchanged.revision, 2);
+  assert.deepEqual(unchanged.game!.highlights, []);
+  assert.deepEqual(unchanged.game!.streak.before, unchanged.game!.streak.after);
+
+  // Mein Tag und die Startseite rechnen dieselbe Serie wie summary.
+  const state = await closingState(db, alice, today().slice(0, 7));
+  assert.deepEqual(state.game?.streak.current, state.summary?.streak.current);
+  assert.deepEqual(state.game?.streak.best, state.summary?.streak.best);
+  const home = await homeState(db, alice, today(), new Date(), { game: true });
+  assert.deepEqual(home.game?.streak, state.game?.streak);
+});
+
+test("a replaced wins import counts as the first submission; the month place before uses the imported numbers", async () => {
+  const id = await member(alice, "Alice");
+  const day = openDay();
+  await db.query("UPDATE participants SET eligible_since=now()-interval '10 days' WHERE id=$1", [id]);
+  const imported = (participant: string, attempts: number) =>
+    db.query(
+      "INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,$2,$3::jsonb,'wins-import','import')",
+      [participant, day, fullCounts({ attempts, settingsBooked: 0, closingsBooked: 0 })],
+    );
+  await imported(id, 70);
+  for (const [name, attempts] of [["Bert", 80], ["Carl", 75]] as const) {
+    const other = randomUUID();
+    await db.query("INSERT INTO participants(id,name) VALUES($1,$2)", [other, name]);
+    await imported(other, attempts);
+  }
+  const result = await submitClosing(
+    db,
+    alice,
+    closing({ day, expectedRevision: 1, counts: { attempts: 78, settingsBooked: 0, closingsBooked: 0 } }),
+  );
+  // Vorher Platz 3 mit den übernommenen 70, danach Platz 2. Ohne die
+  // Import-Zahlen wäre es ein Neueinstieg aufs Podium.
+  assert.deepEqual(result.game!.highlights.map((h) => h.kind), ["place"]);
+  assert.match(result.game!.highlights[0].title, /^Dein Tag hat dich im \S+ von Platz 3 auf Platz 2 gebracht\.$/);
+  assert.equal(result.game!.round?.imported, false);
+});
+
+test("a late submission: no etappe, the streak stays, a new best still counts", async () => {
+  const id = await member(alice, "Alice");
+  // Die Frist dieses Tages ist sicher vorbei.
+  const late = previousDueDay(previousDueDay(today(), S)!, S)!;
+  const history = dueDaysBefore(late, 5);
+  await startsOn(id, history[0]);
+  for (const d of history) await pastClosing(id, d, { attempts: 40, settingsBooked: 0, closingsBooked: 0 });
+  const result = await submitClosing(
+    db,
+    alice,
+    closing({ day: late, counts: { attempts: 400, settingsBooked: 0, closingsBooked: 0 } }),
+  );
+  const game = result.game!;
+  assert.equal(game.status, "late");
+  assert.deepEqual(game.streak.after, game.streak.before);
+  assert.equal(game.round?.full, false);
+  const kinds = game.highlights.map((h) => h.kind);
+  assert.ok(!kinds.includes("etappe") && !kinds.includes("streak-best"));
+  assert.equal(game.highlights[0].title, "Neuer Bestwert: 400 Anwahlen an einem Tag.");
+});
+
+test("a day with 0 calls still extends the streak", async () => {
+  const id = await member(alice, "Alice");
+  const day = openDay();
+  const [previous] = dueDaysBefore(day, 1);
+  await startsOn(id, previous);
+  await pastClosing(id, previous, { attempts: 30, settingsBooked: 0, closingsBooked: 0 });
+  const result = await submitClosing(db, alice, closing({ day, counts: { attempts: 0, settingsBooked: 0, closingsBooked: 0 } }));
+  assert.equal(result.game!.status, "reflected");
+  assert.equal(result.game!.streak.after.current, result.game!.streak.before.current + 1);
+  assert.equal(result.game!.round?.full, false);
+});
+
+test("level ups are computed on the server from the current numbers of all own days, as the form did", async () => {
+  const id = await member(alice, "Alice");
+  const earlier = previousDueDay(previousDueDay(today(), S)!, S)!;
+  await startsOn(id, earlier);
+  await pastClosing(id, earlier, { attempts: 10, settingsBooked: 0, closingsBooked: 0 });
+  // Nach der Frist auf 90 erhöht: für das Spiel zählen 10, für die Level 90.
+  const after = new Date(zonedTime(previousDueDay(today(), S)!, 10, 0, TZ).getTime() + 3_600_000).toISOString();
+  await db.query(
+    "UPDATE checkins SET counts=$3::jsonb,revision=2,submitted_at=$4 WHERE participant=$1 AND day=$2",
+    [id, earlier, fullCounts({ attempts: 90, settingsBooked: 0, closingsBooked: 0 }), after],
+  );
+  await db.query(
+    "INSERT INTO checkin_revisions(participant,day,revision,counts,actor,source,created_at) VALUES($1,$2,2,$3::jsonb,'test','website',$4)",
+    [id, earlier, fullCounts({ attempts: 90, settingsBooked: 0, closingsBooked: 0 }), after],
+  );
+  const result = await submitClosing(
+    db,
+    alice,
+    closing({ day: openDay(), counts: { attempts: 20, settingsBooked: 0, closingsBooked: 0 } }),
+  );
+  assert.deepEqual(result.game!.highlights[0], {
+    kind: "level",
+    title: "Neues Leistungslevel: Anwahlen auf Level 1.",
+    detail: "",
+  });
 });

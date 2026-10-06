@@ -13,6 +13,7 @@ import {
   type Counts,
 } from "../lib/kpis";
 import { summarize, type Closing, type ImportedDay } from "../lib/commitment";
+import { gameMoments, gameView, withSubmitted, type GameMoments } from "../lib/game";
 import { teamEvent } from "./notify";
 import {
   approvedPauses,
@@ -20,6 +21,8 @@ import {
   loadCommitmentSettings,
   trackingStart,
 } from "./settings";
+import { loadGameInputs } from "./game";
+import { loadRankingRecords } from "./ranking-history";
 
 /**
  * Der Tagesabschluss: Zahlen und Reflexion gemeinsam.
@@ -293,7 +296,43 @@ export function replaceableImport(row: { origin?: string; source?: string }) {
   return row.origin === "import" && row.source === "wins-import";
 }
 
-export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
+/**
+ * Antwort auf das Einreichen. `game` ist die Tagesbilanz (lib/game.ts
+ * gameMoments): Runde, Serie vorher und nachher, höchstens zwei Höhepunkte
+ * (nur bei der ersten Einreichung eines Tages) und „Als Nächstes“. Ohne
+ * neue Fassung (unchanged) und bei Korrekturen ohne Höhepunkte.
+ */
+export type SubmitClosingResult = {
+  ok: true;
+  revision: number;
+  /** Nur mit neuer Fassung: erste vollständige Einreichung, ISO. */
+  firstSubmittedAt?: string;
+  /** Inhaltlich gleich eingereicht: keine neue Fassung. */
+  unchanged?: true;
+  game: GameMoments | null;
+};
+
+/**
+ * Die Tagesrunde darf ein Einreichen oder Mein Tag nie verhindern: scheitert
+ * sie, fehlt nur die Bilanz bzw. der Spielstand, die Zahlen zählen trotzdem.
+ */
+async function quietly<T>(work: () => T | Promise<T>): Promise<T | null> {
+  try {
+    return await work();
+  } catch (error) {
+    console.error(
+      "Tagesrunde:",
+      error instanceof z.ZodError ? "gespeicherte Zahlen nicht lesbar" : (error as Error).message,
+    );
+    return null;
+  }
+}
+
+export async function submitClosing(
+  db: Database,
+  actor: Actor,
+  raw: unknown,
+): Promise<SubmitClosingResult> {
   const v = submitSchema.parse(raw);
   if (v.day > berlinDate())
     throw new AppError("Ein Tagesabschluss für einen künftigen Tag ist nicht möglich.");
@@ -331,6 +370,14 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
         "Für diesen Tag gibt es inzwischen einen neueren Stand. Lade ihn und prüfe deine Eingabe erneut.",
         409,
       );
+    // Tagesrunde: der Stand vor dem Schreiben, im selben Transaktionsblock.
+    // Erste Einreichung heißt: noch kein eigener Abschluss (ein ersetzter
+    // Wins-Import gilt als erste). Nur dann gibt es Höhepunkte, und nur
+    // dann braucht es die Monatszeilen für den eigenen Platz.
+    const before = await quietly(() => loadGameInputs(tx, participant, { settings }));
+    const firstSubmission = old?.origin !== "closing";
+    const monthRecords =
+      before && firstSubmission ? await quietly(() => loadRankingRecords(tx, v.day.slice(0, 7))) : null;
     // Termine ohne Typangabe und Entscheidergespräche nimmt das Formular
     // nicht mehr an; vorhandene Werte eines früheren Abschlusses bleiben
     // stehen. Ein ersetzter Import-Tag gibt keine Werte weiter: es gilt
@@ -360,7 +407,24 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
         );
         await outbox(tx, participant);
       }
-      return { ok: true, revision: old.revision as number, unchanged: true };
+      return {
+        ok: true,
+        revision: old.revision as number,
+        unchanged: true,
+        // Nichts Neues: Marke, Serie und Folge wie gehabt, keine Höhepunkte.
+        game: before
+          ? await quietly(() =>
+              gameMoments({
+                before,
+                after: before,
+                day: v.day,
+                firstSubmission: false,
+                participantId: participant,
+                now: new Date(),
+              }),
+            )
+          : null,
+      };
     }
     const revision = (old?.revision || 0) + 1;
     // Fristgerecht ist, was ZUERST vollständig einging. Eine spätere
@@ -378,7 +442,7 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
          -- Ein ersetzter Import-Tag hat noch keine erste Einreichung.
          first_submitted_at=COALESCE(checkins.first_submitted_at, excluded.first_submitted_at)
        WHERE checkins.origin='closing' OR (checkins.origin='import' AND checkins.source='wins-import')
-       RETURNING revision, first_submitted_at, submitted_at`,
+       RETURNING revision, first_submitted_at, submitted_at, calls_documented_at`,
       [participant, v.day, JSON.stringify(counts), JSON.stringify(reflection), revision, (counts.attempts ?? 0) > 0],
     );
     await tx.query(
@@ -402,10 +466,37 @@ export async function submitClosing(db: Database, actor: Actor, raw: unknown) {
         body: `${v.day}: ${reflection.help}`.slice(0, 1600),
         alert: false,
       });
+    const firstSubmittedAt = new Date(row.first_submitted_at).toISOString();
+    // Der Stand danach ohne zweite Abfrage: die eine Tageszeile wird im
+    // Speicher ersetzt. Die Antwort läuft durch once(); eine Wiederholung mit
+    // gleichem Schlüssel liefert dieselbe Bilanz.
+    const game = before
+      ? await quietly(() =>
+          gameMoments({
+            before,
+            after: withSubmitted(before, {
+              day: v.day,
+              counts,
+              submittedAt: new Date(row.submitted_at).toISOString(),
+              firstSubmittedAt,
+              callsDocumentedAt: row.calls_documented_at
+                ? new Date(row.calls_documented_at).toISOString()
+                : null,
+            }),
+            day: v.day,
+            firstSubmission,
+            monthRecords,
+            oldCounts: old ? old.counts : null,
+            participantId: participant,
+            now: new Date(),
+          }),
+        )
+      : null;
     return {
       ok: true,
       revision: row.revision as number,
-      firstSubmittedAt: new Date(row.first_submitted_at).toISOString(),
+      firstSubmittedAt,
+      game,
     };
   });
 }
@@ -480,8 +571,9 @@ export async function closingState(
       firstClosableDay: null,
       pauses: [],
       visibilityConfirmed: false,
+      game: null,
     };
-  const [rows, drafts, pauses, pending] = await Promise.all([
+  const [rows, drafts, pauses, pending, inputs] = await Promise.all([
     ownClosings(db, e.participant.id),
     db.query(
       `SELECT d.day,d.counts,d.reflection,d.updated_at,d.base_revision FROM checkin_drafts d
@@ -497,6 +589,7 @@ export async function closingState(
       "SELECT id,from_day,to_day,reason,status FROM pauses WHERE participant=$1 ORDER BY from_day DESC LIMIT 20",
       [e.participant.id],
     ),
+    loadGameInputs(db, e.participant.id, { settings }),
   ]);
   const from = `${month}-01`;
   const last = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0))
@@ -564,6 +657,12 @@ export async function closingState(
      * hier aus den ohnehin geladenen Zeilen.
      */
     visibilityConfirmed: rows.some((r) => r.origin === "closing"),
+    /**
+     * Tagesrunde: Marke und Runde heute, Serie (dasselbe summarize() wie
+     * summary), Woche, Bestwerte und je Tag volle Runde, Bestwerte und
+     * Abweichungen vom Stand bis zur Frist. Nur für die Person selbst.
+     */
+    game: inputs ? await quietly(() => gameView(inputs, now)) : null,
   };
 }
 

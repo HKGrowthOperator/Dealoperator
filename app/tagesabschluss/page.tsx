@@ -78,13 +78,22 @@ export default async function Page({
       due = home.today?.due ?? true;
       const settled = !day && (status === "done" || status === "imported");
       if (settled) {
-        // Der eigene Tag steht: die anderen lesen; das Formular braucht es nicht.
-        const [row] = await db.query(
-          "SELECT counts FROM checkins WHERE participant=$1 AND day=$2",
-          [home.participant!.id, today],
-        );
+        // Der eigene Tag steht: die anderen lesen; das Formular braucht es
+        // nicht. Der Stand des Abschlusses reicht trotzdem einmal mit, für die
+        // Pille „Volle Runde“ und für Serie und Level am Ende; so lädt der
+        // Browser ihn nicht zweimal nach. Scheitert nur er, lädt DayProgress
+        // selbst, die Beiträge stehen trotzdem.
+        const [[row], loaded, closing] = await Promise.all([
+          db.query("SELECT counts FROM checkins WHERE participant=$1 AND day=$2", [
+            home.participant!.id,
+            today,
+          ]),
+          reflectionFeed(db, actor, {}),
+          closingState(db, actor, today.slice(0, 7)).catch(() => null),
+        ]);
         summary = summaryOf(row?.counts as Record<string, unknown> | undefined);
-        feed = JSON.parse(JSON.stringify(await reflectionFeed(db, actor, {}))) as ReflectionFeedData;
+        feed = JSON.parse(JSON.stringify(loaded)) as ReflectionFeedData;
+        initial = closing ? (JSON.parse(JSON.stringify(closing)) as ClosingState) : null;
       } else {
         initial = JSON.parse(
           JSON.stringify(await closingState(db, actor, today.slice(0, 7))),

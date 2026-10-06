@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { Database } from "../server/database";
 import { homeState } from "../server/home";
+import { closingState } from "../server/closing";
 import { latestPublicDay } from "../server/ranking-history";
 import { safeNext } from "../lib/navigation";
 
@@ -19,7 +20,7 @@ before(async () => {
   db = new Database(pg as any, (fn) => pg.transaction((tx) => fn(new Database(tx as any))));
 });
 beforeEach(async () => {
-  await pg.exec("TRUNCATE participants,onboarding_requests,pauses,app_settings CASCADE");
+  await pg.exec("TRUNCATE participants,onboarding_requests,pauses,app_settings,profiles CASCADE");
   await db.query(
     `INSERT INTO participants(id,name,owner,public_consent,claimed_at,eligible_since,kind)
      VALUES('p-alice','Alice Beispiel','alice',true,now(),'2026-09-01T08:00:00Z','person')`,
@@ -112,4 +113,85 @@ test("login without a target goes to the shared homepage", () => {
   assert.equal(safeNext(null), "/");
   assert.equal(safeNext(""), "/");
   assert.equal(safeNext("/?day=2026-09-22&metric=attempts"), "/?day=2026-09-22&metric=attempts");
+});
+
+// ---------------------------------------------------------------------------
+// Tagesrunde: nur auf Anforderung (Startseite), sonst bleibt der Kopf schlank.
+
+test("the daily round is only computed on request", async () => {
+  const plain = await homeState(db, alice, "2026-09-24", thursday);
+  assert.equal("game" in plain, false);
+  const s = await homeState(db, alice, "2026-09-24", thursday, { game: true });
+  assert.ok(s.game);
+  assert.equal(s.game.free, false);
+  assert.equal(s.game.paused, false);
+  // Neues Konto ohne gemeldete Tage: die erste Marke ist 50.
+  assert.deepEqual(s.game.mark, { mark: 50, basisDays: 0, comeback: null });
+  assert.deepEqual(s.game.round, {
+    mark: 50,
+    attempts: null,
+    markReached: false,
+    onTime: false,
+    full: false,
+    imported: false,
+  });
+  assert.equal(s.game.todayStatus, "open");
+  // Frist Freitag 10:00 in Berlin.
+  assert.equal(s.game.deadline, "2026-09-25T08:00:00.000Z");
+  assert.equal(s.game.streak.current, 0);
+  assert.equal(s.game.streak.flame, "none");
+  assert.deepEqual(s.game.week, { attempts: 0, goal: null, reached: false });
+  // Ohne Profil gibt es keine Tagesrunde.
+  assert.equal((await homeState(db, newbie, "2026-09-24", thursday, { game: true })).game, undefined);
+});
+
+test("no mark on free days, in pauses and without access to the daily closing", async () => {
+  const saturday = await homeState(db, alice, "2026-09-26", new Date("2026-09-26T12:00:00Z"), { game: true });
+  assert.equal(saturday.game?.free, true);
+  assert.equal(saturday.game?.mark, null);
+  assert.equal(saturday.game?.round, null);
+  assert.equal(saturday.game?.deadline, null);
+  await db.query(
+    `INSERT INTO pauses(id,participant,from_day,to_day,status,requested_by)
+     VALUES('pause-1','p-alice','2026-09-23','2026-09-25','approved','alice')`,
+  );
+  const paused = await homeState(db, alice, "2026-09-24", thursday, { game: true });
+  assert.equal(paused.game?.paused, true);
+  assert.equal(paused.game?.free, false);
+  assert.equal(paused.game?.mark, null);
+  assert.equal(paused.game?.streak.paused, true);
+  assert.equal(paused.game?.streak.flame, "paused");
+  await db.query("DELETE FROM pauses");
+  await db.query("UPDATE participants SET eligible_since=NULL WHERE id='p-alice'");
+  const locked = await homeState(db, alice, "2026-09-24", thursday, { game: true });
+  assert.equal(locked.game?.mark, null);
+  assert.equal(locked.game?.round, null);
+});
+
+test("week: own numbers against the weekly goal from the profile", async () => {
+  await db.query("INSERT INTO profiles(id,data) VALUES('alice',$1)", [
+    JSON.stringify({ name: "Alice Beispiel", goal: 500, days: [1, 2, 3, 4, 5] }),
+  ]);
+  await closed("2026-09-22");
+  await closed("2026-09-24");
+  const s = await homeState(db, alice, "2026-09-24", thursday, { game: true });
+  assert.deepEqual(s.game?.week, { attempts: 80, goal: 500, reached: false });
+  // Der Sonntag davor gehört zur Vorwoche.
+  await closed("2026-09-20");
+  assert.equal((await homeState(db, alice, "2026-09-24", thursday, { game: true })).game?.week.attempts, 80);
+});
+
+test("home and Mein Tag show the same streak", async () => {
+  for (const day of ["2026-09-21", "2026-09-22", "2026-09-23"])
+    await db.query(
+      `INSERT INTO checkins(participant,day,counts,source,origin,first_submitted_at,submitted_at,calls_documented_at)
+       VALUES('p-alice',$1,$2,'website','closing',$3,$3,$3)`,
+      [day, counts, `${day}T18:00:00Z`],
+    );
+  await db.query("UPDATE participants SET eligible_since='2026-09-21T06:00:00Z' WHERE id='p-alice'");
+  const home = await homeState(db, alice, "2026-09-24", thursday, { game: true });
+  const state = await closingState(db, alice, "2026-09", thursday);
+  assert.equal(home.game?.streak.current, 3);
+  assert.deepEqual(home.game?.streak, state.game?.streak);
+  assert.equal(state.summary?.streak.current, 3);
 });

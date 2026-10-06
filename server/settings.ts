@@ -3,10 +3,19 @@ import type { Database } from "./database";
 import {
   addDays,
   defaultCommitmentSettings,
+  isoWeekday,
   localDay,
   type CommitmentSettings,
   type Pause,
 } from "../lib/commitment";
+import { berlinDate, calendarDaySchema } from "../lib/kpis";
+import {
+  COMMUNITY_GOAL_ENTRIES,
+  COMMUNITY_GOAL_MAX,
+  COMMUNITY_GOAL_MIN,
+  weekStartOf,
+  type CommunitySettings,
+} from "../lib/game";
 
 /**
  * Startwerte der Dranbleiben-Regeln, überschreibbar über app_settings
@@ -111,4 +120,88 @@ export function firstClosableDay(
   settings: CommitmentSettings,
 ): string | null {
   return eligibleSince ? localDay(new Date(eligibleSince), settings.timeZone) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Gemeinsames Wochenziel aller Anwahlen (app_settings, Schlüssel „community“).
+
+/**
+ * Teamwerte je Woche: ein Eintrag gilt ab seinem Montag, bis ein neuerer
+ * Eintrag folgt. Ohne Eintrag oder mit leerem Eintrag (attempts null, „ab
+ * hier automatisch“) rechnet lib/game.ts das Ziel aus den Wochen davor.
+ * Ungültige gespeicherte Werte fallen auf die Automatik zurück, statt die
+ * Startseite anzuhalten.
+ */
+const goalAttempts = z
+  .number({ invalid_type_error: "Bitte eine Zahl eintragen." })
+  .int("Bitte eine ganze Zahl eintragen.")
+  .min(COMMUNITY_GOAL_MIN, "Das gemeinsame Wochenziel liegt zwischen 500 und 200.000 Anwahlen.")
+  .max(COMMUNITY_GOAL_MAX, "Das gemeinsame Wochenziel liegt zwischen 500 und 200.000 Anwahlen.");
+export const communitySettingsSchema = z
+  .object({
+    goals: z
+      .array(
+        z
+          .object({
+            from: calendarDaySchema.refine(
+              // Läuft auch nach einem Formatfehler; isoWeekday() braucht das Format.
+              (day) => /^\d{4}-\d{2}-\d{2}$/.test(day) && isoWeekday(day) === 1,
+              "Ein Wochenziel gilt immer ab einem Montag.",
+            ),
+            attempts: goalAttempts.nullable(),
+          })
+          .strict(),
+      )
+      .max(COMMUNITY_GOAL_ENTRIES)
+      .refine((goals) => new Set(goals.map((g) => g.from)).size === goals.length, "Montag doppelt."),
+  })
+  .strict();
+
+/** Eingabe der Verwaltung: der Wert ab dieser Woche, leer heißt automatisch. */
+const communityGoalInput = z.object({ attempts: goalAttempts.nullable() }).strict();
+
+// Steigt mit jedem Speichern; server/game.ts verwirft damit seinen
+// Zwischenspeicher, damit ein neuer Teamwert sofort sichtbar ist.
+let communityVersion = 0;
+export const communitySettingsVersion = () => communityVersion;
+
+export async function loadCommunitySettings(db: Database): Promise<CommunitySettings> {
+  const [row] = await db.query("SELECT value FROM app_settings WHERE key='community'");
+  const parsed = communitySettingsSchema.safeParse(row?.value);
+  return parsed.success ? parsed.data : { goals: [] };
+}
+
+/**
+ * Teamwert ab der laufenden Woche (Montag dieser Woche); ein Eintrag mit
+ * gleichem Montag wird ersetzt. Leer heißt: ab dieser Woche wieder
+ * automatisch. Dafür steht ein leerer Eintrag an diesem Montag, damit kein
+ * älterer Teamwert weiter greift und frühere Wochen trotzdem ihr Ziel
+ * behalten (Vorwochen-Zeile). Ein leerer Eintrag ohne Teamwert davor
+ * ändert nichts und fällt weg. Höchstens 26 Einträge; die ältesten fallen
+ * zuerst.
+ */
+export async function saveCommunitySettings(
+  db: Database,
+  actorId: string,
+  raw: unknown,
+  today = berlinDate(),
+): Promise<CommunitySettings> {
+  const { attempts } = communityGoalInput.parse(raw);
+  const from = weekStartOf(today);
+  const { goals } = await loadCommunitySettings(db);
+  const sorted = [...goals.filter((g) => g.from !== from), { from, attempts }].sort((a, b) =>
+    a.from.localeCompare(b.from),
+  );
+  const value = communitySettingsSchema.parse({
+    goals: sorted
+      .filter((g, i) => g.attempts !== null || (i > 0 && sorted[i - 1].attempts !== null))
+      .slice(-COMMUNITY_GOAL_ENTRIES),
+  });
+  await db.query(
+    `INSERT INTO app_settings(key,value,updated_by) VALUES('community',$1::jsonb,$2)
+     ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_by=excluded.updated_by,updated_at=now()`,
+    [JSON.stringify(value), actorId],
+  );
+  communityVersion++;
+  return value;
 }

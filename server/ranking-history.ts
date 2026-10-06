@@ -6,11 +6,15 @@ import {
   type DatedRankingRow,
 } from "../lib/ranking-history";
 
-export async function publicRankingMonth(
+/**
+ * Alle Tageszeilen eines Monats bis heute, je Profil und Tag. Grundlage der
+ * Monatsrangliste und des eigenen Monatsplatzes in der Tagesbilanz
+ * (server/closing.ts), dort im selben Transaktionsblock wie das Einreichen.
+ */
+export async function loadRankingRecords(
   db: Database,
   month: string,
-  day?: string,
-) {
+): Promise<DatedRankingRow[]> {
   const { from, to } = monthRange(month);
   // One bounded query keeps the ranking, group totals and daily history on the
   // same database snapshot. No contacts or reflections; every reported day counts.
@@ -22,7 +26,7 @@ export async function publicRankingMonth(
      ORDER BY c.day,c.updated_at DESC`,
     [from, to],
   );
-  const records: DatedRankingRow[] = rows.map((r) => ({
+  return rows.map((r) => ({
     id: r.id,
     key: r.import_key || "",
     name: r.name,
@@ -38,7 +42,14 @@ export async function publicRankingMonth(
     source: "Selbst gemeldet",
     updatedAt: new Date(r.updated_at).toISOString(),
   }));
-  return summarizeRankingMonth(records, month, day);
+}
+
+export async function publicRankingMonth(
+  db: Database,
+  month: string,
+  day?: string,
+) {
+  return summarizeRankingMonth(await loadRankingRecords(db, month), month, day);
 }
 
 /**
