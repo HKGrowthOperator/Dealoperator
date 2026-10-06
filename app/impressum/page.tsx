@@ -4,6 +4,7 @@ import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 export const metadata: Metadata = {
   title: "Impressum · Deal Operator",
   description: "Anbieterkennzeichnung nach § 5 DDG.",
+  alternates: { canonical: "/impressum" },
 };
 
 /**
