@@ -420,8 +420,14 @@ const PATTERNS: Pattern[] = [
 ];
 
 // Halbe, Dezimal- oder unsichere Angaben: nie als feste Zahl übernehmen.
+// „ca 200“ zählt auch ohne Punkt.
 const UNCERTAIN =
-  /\d\s*[.,]\s*\d|½|\b\d\s*\/\s*\d\b|\bhalbe[nrs]?\b|\b(?:vielleicht|evtl\.?|eventuell|ca\.|circa|ungef(?:ä|ae)hr|wahrscheinlich|vermutlich|unsicher|etwa|so um die)\b|\d\s*\?/i;
+  /\d\s*[.,]\s*\d|½|\b\d\s*\/\s*\d\b|\bhalbe[nrs]?\b|\b(?:vielleicht|evtl\.?|eventuell|ca\.|circa|ungef(?:ä|ae)hr|wahrscheinlich|vermutlich|unsicher|etwa|so um die)\b|\bca\.?\s*\d|\d\s*\?/i;
+
+// Summe über mehrere Tage („bis jetzt 200 Anwahlen“, „diese Woche“): kein
+// Tagesstand.
+const MULTI_DAY_SUM =
+  /\b(?:bis jetzt|bisher|bislang|in summe|seit (?:start|beginn|anfang|montag|letzter woche)|diese woche|letzte woche|diesen monat|im monat|insgesamt seit)\b/i;
 
 const INCREMENT =
   /\b(?:noch|nochmal|weitere[rnms]?|zus(?:ä|ae)tzlich)\s+(?:ein|eine|einen|\d+)\b|\b\d+\.\s*(?:termin|setting|closing|deal)|\+\s*\d+\s*(?:termin|setting|closing|anwahl|call|deal)/i;
@@ -446,6 +452,7 @@ export function readMetrics(text: string): {
   conflicts: Metric[];
   increment: boolean;
   uncertain: boolean;
+  cumulative: boolean;
 } {
   // Datumsangaben („22.9.“, „22.09.2026“) sind weder Kennzahl noch Dezimalwert;
   // der Leistungstag wird getrennt davon gelesen (dayMarks).
@@ -509,6 +516,7 @@ export function readMetrics(text: string): {
     conflicts,
     increment: INCREMENT.test(text),
     uncertain: UNCERTAIN.test(text),
+    cumulative: MULTI_DAY_SUM.test(text),
   };
 }
 
@@ -832,7 +840,7 @@ export function parseWins({
     const reasons: string[] = [];
     const notes: string[] = [];
     const prev = shift(m.messageDay, -1);
-    const { metrics, conflicts, increment, uncertain } = readMetrics(m.text);
+    const { metrics, conflicts, increment, uncertain, cumulative } = readMetrics(m.text);
     const marks = dayMarks(m.text, m.messageDay);
     const late = m.time !== null && m.time < lateNightCutoff;
     // Im Zoom-Chat einer laufenden Session meint eine Zahl am Vormittag
@@ -885,7 +893,7 @@ export function parseWins({
     const matches = m.author ? resolveAuthor(m.author, directory, key) : [];
     // Ohne Kennzahl (Plaudern, „Top!“, Medien) kein Prüffall — außer bei
     // unsicheren Angaben wie „½ Termin“.
-    const chatter = !Object.keys(metrics).length && !uncertain && !increment;
+    const chatter = !Object.keys(metrics).length && !uncertain && !increment && !cumulative;
     if (chatter) notes.push("Keine Kennzahl erkannt — nicht übernommen.");
     else if (!Object.keys(metrics).length) reasons.push("Keine Kennzahl erkannt.");
     if (conflicts.length)
@@ -899,6 +907,10 @@ export function parseWins({
     if (uncertain)
       reasons.push(
         "Halbe, Dezimal- oder unsichere Angabe („1,5“, „½“, „ca.“, „vielleicht“). Bitte den festen Stand prüfen.",
+      );
+    if (cumulative)
+      reasons.push(
+        "Klingt nach einer Summe über mehrere Tage („bis jetzt“, „diese Woche“) statt nach einem Tagesstand. Bitte prüfen.",
       );
     let personProblem = true;
     if (!m.author) reasons.push("Zeile ohne erkennbaren Absender.");
@@ -921,7 +933,7 @@ export function parseWins({
     else personProblem = false;
     const match = matches.length === 1 ? matches[0] : null;
     const joint = match?.kind === "joint";
-    const applicable = Object.keys(metrics).length > 0 && !increment && !multiDay && !joint;
+    const applicable = Object.keys(metrics).length > 0 && !increment && !cumulative && !multiDay && !joint;
     const stamp = m.time ? `${m.messageDay} ${m.time}` : null;
     const correction = !!m.edited || CORRECTION.test(m.text);
     if (m.edited) notes.push("Nachricht wurde nachträglich bearbeitet: gilt als Korrektur.");
@@ -963,6 +975,36 @@ export function parseWins({
       line: m.line,
     } satisfies WinsEntry;
   });
+
+  // Wiederholt jemand kurz nach einer Meldung genau deren Zahlen („20 Calls,
+  // 1 Termin gelegt, stark!“), ist das meist ein Zitat und nicht der eigene
+  // Tag. Gilt nur für Nachrichten ohne eigene Datumszeile.
+  const minutes = (stamp: string) => {
+    const [d, t] = stamp.split(" ");
+    return Date.parse(`${d}T${t}:00Z`) / 60000;
+  };
+  for (const e of entries) {
+    const own = Object.entries(e.metrics) as [Metric, number][];
+    if (!own.length || !e.stamp || (e.status !== "ok" && e.status !== "review") || /^\s*datum\s*:/im.test(e.text)) continue;
+    const quoted = entries.find(
+      (o) =>
+        o !== e &&
+        o.stamp &&
+        o.author !== e.author &&
+        o.messageDay === e.messageDay &&
+        minutes(e.stamp!) - minutes(o.stamp) >= 0 &&
+        minutes(e.stamp!) - minutes(o.stamp) <= 15 &&
+        o.line < e.line &&
+        own.every(([metric, value]) => o.metrics[metric] === value),
+    );
+    if (!quoted) continue;
+    e.reasons.push(
+      `Gleiche Zahlen wie in der Meldung von ${quoted.author} kurz davor. Vermutlich zitiert, nicht die eigenen Zahlen. Bitte prüfen.`,
+    );
+    e.status = "review";
+    e.review = "unclear";
+    e.applicable = false;
+  }
 
   // Je Person und Leistungstag gilt für JEDE Kennzahl der zuletzt gemeldete
   // Wert — gemessen am vollen Zeitpunkt der Nachricht, nicht nur an der

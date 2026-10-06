@@ -564,3 +564,45 @@ test("numbers posted in a live Zoom session in the morning count for that day", 
   });
   assert.deepEqual([e.day, e.status], ["2026-09-22", "ok"]);
 });
+
+test("„ca 200“ ohne Punkt und Summen über mehrere Tage werden Prüffälle, kein Tagesstand", () => {
+  const text = [
+    "[30.09.26, 20:08:50] Emil Test: Bis jetzt ca 200 Anwahlen und ca 40-50 Prozent erreicht",
+    "[30.09.26, 20:10:00] Anna Beispiel: Diese Woche 300 Anwahlen geschafft",
+    "[30.09.26, 20:12:00] Ben Muster: Anwahlen heute: 120",
+  ].join("\n");
+  const entries = parseWins({ text, defaultDay: "2026-09-30", directory });
+  const [emil, anna, ben] = entries;
+  assert.equal(emil.status, "review");
+  assert.equal(emil.applicable, false);
+  assert.ok(emil.reasons.some((r) => r.includes("unsichere Angabe")));
+  assert.ok(emil.reasons.some((r) => r.includes("Summe über mehrere Tage")));
+  assert.equal(anna.status, "review");
+  assert.equal(anna.applicable, false);
+  assert.equal(ben.status, "ok");
+  assert.equal(ben.metrics.attempts, 120);
+});
+
+test("wer kurz nach einer Meldung deren Zahlen wiederholt, zitiert: Prüffall statt eigener Tag", () => {
+  const text = [
+    "[05.10.26, 17:09:19] Anna Beispiel: Datum: 05.10.2026",
+    "Anwahlen heute: 20",
+    "Termine: 1",
+    "[05.10.26, 17:14:54] Emil Test: 20 calls 1 termin gelegt",
+    "[05.10.26, 17:15:00] Emil Test: du bist so krass",
+    "[05.10.26, 18:30:00] Ben Muster: Datum: 05.10.2026",
+    "Anwahlen heute: 20",
+    "Termine: 1",
+  ].join("\n");
+  const entries = parseWins({ text, defaultDay: "2026-10-05", directory });
+  const anna = entries.find((e) => e.author === "Anna Beispiel")!;
+  const emil = entries.find((e) => e.author === "Emil Test" && Object.keys(e.metrics).length)!;
+  const ben = entries.find((e) => e.author === "Ben Muster")!;
+  assert.equal(anna.status, "ok");
+  assert.equal(emil.status, "review");
+  assert.equal(emil.applicable, false);
+  assert.ok(emil.reasons.some((r) => r.includes("Vermutlich zitiert")));
+  // Eigene Meldung mit Datumszeile und gleichen Zahlen: kein Zitat.
+  assert.equal(ben.status, "ok");
+  assert.equal(ben.metrics.attempts, 20);
+});
