@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import OnboardingStart, { type PendingStart } from "../features/onboarding-start";
 import { authReady, getCurrentUser, safeNext } from "@/server/auth";
@@ -13,6 +14,11 @@ import {
 } from "@/server/onboarding";
 import { AppError } from "@/server/operator";
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Mitmachen · Deal Operator",
+  description: "Kostenfrei in die Sales-Community einsteigen: Konto anlegen oder vorbereitetes Profil übernehmen und beim gemeinsamen Callen dranbleiben.",
+  alternates: { canonical: "/starten" },
+};
 
 /**
  * Start für neue Konten mit zwei gleichwertigen Wegen. Die Auswahl eines
