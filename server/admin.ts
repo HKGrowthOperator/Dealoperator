@@ -3,12 +3,14 @@ import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, type Actor } from "./auth";
 import { AppError } from "./operator";
-import { calendarDaySchema } from "../lib/kpis";
-import { saveCommitmentSettings, loadCommitmentSettings } from "./settings";
+import { berlinDate, calendarDaySchema } from "../lib/kpis";
+import { saveCommitmentSettings, loadCommitmentSettings, saveCommunitySettings } from "./settings";
+import { communityGoalState } from "./game";
 import { DELIVERY_LABEL, deliveryStates, type DeliveryState } from "./notify";
 
 /**
- * Verwaltung: Team-Inbox, Pausen, Akquise Days und die Dranbleiben-Regeln.
+ * Verwaltung: Team-Inbox, Pausen, Akquise Days, die Dranbleiben-Regeln und
+ * das gemeinsame Wochenziel.
  * Jede Funktion prüft selbst, dass ein Verwaltungskonto handelt — die Route
  * allein reicht nicht.
  */
@@ -263,4 +265,30 @@ export async function commitmentRules(db: Database, actor: Actor) {
 export async function saveCommitmentRules(db: Database, actor: Actor, raw: unknown) {
   requireAdmin(actor);
   return saveCommitmentSettings(db, actor.userId, raw);
+}
+
+// ---------------------------------------------------------------------------
+// Gemeinsames Wochenziel aller Anwahlen (app_settings, Schlüssel „community“)
+
+/**
+ * Für das Feld unter Einstellungen: der Teamwert, der diese Woche gilt (sonst
+ * null, dann rechnet die Automatik), und der Wert der Automatik für diese
+ * Woche. Nur Summen, keine Namen.
+ */
+export async function communityRules(db: Database, actor: Actor, today = berlinDate()) {
+  requireTeam(actor);
+  const { weekStart, team, auto } = await communityGoalState(db, today);
+  return { weekStart, team, auto };
+}
+
+/**
+ * Teamwert ab der laufenden Woche; leer (null) heißt: ab dieser Woche wieder
+ * automatisch. Ändern nur Admins, wie alle Einstellungen (das Feld steht
+ * unter Dranbleiben-Regeln, das Moderatoren nicht sehen). Prüfung und
+ * Speicherung in server/settings.ts. Zurück kommt der neue Stand für das Feld.
+ */
+export async function saveCommunityRules(db: Database, actor: Actor, raw: unknown, today = berlinDate()) {
+  requireAdmin(actor);
+  await saveCommunitySettings(db, actor.userId, raw, today);
+  return communityRules(db, actor, today);
 }

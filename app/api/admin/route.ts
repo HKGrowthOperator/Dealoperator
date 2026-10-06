@@ -5,12 +5,14 @@ import { AppError, rateLimit } from "@/server/operator";
 import {
   addPause,
   commitmentRules,
+  communityRules,
   decidePause,
   deleteEvent,
   listEvents,
   pauseList,
   resolveInbox,
   saveCommitmentRules,
+  saveCommunityRules,
   saveEvent,
   teamInbox,
   unconfirmedRegistrations,
@@ -117,6 +119,11 @@ export async function POST(request: Request) {
         return json(await deleteEvent(db, actor, v));
       case "saveRules":
         return json(await saveCommitmentRules(db, actor, v));
+      // Gemeinsames Wochenziel: Stand lesen und Teamwert speichern (leer = automatisch).
+      case "communityRules":
+        return json(await communityRules(db, actor));
+      case "saveCommunityRules":
+        return json(await saveCommunityRules(db, actor, v));
       case "previewWins":
         return json(await previewWins(db, actor, v));
       case "commitWins":
