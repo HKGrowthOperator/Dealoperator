@@ -4,9 +4,9 @@ import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import { SITE_URL, ORGANIZATION_ID } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Für wen ist Deal Operator? Sales-Community für Opener, Setter, Closer und Selbstständige",
+  title: "Für wen ist Deal Operator? Sales-Community für Caller",
   description:
-    "Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen: eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und Discord-Runde. Für Opener, Setter, Closer, Selbstständige und kleine Vertriebsteams, die dranbleiben wollen.",
+    "Kostenfreie Sales-Community fürs gemeinsame Callen: Calling-Routine mit Tagesabschluss, Serie und Rangliste. Für Opener, Setter, Closer und Selbstständige.",
   alternates: { canonical: "/fuer-wen" },
 };
 

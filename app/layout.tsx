@@ -7,9 +7,9 @@ import "./ranking.css";
 import "./ui.css";
 import "./game.css";
 
-const TITLE = "Deal Operator – Kostenfreie Sales-Community fürs gemeinsame Callen";
+const TITLE = "Deal Operator: kostenfreie Sales-Community zum Callen";
 const DESCRIPTION =
-  "Deal Operator ist die kostenfreie Sales-Community von HK Growth fürs gemeinsame Callen: Kaltakquise-Zahlen und Learnings an jedem Calling-Tag festhalten, Rangliste und Fortschritt sehen, dranbleiben. Mit Discord-Runde.";
+  "Kostenfreie Sales-Community von HK Growth fürs gemeinsame Callen: Zahlen je Calling-Tag festhalten, Serie und Rangliste, dranbleiben. Mit Discord-Runde.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
