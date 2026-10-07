@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 const FAQ: [string, string][] = [
   [
     "Was kostet Deal Operator?",
-    "Nichts. Deal Operator ist kostenfrei, ohne Testphase und ohne Paket dahinter. HK Growth betreibt die Community, weil wir selbst callen und aus der gleichen Vertriebsarbeit die Sales-App DealUno entwickelt haben.",
+    "Nichts. Deal Operator ist kostenfrei, ohne Testphase und ohne Paket dahinter. HK Growth aus Marienheide bei Köln betreibt die Community, weil wir selbst callen und aus der gleichen Vertriebsarbeit die Sales-App DealUno entwickelt haben.",
   ],
   [
     "Ist Deal Operator eine Kaltakquise-Challenge?",
