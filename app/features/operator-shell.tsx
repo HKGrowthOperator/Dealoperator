@@ -238,6 +238,9 @@ export function OperatorFooter({
           {showAdmin && <Link href="/verwaltung">Verwaltung</Link>}
           <Link href="/impressum">Impressum</Link>
           <Link href="/datenschutz">Datenschutz</Link>
+          <a href="#" data-consent-open>
+            Cookie-Einstellungen
+          </a>
         </nav>
       </div>
     </footer>

@@ -152,14 +152,48 @@ export default function Page() {
         <section>
           <h2>7. Cookies</h2>
           <p>
-            Es werden nur technisch erforderliche Cookies gesetzt: die Sitzung
-            nach der Anmeldung und eine Anzeigeeinstellung der Oberfläche.
-            Analyse- oder Werbe-Cookies gibt es nicht.
+            Ohne deine Einwilligung werden nur technisch erforderliche Cookies
+            gesetzt: die Sitzung nach der Anmeldung und eine Anzeigeeinstellung
+            der Oberfläche. Deine Entscheidung im Cookie-Banner wird sechs
+            Monate im Browser gespeichert (<code>hk_consent</code>).
           </p>
         </section>
 
         <section>
-          <h2>8. Discord</h2>
+          <h2>8. Meta-Pixel und Google Ads (nur mit Einwilligung)</h2>
+          <p>
+            Wenn du im Cookie-Banner „Alle akzeptieren“ wählst, binden wir das
+            Meta-Pixel (Meta Platforms Ireland Ltd., Merrion Road, Dublin 4,
+            Irland) und den Google-Tag für Google Ads (Google Ireland Ltd.,
+            Gordon House, Barrow Street, Dublin 4, Irland) ein. Beide setzen
+            Cookies (unter anderem <code>_fbp</code>, <code>_fbc</code>,{" "}
+            <code>_gcl_au</code>) und übermitteln deine IP-Adresse, Browserdaten,
+            die aufgerufenen Seiten und Ereignisse wie den Abschluss der
+            Anmeldung oder den Klick auf unsere Telefonnummer. Meta und Google
+            nutzen diese Daten, um die Wirkung unserer Anzeigen zu messen und
+            Anzeigen auf deine Interessen abzustimmen; dabei können Daten in die
+            USA übermittelt werden. Beide Anbieter sind nach dem EU-US Data
+            Privacy Framework zertifiziert.
+          </p>
+          <p>
+            Rechtsgrundlage ist deine Einwilligung (Art. 6 Abs. 1 lit. a DSGVO,
+            § 25 Abs. 1 TDDDG). Ohne Einwilligung werden diese Dienste nicht
+            geladen und keine Cookies gesetzt. Du kannst die Einwilligung
+            jederzeit mit Wirkung für die Zukunft über „Cookie-Einstellungen“ im
+            Fußbereich widerrufen. Weitere Informationen:{" "}
+            <a href="https://www.facebook.com/privacy/policy/" rel="noopener noreferrer" target="_blank">
+              Datenschutzrichtlinie von Meta
+            </a>
+            ,{" "}
+            <a href="https://policies.google.com/privacy" rel="noopener noreferrer" target="_blank">
+              Datenschutzerklärung von Google
+            </a>
+            .
+          </p>
+        </section>
+
+        <section>
+          <h2>9. Discord</h2>
           <p>
             Die Website verlinkt auf einen Discord-Server. Discord ist ein
             eigenständiger Dienst der Discord Netherlands B.V. Mit dem Aufruf
@@ -190,7 +224,7 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>9. Speicherdauer</h2>
+          <h2>10. Speicherdauer</h2>
           <p>
             Konto- und Zahlendaten bleiben gespeichert, solange das Konto
             besteht. Auf Wunsch werden Konto und zugehörige Daten gelöscht,
@@ -199,7 +233,7 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>10. Deine Rechte</h2>
+          <h2>11. Deine Rechte</h2>
           <p>
             Es bestehen die Rechte auf Auskunft (Art. 15), Berichtigung (Art.
             16), Löschung (Art. 17), Einschränkung (Art. 18),

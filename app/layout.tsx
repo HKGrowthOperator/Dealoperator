@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ORGANIZATION_ID, SITE_URL } from "@/lib/site";
+import { TrackingConsent } from "./features/tracking-consent";
 import "./globals.css";
 import "./operator-brand.css";
 import "./operator-glass.css";
@@ -114,6 +115,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
         />
         {children}
+        <TrackingConsent />
       </body>
     </html>
   );
