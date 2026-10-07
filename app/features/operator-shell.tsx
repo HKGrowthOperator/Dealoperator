@@ -232,6 +232,8 @@ export function OperatorFooter({
           <a href={discordUrl} target="_blank" rel="noopener noreferrer">
             Discord
           </a>
+          <a href="https://dealuno.hk-growthoperator.de/">DealUno</a>
+          <a href="https://website.hk-growthoperator.de/">Webstudio</a>
           <a href="https://hk-growthoperator.de/">HK Growth</a>
           {showAdmin && <Link href="/verwaltung">Verwaltung</Link>}
           <Link href="/impressum">Impressum</Link>
