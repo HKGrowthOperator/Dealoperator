@@ -224,7 +224,7 @@ function Empty({
 /** Der Session-Typ „Reflexion“ heißt in der Oberfläche „Rückblick“ (sonst
  *  verwechselbar mit dem Bereich Reflexionen); gespeichert bleibt der Wert. */
 function sessionKindLabel(kind: string) {
-  return kind === "Reflexion" ? "Rückblick" : kind;
+  return kind === "Reflexion" ? "Rückblick" : kind === "Call-Block" ? "Zusammen callen" : kind;
 }
 function MiniChart({
   records,
@@ -621,11 +621,13 @@ export default function CommunityApp({
       return;
     }
     setEditSessionId(null);
+    const nextStart = new Date();
+    nextStart.setMinutes(Math.ceil((nextStart.getMinutes() + 1) / 30) * 30, 0, 0);
     setNewSession({
       title: "",
       kind: "Call-Block",
-      date: earliestSessionDay(),
-      time: "18:00",
+      date: new Intl.DateTimeFormat("sv-SE").format(nextStart),
+      time: `${String(nextStart.getHours()).padStart(2, "0")}:${String(nextStart.getMinutes()).padStart(2, "0")}`,
       minutes: 50,
       capacity: 2,
     });
@@ -1364,14 +1366,15 @@ export default function CommunityApp({
                     )}
                   </PageHeading>
                   <section className="call-partner-hub" aria-label="Gemeinsame Calls">
-                    <div><span className="call-hub-kicker">Gemeinsam besser werden</span><h2>Einwände üben. Zusammen callen.</h2><p>Verabrede deinen Call am besten hier in Deal Operator. So können andere zusagen und sich am Tag des Calls erinnern lassen. Spontan könnt ihr auch direkt in Google Meet zusammenkommen.</p></div>
-                    <div className="call-hub-actions">
-                      <button className="btn primary" onClick={openNewSession}><Plus size={18} />Call verabreden</button>
-                      {data.callUrl && <a className="btn secondary" href={data.callUrl} target="_blank" rel="noopener noreferrer"><Headphones size={18} />Direkt zum Call<span className="do-sr"> (neues Fenster)</span></a>}
-                      <Link className="btn secondary" href="/sessions?modus=eigen"><CalendarDays size={18} />Calls und Roleplays</Link>
+                    <h2>Gemeinsam callen</h2>
+                    <div className="call-choice-grid">
+                      <button className="call-choice call-choice-plan" onClick={openNewSession}><CalendarDays size={26} aria-hidden="true" /><span>Call verabreden</span></button>
+                      {data.callUrl && <a className="call-choice" href={data.callUrl} target="_blank" rel="noopener noreferrer"><Headphones size={26} aria-hidden="true" /><span>Jetzt beitreten</span><span className="do-sr"> (Google Meet, neues Fenster)</span></a>}
                     </div>
-                    {upcomingCalls.length === 0 && <p>Aktuell sind keine Calls verabredet.</p>}
+                    <div className="call-upcoming-heading"><h3>Verabredete Calls</h3><Link href="/sessions?modus=eigen">Alle ansehen</Link></div>
+                    {upcomingCalls.length === 0 && <p className="call-empty">Noch keine Termine.</p>}
                     {upcomingCalls.slice(0,3).map((s) => <button className="call-hub-upcoming" key={s.id} onClick={() => setSession(s)}><span><strong>{s.title}</strong><small>{sessionDay(s.date)} · {s.time} Uhr · mit {s.host}</small></span><span>{s.joined ? "Du bist dabei" : "Ansehen"}</span></button>)}
+                    {upcomingCalls.some((s) => s.joined) && <PushPrompt variant="call" />}
                   </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
@@ -1825,7 +1828,7 @@ export default function CommunityApp({
       <Dialog open={!!modal} onOpenChange={(open) => !open && setModal(null)}>
         <DialogContent
           className={
-            modal === "reflection" || modal === "profile" ? "wide-dialog" : ""
+            modal === "reflection" || modal === "profile" ? "wide-dialog" : modal === "create-session" ? "call-create-dialog" : ""
           }
         >
           <DialogHeader>
@@ -1838,15 +1841,17 @@ export default function CommunityApp({
                       ? "Dein Profil"
                       : modal === "create-session"
                         ? editSessionId
-                          ? "Deine Session bearbeiten"
+                          ? "Call bearbeiten"
                           : "Call verabreden"
                         : modal === "buddy"
                           ? "Call-Partner anfragen"
                           : "Hier zählt, dass du dranbleibst."}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className={modal === "create-session" ? "do-sr" : undefined}>
               {demo
                 ? "Du bist in der Vorschau. Personen, Termine und Einträge sind Beispiele."
+                : modal === "create-session"
+                  ? "Format, Datum und Uhrzeit wählen."
                 : "Dein Bereich. Was andere sehen, steht beim Tagesabschluss."}
             </DialogDescription>
           </DialogHeader>
@@ -1894,6 +1899,7 @@ export default function CommunityApp({
                 }
                 const payload = {
                   ...newSession,
+                  title: newSession.title.trim() || sessionKindLabel(newSession.kind),
                   startsAt: new Date(
                     `${newSession.date}T${newSession.time}`,
                   ).toISOString(),
@@ -1931,38 +1937,19 @@ export default function CommunityApp({
                   setNewSession({ ...newSession, title: "" });
                   toast.success(
                     editSessionId
-                      ? "Session aktualisiert."
+                      ? "Call aktualisiert."
                       : demo
                         ? "Beispielsession angelegt."
-                        : "Deine Session ist jetzt für andere Angemeldete sichtbar. Der Call ist unter Call-Partner zu finden.",
+                        : "Call verabredet.",
                   );
                 }
               }}
             >
-              <label>
-                Wie heißt dein Call?
-                <input
-                  required
-                  minLength={4}
-                  maxLength={100}
-                  value={newSession.title}
-                  onChange={(e) =>
-                    setNewSession({ ...newSession, title: e.target.value })
-                  }
-                  placeholder="Zum Beispiel: Extra-Block am Dienstag"
-                />
-              </label>
-              <label>
-                Format
-                <FieldSelect
-                  label="Session-Format"
-                  value={newSession.kind}
-                  onChange={(v) => setNewSession({ ...newSession, kind: v })}
-                  options={["Call-Block", "Roleplay", "Reflexion"]}
-                  optionLabel={sessionKindLabel}
-                />
-              </label>
-              <div className="form-grid">
+              <fieldset className="call-format-picker">
+                <legend>Was habt ihr vor?</legend>
+                <div>{["Call-Block", "Roleplay", "Reflexion"].map((kind) => <label key={kind}><input type="radio" name="call-format" value={kind} checked={newSession.kind === kind} onChange={() => setNewSession({ ...newSession, kind })} /><span>{sessionKindLabel(kind)}</span></label>)}</div>
+              </fieldset>
+              <div className="form-grid call-date-fields">
                 <label>
                   Datum
                   <input
@@ -1986,6 +1973,14 @@ export default function CommunityApp({
                     }
                   />
                 </label>
+              </div>
+              <details className="call-extra-settings" onInvalidCapture={(e) => { e.currentTarget.open = true; }}>
+                <summary>Weitere Einstellungen</summary>
+                <label>
+                  Thema (optional)
+                  <input minLength={4} maxLength={100} value={newSession.title} onChange={(e) => setNewSession({ ...newSession, title: e.target.value })} placeholder="z. B. Einwände üben" />
+                </label>
+                <div className="form-grid">
                 <label>
                   Dauer in Minuten
                   <input
@@ -2003,7 +1998,7 @@ export default function CommunityApp({
                   />
                 </label>
                 <label>
-                  Plätze
+                  Teilnehmerzahl
                   <input
                     type="number"
                     min={2}
@@ -2018,23 +2013,16 @@ export default function CommunityApp({
                     }
                   />
                 </label>
-              </div>
+                </div>
+              </details>
               <div className="session-where">
                 <Headphones size={20} aria-hidden="true" />
                 <div>
                   <strong>Treffpunkt: Google Meet</strong>
-                  <p>
-                    Der Google-Meet-Link steht direkt beim Termin. Zusagen, zur Startzeit öffnen und loslegen.
-                  </p>
                 </div>
               </div>
-              <p className="hint">
-                Zeiten gelten in deiner lokalen Zeitzone (
-                {Intl.DateTimeFormat().resolvedOptions().timeZone}).
-              </p>
               <button className="btn primary full" disabled={saving}>
-                {editSessionId ? "Änderungen speichern" : "Call verabreden"}{" "}
-                <Plus size={17} />
+                {saving ? "Wird gespeichert …" : editSessionId ? "Änderungen speichern" : "Termin erstellen"}
               </button>
             </form>
           ) : modal === "buddy" ? (
@@ -2206,12 +2194,12 @@ export default function CommunityApp({
             <DialogDescription>
               {demo
                 ? "Fiktiver Beispieltermin · keine echte Veranstaltung"
-                : `Eine Session mit ${session?.host}`}
+                : `Mit ${session?.host}`}
             </DialogDescription>
           </DialogHeader>
           {session && (
             <div className="form-stack">
-              <Tag tone="green">{session.kind}</Tag>
+              <div className="button-row"><Tag>{sessionKindLabel(session.kind)}</Tag>{session.joined && !session.cancelled && <Tag tone="green">Du bist dabei</Tag>}</div>
               <div className="session-details">
                 <span>
                   <CalendarDays size={18} />
@@ -2226,15 +2214,8 @@ export default function CommunityApp({
                   {session.attendees} von {session.capacity} Plätzen
                 </span>
               </div>
-              <p>
-                {session.kind === "Call-Block"
-                  ? "Ein zusätzlicher Block mit deinem Call-Partner. Wie ihr ihn gestaltet, stimmt ihr selbst ab."
-                  : session.kind === "Roleplay"
-                    ? "Bring einen Gesprächseinstieg oder einen Einwand mit. Geübt wird im kleinen Kreis, mit konkretem und respektvollem Feedback."
-                    : "Kurzer Rückblick mit deinem Call-Partner: Was lief gut, was probiert ihr als Nächstes?"}
-              </p>
               <button
-                className="btn primary full"
+                className={`btn ${session.joined ? "secondary" : "primary"} full`}
                 disabled={
                   saving ||
                   session.cancelled ||
@@ -2278,17 +2259,17 @@ export default function CommunityApp({
                         ? "Teilnahme in der Demo geändert."
                         : current.joined
                           ? "Teilnahme abgesagt."
-                          : "Du bist dabei. Trag dir den Termin im Kalender ein.",
+                          : "Du bist dabei.",
                     );
                   }
                 }}
               >
                 {session.cancelled
-                  ? "Session abgesagt"
+                  ? "Call abgesagt"
                   : new Date(
                         session.startsAt || `${session.date}T${session.time}`,
                       ) <= new Date()
-                    ? "Session beendet"
+                    ? sessionEnd(session) > new Date() ? "Call läuft" : "Call beendet"
                     : session.joined
                       ? "Teilnahme absagen"
                       : session.attendees >= session.capacity
@@ -2318,13 +2299,13 @@ export default function CommunityApp({
                         setModal("create-session");
                       }}
                     >
-                      Session bearbeiten
+                      Call bearbeiten
                     </button>
                     <button
                       className="text-button"
                       onClick={() => setCancelSession(session)}
                     >
-                      Session absagen
+                      Call absagen
                     </button>
                   </div>
                 )}

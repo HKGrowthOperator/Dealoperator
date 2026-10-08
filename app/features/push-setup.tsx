@@ -714,12 +714,12 @@ export function PushPrompt({
       </span>
       <div>
         <strong>
-          {variant === "call" ? "Möchtest du vor dem Call erinnert werden?" : variant === "after-submit"
+          {variant === "call" ? "Call-Erinnerung" : variant === "after-submit"
             ? "Soll dich Deal Operator erinnern, wenn ein Abschluss fehlt?"
             : "Erinnerung an deinen Tagesabschluss?"}
         </strong>
         <p>
-          {variant === "call" ? "Am Tag des Calls bekommst du 15 Minuten vor Beginn einen Hinweis. Einmal einschalten reicht; ändern kannst du das im Profil." : <>Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.</>}
+          {variant === "call" ? "15 Minuten vor Beginn" : <>Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.</>}
         </p>
         {variant === "after-submit" ? (
           // In der Bestätigung bleibt „Zu den Ergebnissen“ der einzige
@@ -750,7 +750,7 @@ export function PushPrompt({
               ) : (
                 <Bell size={17} aria-hidden="true" />
               )}
-              Erinnerungen einschalten
+              {variant === "call" ? "Erinnerung aktivieren" : "Erinnerungen einschalten"}
             </button>
             <button type="button" className="btn secondary" onClick={postpone}>
               Später
