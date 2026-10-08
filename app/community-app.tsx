@@ -1374,7 +1374,7 @@ export default function CommunityApp({
                     <div className="call-upcoming-heading"><h3>Verabredete Calls</h3><Link href="/sessions?modus=eigen">Alle ansehen</Link></div>
                     {upcomingCalls.length === 0 && <p className="call-empty">Noch keine Termine.</p>}
                     {upcomingCalls.slice(0,3).map((s) => <button className="call-hub-upcoming" key={s.id} onClick={() => setSession(s)}><span><strong>{s.title}</strong><small>{sessionDay(s.date)} · {s.time} Uhr · mit {s.host}</small></span><span>{s.joined ? "Du bist dabei" : "Ansehen"}</span></button>)}
-                    {upcomingCalls.some((s) => s.joined) && <PushPrompt variant="call" />}
+                    {!session && upcomingCalls.some((s) => s.joined) && <PushPrompt variant="call" />}
                   </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
