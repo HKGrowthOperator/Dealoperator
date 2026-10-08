@@ -6,7 +6,7 @@ import { AppError, createMember, rateLimit, refusePersonalUse } from "./operator
 import { notifyApplicant, teamEvent, teamPushText, type ApplicantNotice, type Reach } from "./notify";
 import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
-import { preparedMemberForEmail } from "./member-directory";
+import { preparedMemberForEmail, preparedMemberWithoutEmail } from "./member-directory";
 
 /**
  * Gemeinsame Meldungen sind keine persönlichen Konten. Der Text steht an
@@ -528,7 +528,11 @@ export async function bindConfirmedRequest(
           "Zu deiner E-Mail gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.",
           409,
         );
-      if (prepared && (prepared.hasReports || prepared.owner)) {
+      const missingAddress = !prepared ? await preparedMemberWithoutEmail(tx, String(request.full_name)) : null;
+      if (missingAddress && "ambiguous" in missingAddress)
+        throw new AppError("Zu deinem Namen gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.", 409);
+      const target = prepared || missingAddress;
+      if (target && !("ambiguous" in target) && (missingAddress || target.hasReports || target.owner)) {
         await tx.query(
           `UPDATE onboarding_requests SET status='superseded',updated_at=now()
            WHERE lower(email)=$1 AND status='awaiting_email' AND id<>$2`,
@@ -536,10 +540,10 @@ export async function bindConfirmedRequest(
         );
         await tx.query(
           "UPDATE onboarding_requests SET kind='claim',participant=$2 WHERE id=$1",
-          [request.id, prepared.id],
+          [request.id, target.id],
         );
         request.kind = "claim";
-        request.participant = prepared.id;
+        request.participant = target.id;
       }
     }
     // Die Bindung an das Konto ist die Stelle, an der aus einer anonymen

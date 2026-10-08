@@ -4,7 +4,7 @@ import type { Database } from "./database";
 import { isTeam, type Actor } from "./auth";
 import { teamEvent, teamPushText } from "./notify";
 import { normalisePhone } from "../lib/phone";
-import { preparedMemberForEmail } from "./member-directory";
+import { preparedMemberForEmail, preparedMemberWithoutEmail } from "./member-directory";
 import {
   aggregate,
   countsSchema,
@@ -234,6 +234,8 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         "Zu deiner E-Mail gibt es bereits ein Profil. Bitte übernimm dieses Profil, damit deine Zahlen zusammenbleiben.",
         409,
       );
+    if (!prepared && await preparedMemberWithoutEmail(tx, value.name))
+      throw new AppError("Für diesen Namen gibt es ein vorbereitetes Profil ohne bestätigte Zuordnung. Bitte lass das Team dein vorhandenes Profil zuordnen.", 409);
     const id = prepared?.id ?? randomUUID();
     const name = prepared?.name ?? value.name;
     if (prepared) {

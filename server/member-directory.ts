@@ -34,3 +34,21 @@ export async function preparedMemberForEmail(
   if (!rows.length) return null;
   return rows[0] as PreparedMember;
 }
+
+/** Fehlende Quelladresse: Namensgleichheit erlaubt nur Teamprüfung, nie Besitz. */
+export async function preparedMemberWithoutEmail(db: Database, name: string) {
+  const rows = await db.query(
+    `SELECT DISTINCT p.id,p.name,p.company,p.role,p.owner,
+       EXISTS(SELECT 1 FROM checkins c WHERE c.participant=p.id) AS "hasReports"
+     FROM app_settings s
+     CROSS JOIN LATERAL jsonb_each(
+       CASE WHEN jsonb_typeof(s.value)='object' THEN s.value ELSE '{}'::jsonb END
+     ) e
+     JOIN participants p ON p.id=e.value->>'participantId'
+     WHERE s.key=$1 AND coalesce(trim(e.value->>'email'),'')='' AND p.kind='person'
+       AND lower(regexp_replace(trim(p.name),'[[:space:]]+',' ','g'))=$2
+     LIMIT 2`,
+    [MEMBER_DIRECTORY_KEY, name.trim().replace(/\s+/g, " ").toLowerCase()],
+  );
+  return rows.length === 1 ? rows[0] as PreparedMember : rows.length ? { ambiguous: true } as const : null;
+}

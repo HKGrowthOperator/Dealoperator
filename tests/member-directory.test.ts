@@ -253,3 +253,18 @@ test("automatic completion never assigns historical reports", async () => {
   assert.equal(await finishPreparedRegistration(db, alice), null);
   assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0].owner, null);
 });
+
+test("a known profile with missing source email becomes a team-reviewed claim instead of a duplicate", async () => {
+  const id = await prepared("email-missing", "");
+  const r = await registration();
+  await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(await finishPreparedRegistration(db, alice), null);
+  assert.deepEqual((await db.query("SELECT kind,participant,status FROM onboarding_requests WHERE id=$1", [r.id]))[0], {kind:"claim",participant:id,status:"pending"});
+  assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0].owner, null);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM participants"))[0].n, 1);
+});
+test("direct onboarding cannot duplicate an unresolved prepared name or assign it on name alone", async () => {
+  await prepared("email-missing", "");
+  await assert.rejects(createMember(db, alice, {...form,name:"Alice Beispiel"}), /vorbereitetes Profil/);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM participants WHERE owner IS NOT NULL"))[0].n, 0);
+});
