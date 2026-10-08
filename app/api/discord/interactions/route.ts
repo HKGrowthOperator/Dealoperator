@@ -1,6 +1,7 @@
 import { database, databaseReady } from "@/server/database";
 import { discordConfig, verifyDiscordSignature } from "@/server/discord-bridge";
 import { ownerForDiscordUser } from "@/server/discord-admin";
+import { isTeamMember } from "@/server/roles";
 import { discordStreakText } from "@/server/commitment-public";
 
 export const dynamic = "force-dynamic";
@@ -51,8 +52,9 @@ export async function POST(request: Request) {
   const owner = await ownerForDiscordUser(database(), userId);
   if (!owner)
     return reply(
-      `Dein Discord-Konto ist noch nicht mit Deal Operator verknüpft. Verknüpfen kannst du es unter Profil und Einstellungen: ${site}/profil`,
+      `Dein Discord-Konto ist noch nicht mit Deal Operator verknüpft. Die interne Verknüpfung findest du in der Teamverwaltung: ${site}/verwaltung?bereich=discord`,
     );
+  if (!(await isTeamMember(database(), owner))) return reply("Discord wird nur intern vom Team genutzt. Deine Calls und Call-Partner findest du auf der Website.");
   switch (interaction.data?.name) {
     case "tagesabschluss":
       return reply(`Deinen Tagesabschluss mit Zahlen und kurzer Reflexion trägst du hier ein: ${site}/reflexionen`);

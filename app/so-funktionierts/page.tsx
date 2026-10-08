@@ -1,403 +1,48 @@
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { Phone, NotebookPen, BarChart3, UsersRound, CalendarCheck, Bell, Flame } from "lucide-react";
 import { getCurrentUser, isTeam, viewerOf } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { loadCommitmentSettings } from "@/server/settings";
-import { discordDestination } from "@/server/discord";
-import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commitment";
-import { ACTIVE_LOST_AFTER_IDLE, ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
-import { tracks } from "@/lib/kpis";
-import { ETAPPEN, GAME_LADDER, GAME_TEXT, MARK_START } from "@/lib/game";
+import { defaultCommitmentSettings } from "@/lib/commitment";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
-import DiscordSteps from "../features/discord-steps";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "So funktioniert’s · Deal Operator",
-  description:
-    "Wie Tagesabschluss, Tagesmarke, Serie, Wochenziel, Bestwerte, aktive Calling-Tage und Leistungslevel funktionieren, und wer was sieht.",
+  description: "Zahlen festhalten, gemeinsam dranbleiben und einen Call-Partner zum Üben finden.",
   alternates: { canonical: "/so-funktionierts" },
 };
-
-const DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
-const DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-
-/** „Montag bis Freitag“ oder eine Aufzählung, aus den tatsächlichen Regeln. */
-function callingDays(days: number[]) {
-  const sorted = [...days].sort((a, b) => a - b);
-  const contiguous = sorted.every((d, i) => i === 0 || d === sorted[i - 1] + 1);
-  if (sorted.length >= 3 && contiguous)
-    return `${DAY_NAMES[sorted[0] - 1]} bis ${DAY_NAMES[sorted.at(-1)! - 1]}`;
-  const names = sorted.map((d) => DAY_NAMES[d - 1]);
-  return names.length > 1 ? `${names.slice(0, -1).join(", ")} und ${names.at(-1)}` : names[0] ?? "";
-}
-const clock = ({ hour, minute }: { hour: number; minute: number }) =>
-  `${hour}:${String(minute).padStart(2, "0")} Uhr`;
-const n = (v: number) => v.toLocaleString("de-DE");
-/** „5, 10, 20, 40, 60 und 100“ */
-const listing = (values: readonly number[]) =>
-  `${values.slice(0, -1).map(n).join(", ")} und ${n(values.at(-1) ?? 0)}`;
-
-/**
- * So funktioniert’s: öffentlich lesbar. Alle Regeln (Calling-Tage, Frist,
- * Erinnerungszeiten, Schwellen) kommen aus denselben Einstellungen und
- * Konstanten wie die App, damit die Erklärung nie von der Wirklichkeit
- * abweicht.
- */
 export default async function Page() {
   const actor = await getCurrentUser().catch(() => null);
-  let settings: CommitmentSettings = defaultCommitmentSettings;
-  if (databaseReady()) {
-    try {
-      settings = await loadCommitmentSettings(database());
-    } catch {
-      settings = defaultCommitmentSettings;
-    }
-  }
-  const signedIn = !!actor;
-  const days = callingDays(settings.callingWeekdays);
-  const deadline = `${settings.deadlineHour}:00 Uhr`;
-  // Der Satz zum Freitag stimmt nur bei Calling-Tagen Montag bis Freitag.
-  const weekdaysOnly = [1, 2, 3, 4, 5].every((d) => settings.callingWeekdays.includes(d)) &&
-    !settings.callingWeekdays.some((d) => d > 5);
-  const firstLevels = tracks.map((t) => t.thresholds[0]);
-  const discord = discordDestination().url;
-
-  return (
-    <div className="operator-site">
-      <OperatorHeader viewer={viewerOf(actor)} />
-      <main id="inhalt" className="do-page hw">
-        <header className="hw-head">
-          <h1>So funktioniert’s</h1>
-          <p>
-            Deal Operator hält fest, was beim gemeinsamen Callen entsteht: deine Zahlen, was du
-            gelernt hast und was alle zusammen schaffen. Kostenfrei.
-          </p>
-          <nav className="hw-jump" aria-label="Auf dieser Seite">
-            <a href="#dein-tag">Dein Tag</a>
-            <a href="#was-zaehlt">Was zählt</a>
-            <a href="#sichtbarkeit">Wer sieht was</a>
-            <a href="#fair">Fair gezählt</a>
-            <a href="#discord">Discord</a>
-          </nav>
-        </header>
-
-        <section className="hw-section" id="dein-tag" aria-labelledby="hw-day">
-          <h2 id="hw-day">Dein Calling-Tag in drei Schritten</h2>
-          <ol className="hw-steps">
-            <li>
-              <div className="hw-step-text">
-                <h3>Callen</h3>
-                <p>
-                  Du callst wie gewohnt. Calling-Tage sind {days}; an anderen Tagen ist ein
-                  Abschluss freiwillig.
-                </p>
-              </div>
-              <div className="hw-visual hw-week" aria-hidden="true">
-                {DAY_SHORT.map((d, i) => (
-                  <span key={d} data-on={settings.callingWeekdays.includes(i + 1) || undefined}>
-                    {d}
-                  </span>
-                ))}
-              </div>
-            </li>
-            <li>
-              <div className="hw-step-text">
-                <h3>Zahlen eintragen</h3>
-                <p>
-                  Anwahlen, Settings und Closings eintragen, Energie wählen und zwei Fragen
-                  beantworten: Was lief gut? Was machst du beim nächsten Calling-Tag besser?
-                </p>
-              </div>
-              <div className="hw-visual hw-form" aria-hidden="true">
-                <span>
-                  <small>Anwahlen</small>
-                  <b>64</b>
-                </span>
-                <span>
-                  <small>Settings</small>
-                  <b>2</b>
-                </span>
-                <span>
-                  <small>Closings</small>
-                  <b>0</b>
-                </span>
-                <em>Beispiel</em>
-              </div>
-            </li>
-            <li>
-              <div className="hw-step-text">
-                <h3>Sehen, was entsteht</h3>
-                <p>
-                  Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein
-                  Tag liest du danach, was bei anderen funktioniert hat.
-                </p>
-              </div>
-              <div className="hw-visual hw-rank" aria-hidden="true">
-                {[1, 2, 2].map((place, i) => (
-                  <span key={i} data-place={place}>
-                    <b>{place}</b>
-                    <i style={{ width: `${[92, 70, 70][i]}%` }} />
-                  </span>
-                ))}
-                <em>Gleichstand, gleicher Platz</em>
-              </div>
-            </li>
-          </ol>
-          <Cta signedIn={signedIn} />
-        </section>
-
-        <section className="hw-section" id="was-zaehlt" aria-labelledby="hw-counts">
-          <h2 id="hw-counts">Was wofür zählt</h2>
-          <div className="hw-systems">
-            <article id="tagesmarke">
-              <div className="hw-key">
-                <strong>
-                  {n(MARK_START)} bis {n(GAME_LADDER.at(-1) ?? MARK_START)}
-                </strong>
-                <span>Anwahlen, nach deinem üblichen Tag</span>
-              </div>
-              <div>
-                <h3>{GAME_TEXT.guideMarkTitle}</h3>
-                <p>{GAME_TEXT.guideMarkText}</p>
-              </div>
-            </article>
-            <article id="serie">
-              <div className="hw-key">
-                <strong>bis {deadline}</strong>
-                <span>am nächsten Calling-Tag</span>
-              </div>
-              <div>
-                <h3>Serie</h3>
-                <p>
-                  Jeder rechtzeitige Tagesabschluss an einem Calling-Tag verlängert deine Serie,
-                  auch mit 0 Anwahlen.
-                  {weekdaysOnly ? ` Für Freitag bleibt also Zeit bis Montag, ${deadline}.` : ""}{" "}
-                  Wochenenden und bestätigte Pausen unterbrechen die Serie nicht. Später
-                  eingereicht zählen deine Zahlen trotzdem, nur die Serie nicht. Die Flamme zeigt
-                  deine Serie; Etappen erreichst du bei {listing(ETAPPEN)} Tagen.
-                </p>
-              </div>
-            </article>
-            <article id="wochenziel">
-              <div className="hw-key">
-                <strong>Mo bis So</strong>
-                <span>dein Ziel und das gemeinsame</span>
-              </div>
-              <div>
-                <h3>Wochenziel</h3>
-                <p>
-                  Dein Wochenziel in Anwahlen legst du im Profil fest. Unter Mein Fortschritt füllt
-                  sich der Balken mit allen Anwahlen der Woche, auch vom Wochenende, und je
-                  Calling-Tag siehst du, wo du eine volle Runde hattest.
-                </p>
-                <p>{GAME_TEXT.communityGuide}</p>
-              </div>
-            </article>
-            <article id="bestwerte">
-              <div className="hw-key">
-                <strong>ab Tag 6</strong>
-                <span>mit Meldung</span>
-              </div>
-              <div>
-                <h3>Bestwerte</h3>
-                <p>
-                  Deine meisten Anwahlen, Settings, Closings und Deals an einem Tag, dazu deine
-                  beste Woche und dein bester Monat in Anwahlen. Bei Gleichstand zählt der
-                  frühere Tag. Einen neuen Bestwert zeigt dir die Karte Mein Tag direkt nach dem
-                  Einreichen. Bestwerte siehst nur du.
-                </p>
-              </div>
-            </article>
-            <article id="aktive-calling-tage">
-              <div className="hw-key">
-                <strong>{ACTIVE_RUN_DAYS} Tage am Stück</strong>
-                <span>mit mindestens {ACTIVE_MIN_ATTEMPTS} Anwahlen</span>
-              </div>
-              <div>
-                <h3>Aktiver Caller</h3>
-                <p>
-                  Damit wirst du Aktiver Caller: Sessions und Roleplay stehen dir offen, im
-                  Discord trägst du die gleichnamige Rolle. Nach {ACTIVE_LOST_AFTER_IDLE}{" "}
-                  Calling-Tagen in Folge ohne Anwahlen ist der Rang wieder weg.
-                </p>
-              </div>
-            </article>
-            <article id="leistungslevel">
-              <div className="hw-key">
-                <strong>Level 1</strong>
-                <span>ab {n(firstLevels[0])} Anwahlen</span>
-              </div>
-              <div>
-                <h3>Leistungslevel</h3>
-                <p>
-                  Aus allen deinen Tagen, getrennt je Kennzahl: Level 1 gibt es ab{" "}
-                  {n(firstLevels[0])} Anwahlen, {n(firstLevels[1])} Settings,{" "}
-                  {n(firstLevels[2])} Closings oder dem ersten Deal.
-                </p>
-              </div>
-            </article>
-          </div>
-          {signedIn && (
-            <Link className="do-link" href="/heute?modus=eigen">
-              Mein Fortschritt ansehen
-            </Link>
-          )}
-        </section>
-
-        <section className="hw-section" id="sichtbarkeit" aria-labelledby="hw-who">
-          <h2 id="hw-who">Wer sieht was</h2>
-          <dl className="hw-who">
-            <div>
-              <dt>Alle</dt>
-              <dd>
-                Anzeigename, Firma, Rolle, deine gemeldeten Zahlen in Rangliste und gemeinsamer
-                Summe und deine Serie. Wer nicht mehr erscheinen möchte, wendet sich an das Team.
-              </dd>
-            </div>
-            <div>
-              <dt>Angemeldete mit Profil und Telefonnummer</dt>
-              <dd>
-                Deine eingereichten Reflexionen unter Mein Tag: was gut lief, dein nächster
-                Schritt, deine Energie, mit den Zahlen des Tages. Dein Call-Profil, wenn du es
-                bei den Call-Partnern zeigst.
-              </dd>
-            </div>
-            <div>
-              <dt>Nur das Team</dt>
-              <dd>E-Mail-Adresse, Telefonnummer und dein Wunsch nach Unterstützung.</dd>
-            </div>
-            <div>
-              <dt>Nur du</dt>
-              <dd>
-                Entwürfe, bis du sie einreichst. Deine Tagesmarke, deine Bestwerte und dein Stand
-                zum Wochenziel.
-              </dd>
-            </div>
-          </dl>
-          <Link className="do-link" href="/datenschutz">
-            Datenschutz
-          </Link>
-        </section>
-
-        <section className="hw-section" id="fair" aria-labelledby="hw-fair">
-          <h2 id="hw-fair">Fair gezählt</h2>
-          <ul className="hw-rules">
-            <li>
-              <strong>Closings wiegen mehr als Anwahlen.</strong> Die Reihenfolge folgt dem
-              Gesamterfolg des Tages aus Anwahlen, vereinbarten Settings und Closings und
-              gewonnenen Deals; die Zahlen selbst stehen in jeder Zeile.
-            </li>
-            <li>
-              <strong>0 ist eine Meldung, keine Meldung ist keine 0.</strong> Wer nichts meldet,
-              steht in der Rangliste nicht.
-            </li>
-            <li>
-              <strong>Gleichstände teilen sich einen Platz.</strong> Stehen drei Personen auf
-              Platz 2, folgt Platz 5.
-            </li>
-          </ul>
-        </section>
-
-        <section className="hw-section" aria-labelledby="hw-more">
-          <h2 id="hw-more">Gut zu wissen</h2>
-          <div className="hw-details">
-            <details>
-              <summary>Urlaub, Krankheit, Pause</summary>
-              <p>
-                Melde eine Pause unter Mein Fortschritt. Sobald das Team sie bestätigt, zählen
-                diese Tage nicht, und deine Serie wartet. Eine Pause beginnt frühestens heute und
-                dauert höchstens zwei Monate am Stück. Für vergangene Tage sprich das Team an.
-              </p>
-            </details>
-            <details>
-              <summary>Einen Tag nachtragen oder korrigieren</summary>
-              <p>
-                Unter Mein Tag wählst du einen anderen Tag. Nachgetragene Zahlen zählen in der
-                Rangliste; für die Serie zählt nur, was rechtzeitig kam. Für Tagesmarke, Bestwerte
-                und Wochenziel zählt dein Stand bis zur Frist, bei einem Nachtrag deine erste
-                Einreichung: spätere Erhöhungen zählen dort nicht, Senkungen sofort. Bei einer
-                Korrektur gilt die eingereichte Fassung, bis du die neue vollständig einreichst.
-                Fehlen mehrere Abschlüsse, fragt das Team kurz nach, ob alles passt.
-              </p>
-            </details>
-            <details>
-              <summary>Erinnerungen</summary>
-              <p>
-                Nur wenn du sie auf deinem Gerät einschaltest: um {clock(settings.eveningReminder)},
-                falls dein Abschluss an einem Calling-Tag noch fehlt, und um{" "}
-                {clock(settings.streakWarning)} am nächsten Calling-Tag vor Fristende. Geräte stellst
-                du unter Profil und Einstellungen ein.
-              </p>
-            </details>
-            <details>
-              <summary>Deine Zahlen stehen schon in der Rangliste</summary>
-              <p>
-                Such deinen Namen in der Rangliste, tipp ihn an und wähle „Das sind meine
-                Zahlen“. Nach der Prüfung durch das Team gehört das Profil mit allen bisherigen
-                Tagen zu deinem Konto. Es entsteht kein zweites Profil.
-              </p>
-            </details>
-            <details>
-              <summary>Weitere Zählregeln</summary>
-              <ul className="hw-rules">
-                <li>
-                  <strong>Tag und Monat stehen getrennt.</strong> Der Verlauf zeigt jeden Tag einzeln,
-                  keine laufende Summe.
-                </li>
-                <li>
-                  <strong>Gemeinsame Meldungen zählen genau einmal.</strong> Sie bekommen keinen
-                  eigenen Platz; aufgeteilte Werte sind als zugeteilt gekennzeichnet.
-                </li>
-                <li>
-                  <strong>Ehrlich bei leeren Tagen.</strong> Ist für heute noch nichts gemeldet, zeigt
-                  die Startseite den letzten gemeldeten Tag und sagt das dazu.
-                </li>
-              </ul>
-            </details>
-          </div>
-        </section>
-
-        <section className="hw-section hw-discord" id="discord" aria-labelledby="hw-discord">
-          <div>
-            <h2 id="hw-discord">Zahlen hier, Calls im Discord</h2>
-            <p>
-              Tagesabschlüsse und Reflexionen bleiben auf dieser Website. Im Discord trefft ihr
-              euch zu Sessions und Roleplay, findet Call-Partner und pusht euch gegenseitig.
-              Aktive Caller tragen dort ihren Rang.
-            </p>
-            <DiscordSteps />
-          </div>
-          <a className="do-button do-button-secondary" href={discord} target="_blank" rel="noopener noreferrer">
-            Discord öffnen
-            <ExternalLink size={16} aria-hidden="true" />
-            <span className="do-sr">(neues Fenster)</span>
-          </a>
-        </section>
-      </main>
-      <OperatorFooter discordUrl={discord} showAdmin={!!actor && isTeam(actor)} />
-    </div>
-  );
-}
-
-function Cta({ signedIn }: { signedIn: boolean }) {
-  return signedIn ? (
-    <div className="hw-cta">
-      <Link className="do-button do-button-primary" href="/tagesabschluss">
-        Zahlen eintragen
-      </Link>
-      <Link className="do-button do-button-secondary" href="/">
-        Zu den Ergebnissen
-      </Link>
-    </div>
-  ) : (
-    <div className="hw-cta">
-      <Link className="do-button do-button-primary" href="/starten?weg=neu">
-        Kostenfrei starten
-      </Link>
-      <Link className="do-button do-button-secondary" href="/starten?weg=profil">
-        Meine Zahlen sind schon hier
-      </Link>
-    </div>
-  );
+  const settings = databaseReady() ? await loadCommitmentSettings(database()).catch(() => defaultCommitmentSettings) : defaultCommitmentSettings;
+  const clock = (v: { hour: number; minute: number }) => `${v.hour}:${String(v.minute).padStart(2,"0")} Uhr`;
+  return <div className="operator-site">
+    <OperatorHeader viewer={viewerOf(actor)} />
+    <main id="inhalt" className="do-page hw hw-simple">
+      <header className="hw-head">
+        <span className="hw-eyebrow">Dein Calling-Tag. Sichtbar gemacht.</span>
+        <h1>Callen. Festhalten. Dranbleiben.</h1>
+        <p>Sieh, was du und die anderen schaffen. Halte deinen Tag fest und finde jemanden, mit dem du besser wirst.</p>
+        <div className="hw-cta"><Link className="do-button do-button-primary" href={actor ? "/tagesabschluss" : "/starten"}>{actor ? "Meinen Tag eintragen" : "Kostenfrei starten"}</Link><Link className="do-button do-button-secondary" href="/">Ergebnisse ansehen</Link></div>
+      </header>
+      <section className="hw-section" aria-labelledby="hw-day">
+        <h2 id="hw-day">So läuft dein Tag</h2>
+        <ol className="hw-steps">
+          <li><div className="hw-step-text"><Phone size={24} aria-hidden="true" /><h3>Du callst</h3><p>Allein oder mit einem Call-Partner. Anwahlen, Settings und Closings hältst du am Ende fest.</p></div><div className="hw-visual hw-week" aria-hidden="true">{["Mo","Di","Mi","Do","Fr","Sa","So"].map((d,i) => <span key={d} data-on={settings.callingWeekdays.includes(i+1) || undefined}>{d}</span>)}</div></li>
+          <li><div className="hw-step-text"><NotebookPen size={24} aria-hidden="true" /><h3>Du hältst deinen Tag fest</h3><p>Zahlen, Energie und eine kurze Reflexion: Was lief gut? Was probierst du beim nächsten Mal?</p></div><div className="hw-visual hw-form" aria-hidden="true"><span><small>Anwahlen</small><b>64</b></span><span><small>Settings</small><b>2</b></span><span><small>Closings</small><b>1</b></span><em>Beispiel</em></div></li>
+          <li><div className="hw-step-text"><BarChart3 size={24} aria-hidden="true" /><h3>Du siehst deinen Fortschritt</h3><p>Deine Zahlen erscheinen in der Rangliste. Tag für Tag entsteht dein Verlauf.</p></div><div className="hw-visual hw-rank" aria-hidden="true">{[1,2,3].map((n,i) => <span key={n} data-place={n}><b>{n}</b><i style={{width:`${[92,70,48][i]}%`}} /></span>)}<em>Ein Tag. Gemeinsame Ergebnisse.</em></div></li>
+        </ol>
+      </section>
+      <section className="hw-section" aria-labelledby="hw-routine"><h2 id="hw-routine">Was dir beim Dranbleiben hilft</h2><div className="hw-benefits">
+        <article><Flame size={26} aria-hidden="true" /><h3>Deine Serie</h3><p>Ein rechtzeitiger Tagesabschluss verlängert deine Serie. Wochenenden und bestätigte Pausen unterbrechen sie nicht.</p></article>
+        <article><UsersRound size={26} aria-hidden="true" /><h3>Ein Call-Partner</h3><p>Zeig, wann du Zeit hast und was du üben möchtest. Anfragen und Abstimmung laufen direkt hier.</p><Link className="do-link" href="/partner?modus=eigen">Call-Partner finden</Link></article>
+        <article><CalendarCheck size={26} aria-hidden="true" /><h3>Gemeinsame Calls</h3><p>Roleplay, Einwände oder ein zusätzlicher Call-Block. Zusagen und zum Termin den Google-Call öffnen. Ohne Level-Hürde.</p><Link className="do-link" href="/sessions?modus=eigen">Termine ansehen</Link></article>
+      </div></section>
+      <section className="hw-section" aria-labelledby="hw-questions"><h2 id="hw-questions">Noch eine Frage?</h2><div className="hw-details">
+        <details><summary>Meine Zahlen sind schon hier. Wie übernehme ich sie?</summary><p>Wähle deinen Namen in der Rangliste und „Das sind meine Zahlen“. Nach der Prüfung gehören alle bisherigen Tage zu deinem Konto.</p><Link className="do-link" href="/starten?weg=profil">Mein Profil auswählen</Link></details>
+        <details><summary>Kann ich Zahlen nachtragen oder korrigieren?</summary><p>Ja. Unter Mein Tag wählst du das passende Datum. Die Zahlen zählen im Ranking. Für deine Serie muss der Abschluss bis {settings.deadlineHour}:00 Uhr am nächsten Calling-Tag eingehen.</p></details>
+        <details><summary>Wie schalte ich Erinnerungen ein?</summary><p><Bell size={16} aria-hidden="true" /> Nach einer Call-Zusage oder im Profil kannst du Benachrichtigungen erlauben. Für deinen Tagesabschluss erinnern wir dich um {clock(settings.eveningReminder)}, wenn er noch fehlt. Du kannst sie jederzeit im Profil ausschalten.</p></details>
+      </div></section>
+    </main><OperatorFooter showAdmin={!!actor && isTeam(actor)} />
+  </div>;
 }

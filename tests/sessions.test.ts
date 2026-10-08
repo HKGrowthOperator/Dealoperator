@@ -63,22 +63,16 @@ function fakeDiscord(opts: { missing?: Set<string> } = {}) {
   return { calls, fetcher };
 }
 
-test("sessions need at least 12 hours and must be set up by the day before", () => {
-  const now = at("2026-09-23T18:00:00Z"); // 20:00 in Berlin
+test("calls may be arranged today, but never in the past", () => {
+  const now = at("2026-09-23T18:00:00Z");
   assert.match(sessionLeadError(at("2026-09-23T17:00:00Z"), now)!, /zukünftigen/);
-  // Heute noch (Berlin): zu kurzfristig.
-  assert.match(sessionLeadError(at("2026-09-23T21:00:00Z"), now)!, /Vortag/);
-  // Morgen früh um 7 Uhr Berlin: nur 11 Stunden.
-  assert.match(sessionLeadError(at("2026-09-24T05:00:00Z"), now)!, /12 Stunden/);
-  // Morgen 9 Uhr Berlin: 13 Stunden, erlaubt.
-  assert.equal(sessionLeadError(at("2026-09-24T07:00:00Z"), now), null);
-  assert.equal(earliestSessionDay(now), "2026-09-24");
-  // Kurz vor Mitternacht in Berlin: morgen ist der nächste Kalendertag.
-  assert.equal(earliestSessionDay(at("2026-09-23T21:30:00Z")), "2026-09-24");
+  assert.equal(sessionLeadError(at("2026-09-23T18:01:00Z"), now), null);
+  assert.equal(sessionLeadError(new Date("invalid"), now), "Wähle einen zukünftigen Termin.");
+  assert.equal(earliestSessionDay(now), "2026-09-23");
 });
 
 test("members create and edit their own sessions; the team may edit and cancel any, the host stays", async () => {
-  await assert.rejects(createSession(db, alice, "Alice", input(new Date(Date.now() + 3600_000).toISOString())), /Vortag|Vorlauf|12 Stunden/);
+  await assert.rejects(createSession(db, alice, "Alice", input(new Date(Date.now() - 3600_000).toISOString())), /zukünftigen/);
   const start = new Date(Date.now() + 3 * 86_400_000).toISOString();
   const { id } = await createSession(db, alice, "Alice", input(start));
   const [row] = await db.query("SELECT data FROM sessions WHERE id=$1", [id]);
@@ -99,8 +93,8 @@ test("members create and edit their own sessions; the team may edit and cancel a
   assert.equal(edited.discord.channelId, "c9");
   // Verschieben auf zu kurzfristig: abgelehnt.
   await assert.rejects(
-    editSession(db, { userId: alice, team: false }, id, input(new Date(Date.now() + 2 * 3600_000).toISOString())),
-    /Vortag|12 Stunden/,
+    editSession(db, { userId: alice, team: false }, id, input(new Date(Date.now() - 2 * 3600_000).toISOString())),
+    /zukünftigen/,
   );
   await cancelSession(db, { userId: mo, team: true }, id);
   assert.equal(JSON.parse((await db.query("SELECT data FROM sessions WHERE id=$1", [id]))[0].data).cancelled, true);

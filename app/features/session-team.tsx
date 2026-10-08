@@ -156,7 +156,7 @@ export function SessionRoomLink({
         void mutate("sessionRoom", { id: session.id, url });
       }}
     >
-      <label htmlFor={`${id}-url`}>Discord-Link zum Raum</label>
+      <label htmlFor={`${id}-url`}>Google-Meet-Link zum Call</label>
       <div className="session-guest-row">
         <input
           id={`${id}-url`}
@@ -164,7 +164,7 @@ export function SessionRoomLink({
           inputMode="url"
           autoComplete="off"
           maxLength={300}
-          placeholder="https://discord.gg/…"
+          placeholder="https://meet.google.com/abc-defg-hij"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
         />
@@ -172,7 +172,7 @@ export function SessionRoomLink({
           {url.trim() ? "Link speichern" : "Link entfernen"}
         </button>
       </div>
-      <p className="hint">Wer dabei ist, sieht dann „Zum Session-Raum im Discord“.</p>
+      <p className="hint">Der Button „Zum Call“ öffnet diesen Google-Meet-Raum.</p>
     </form>
   );
 }

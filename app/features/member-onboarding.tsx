@@ -23,7 +23,6 @@ export default function MemberOnboarding({
   next,
   presetName,
   needsPhone,
-  discordUrl,
   takenProfile = "",
   suggestions = [],
   fromRegistration = false,
@@ -121,14 +120,8 @@ export default function MemberOnboarding({
             </Link>
           </div>
           <div className="flow-notice">
-            <strong>Calls und Roleplay laufen im Discord</strong>
-            <p>
-              Dort findet ihr euch zum Üben und pusht euch gegenseitig. Kostenfrei und
-              freiwillig.{" "}
-              <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-                Discord öffnen
-              </a>
-            </p>
+            <strong>Gemeinsam callen und üben</strong>
+            <p>Finde einen Call-Partner oder sag beim nächsten Roleplay zu. <Link href="/partner?modus=eigen">Call-Partner ansehen</Link></p>
           </div>
         </div>
       </section>

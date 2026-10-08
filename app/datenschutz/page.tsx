@@ -193,34 +193,9 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>9. Discord</h2>
-          <p>
-            Die Website verlinkt auf einen Discord-Server. Discord ist ein
-            eigenständiger Dienst der Discord Netherlands B.V. Mit dem Aufruf
-            des Links gilt deren Datenschutzerklärung.
-          </p>
-          <p>
-            Sobald der Betreiber sie eingerichtet hat, gilt: Für jede Session
-            legt die Website im Discord einen Raum und ein Event an (Titel,
-            Format, Zeit, Dauer, Plätze und der Anzeigename der Person, die
-            sie anbietet). Freiwillig kannst du dein Discord-Konto verknüpfen
-            (gespeichert werden Discord-ID und Discord-Name); dann bekommst
-            du im Discord die Ränge „Aktiver Caller“ und, im Team,
-            „Moderator“. Zeigst du zusätzlich dein Call-Profil bei den
-            Call-Partnern, sehen angemeldete Mitglieder dort einen Link zu
-            deinem Discord-Profil und, falls du ihn im Call-Profil einträgst,
-            deinen Discord-Namen, um dich anzuschreiben. Admins und
-            Moderatoren sehen alle Call-Profile, auch nicht gezeigte, um
-            Call-Partner und Sessions zu vermitteln. Kommende Sessions (Titel,
-            Format, Termin, Dauer, belegte Plätze und der Anzeigename der Person,
-            die sie anbietet) stehen öffentlich auf der Startseite; wer teilnimmt,
-            sehen nur angemeldete Mitglieder. Das Team kann Personen, die ihre
-            Teilnahme an anderer Stelle zugesagt haben, für eine Session
-            vormerken; dafür entsteht bei Bedarf ein Profil mit dem Anzeigenamen,
-            das die Person später übernehmen kann. Tagesabschlüsse,
-            Reflexionen, Zahlen und Kontaktdaten werden <strong>nicht</strong>{" "}
-            an Discord übertragen.
-          </p>
+          <h2>9. Gemeinsame Calls</h2>
+          <p>Gemeinsame Calls und Roleplays verlinken auf Google Meet. Beim Öffnen des Call-Links verlassen Sie die Website. Für die Verarbeitung im Call gilt die Datenschutzerklärung des jeweiligen Anbieters. Die Website überträgt keine E-Mail-Adresse oder Telefonnummer über den Call-Link.</p>
+          <p>Eine bestehende Discord-Anbindung wird ausschließlich intern durch das Team verwaltet. Für Call-Partner, Zusagen und gemeinsame Calls ist kein Discord-Konto erforderlich.</p>
         </section>
 
         <section>

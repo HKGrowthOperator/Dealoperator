@@ -7,19 +7,16 @@ import {
   setSessionRoom,
   toggleAttendance,
 } from "@/server/sessions";
-import { sessionRoomsReady } from "@/server/discord-sessions";
 import { teamRecipients } from "@/server/roles";
-import { discordDestination } from "@/server/discord";
 import { activeCallerFor } from "@/server/active-caller";
-import { ACTIVE_MIN_ATTEMPTS, ACTIVE_RUN_DAYS } from "@/lib/active-caller";
-import { sessionRoomOf } from "@/lib/discord";
+import { aggregate, progress } from "@/lib/kpis";
+import { callRoomOf } from "@/lib/call-room";
 import { loadWorkflows, handleWorkflow } from "./workflows";
 import { database } from "@/server/database";
 import { loadOwnRecords } from "@/server/records";
 import { body as readBody, errorResponse } from "@/server/http";
 import { AppError, rateLimit } from "@/server/operator";
-import { getCurrentUser, isTeam, type Actor } from "@/server/auth";
-import type { Database } from "@/server/database";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { emptyProfile, resources } from "../../data";
 import { z } from "zod";
 const s = z.string().trim();
@@ -60,18 +57,6 @@ const sessionSchema = z.object({
   // Einen eigenen Raum-Link gibt es nicht mehr: der Raum entsteht im Discord.
   startsAt: z.string().datetime().optional(),
 });
-/**
- * Sessions & Roleplay sind mit dem Rang „Aktiver Caller“ freigeschaltet. Das
- * Team (Admins, Moderatoren) legt Sessions an und betreut sie immer.
- */
-async function requireSessionAccess(database: Database, user: Actor) {
-  if (user.admin || user.moderator) return;
-  if ((await activeCallerFor(database, user.userId)).active) return;
-  throw new AppError(
-    `Sessions & Roleplay schaltest du als aktiver Caller frei: ${ACTIVE_RUN_DAYS} Calling-Tage am Stück mit mindestens ${ACTIVE_MIN_ATTEMPTS} Anwahlen.`,
-    403,
-  );
-}
 function db() {
   return database();
 }
@@ -158,33 +143,31 @@ export async function GET() {
       [user.userId],
     );
     const stored = profile ? JSON.parse(profile.data) : emptyProfile;
-    // Kontakt über Discord nur für Personen, die ihr Call-Profil zeigen und
-    // ihr Discord-Konto selbst verknüpft haben. Kein Discord-Name, nur der Link.
-    const listedIds = crew.results
-      .map((r: any) => r.id as string)
-      .filter((id: string) => id !== user.userId);
-    const discordLinks = listedIds.length
-      ? await database.query(
-          "SELECT owner,discord_user_id FROM discord_links WHERE owner = ANY($1::text[])",
-          [listedIds],
-        )
-      : [];
-    const discordFor = (owner: string) => {
-      const link = discordLinks.find((l) => l.owner === owner);
-      const id = link ? String(link.discord_user_id) : "";
-      return /^\d{5,25}$/.test(id) ? `https://discord.com/users/${id}` : undefined;
+    const [verifiedPackages] = await database.query("SELECT value FROM app_settings WHERE key='dealuno_profiles'");
+    const packageOf = (owner: string) => {
+      const entry = verifiedPackages?.value?.[owner];
+      return entry?.active === true && typeof entry.packageName === "string" ? entry.packageName.slice(0,60) : undefined;
     };
+    const shownOwners = [...new Set([user.userId, ...crew.results.map((p: any) => String(p.id))])];
+    const levelRows = await database.query(
+      `SELECT p.owner,c.counts FROM participants p JOIN checkins c ON c.participant=p.id
+       WHERE p.owner=ANY($1::text[]) AND p.kind='person'`, [shownOwners],
+    );
+    const levelsOf = (owner: string) => progress(aggregate(levelRows.filter((v) => v.owner === owner).map((v) => v.counts)))
+      .filter((v) => v.level > 0).map((v) => ({ label: v.label, level: v.level }));
     return json({
       ...workflows,
-      // Treffpunkt für Sessions und Call-Partner ist Discord.
-      discord: { invite: discordDestination().url, rooms: sessionRoomsReady() },
+      ownLevels: levelsOf(user.userId),
+      ownPackageName: packageOf(user.userId),
+      // Calls öffnen Google Meet, ohne Discord-Konto oder Level-Hürde.
+      callUrl: callRoomOf(""),
       viewerTeam: isTeam(user),
       viewerRole: user.admin ? "admin" : user.moderator ? "moderator" : null,
-      // Rang „Aktiver Caller“: schaltet Sessions & Roleplay frei.
+      // Der Rang ist ein Profilstatus und keine Zugriffshürde.
       activeCaller: active,
       profile: own
-        ? { ...stored, name: own.name as string, role: (own.role as string) || "" }
-        : stored,
+        ? { ...stored, discordName: "", name: own.name as string, role: (own.role as string) || "" }
+        : { ...stored, discordName: "" },
       ownProfile: !!own,
       records: records.results.map((r: any) => JSON.parse(r.data)),
       members: crew.results
@@ -198,7 +181,9 @@ export async function GET() {
         .map(({ row: r, profile: p }: { row: any; profile: z.infer<typeof profileSchema> }) => ({
           id: r.id,
           ...p,
-          discord: discordFor(r.id),
+          levels: levelsOf(r.id),
+          packageName: packageOf(r.id),
+          discordName: undefined,
           latest: (() => {
             const record = shared.results.find((x: any) => x.owner === r.id);
             if (!record) return undefined;
@@ -213,16 +198,16 @@ export async function GET() {
         })),
       people: people.map((p) => ({ id: p.id as string, name: p.name as string })),
       sessions: sessions.results.map((r: any) => {
-        const { discord, guests: rawGuests, roomUrl, ...data } = JSON.parse(r.data);
+        const { guests: rawGuests, roomUrl, ...data } = JSON.parse(r.data);
         const guests: string[] = Array.isArray(rawGuests) ? rawGuests.filter((x: unknown) => typeof x === "string") : [];
         return {
         ...data,
-        // Nur der Link in den Discord-Raum, keine internen Kennungen. Roleplay
-        // läuft immer im festen Raum; sonst geht ein vom Abgleich angelegter
-        // Raum vor dem vom Team eingetragenen Link.
-        ...sessionRoomOf(String(data.kind ?? ""), discord, roomUrl),
+        discord: undefined,
+        // Ein terminbezogener Google-Link geht vor dem gemeinsamen Raum.
+        room: callRoomOf(roomUrl, data.url),
+        roomManual: !!roomUrl,
         guests: guests.map((g) => ({ id: g, name: guestName(g) })),
-        roomEvent: discord?.eventUrl && !discord.closed ? discord.eventUrl : "",
+
         team: team.includes(r.owner),
         id: r.id,
         owner: r.owner,
@@ -318,7 +303,6 @@ export async function POST(request: Request) {
         .run();
     } else if (body.action === "session" || body.action === "editSession") {
       const value = sessionSchema.parse(body.value);
-      if (body.action === "session") await requireSessionAccess(database, user);
       const profile = await database
         .prepare("SELECT data FROM profiles WHERE id = ?")
         .bind(id)
@@ -357,9 +341,7 @@ export async function POST(request: Request) {
       await cancelSession(database, { userId: id, team: isTeam(user) }, sid);
     } else if (body.action === "rsvp") {
       const sid = s.min(1).max(100).parse(body.value);
-      // Absagen geht immer; zusagen nur mit freigeschalteten Sessions.
-      const [present] = await database.query("SELECT 1 FROM rsvps WHERE session=$1 AND owner=$2", [sid, id]);
-      if (!present) await requireSessionAccess(database, user);
+      // Zusagen und Absagen sind unabhängig vom Level.
       await toggleAttendance(database, id, sid);
     } else if (body.action === "buddy") {
       const value = z

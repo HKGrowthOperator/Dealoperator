@@ -2,11 +2,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, PencilLine } from "lucide-react";
+import { PencilLine } from "lucide-react";
 import OperatorWordmark from "./operator-wordmark";
 import AccountMenu from "./account-menu";
 import { keepInstallPrompt } from "./install-app";
-import { DISCORD_INVITE } from "@/lib/discord";
 
 /** Anmeldestand für Kopf und Reiterleiste. */
 export type Viewer = {
@@ -73,7 +72,7 @@ function areaOf(path: string): Area {
 const MAIN = [
   { area: "results", href: "/", label: "Ergebnisse" },
   { area: "day", href: "/tagesabschluss", label: "Mein Tag", only: "in" },
-  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner", only: "in" },
+  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner" },
   { area: "how", href: "/so-funktionierts", label: "So funktioniert’s", only: "out" },
 ] as const;
 
@@ -140,16 +139,6 @@ export function OperatorHeader({
           Verwaltung
         </Link>
       )}
-      <a
-        className="do-nav-link do-nav-discord"
-        href={DISCORD_INVITE}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        Discord
-        <ExternalLink size={14} aria-hidden="true" />
-        <span className="do-sr">(neues Fenster)</span>
-      </a>
     </>
   );
   return (
@@ -213,7 +202,6 @@ export function OperatorHeader({
 }
 
 export function OperatorFooter({
-  discordUrl = DISCORD_INVITE,
   showAdmin = false,
 }: {
   discordUrl?: string;
@@ -229,9 +217,7 @@ export function OperatorFooter({
         <nav aria-label="Weitere Seiten">
           <Link href="/fuer-wen">Für wen</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
-          <a href={discordUrl} target="_blank" rel="noopener noreferrer">
-            Discord
-          </a>
+          <Link href="/partner?modus=eigen">Call-Partner</Link>
           <a href="https://dealuno.hk-growthoperator.de/">DealUno</a>
           <a href="https://website.hk-growthoperator.de/">Webstudio</a>
           <a href="https://hk-growthoperator.de/">HK Growth</a>

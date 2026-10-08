@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -22,16 +22,14 @@ import {
 } from "./features/closing-form";
 import { GAME_TEXT, type BestMetric, type WeekView } from "@/lib/game";
 import AccountSettings, { AccountAccess } from "./features/account-settings";
-import PushSetup from "./features/push-setup";
-import DiscordLink from "./features/discord-link";
-import { ROLEPLAY_ROOM } from "@/lib/discord";
+import PushSetup, { PushPrompt } from "./features/push-setup";
+import { callRoomOf } from "@/lib/call-room";
 import type { CommitmentSettings } from "@/lib/commitment";
 import BuddyInbox from "./features/buddy-inbox";
 import ExchangeBoard from "./features/exchange-board";
 import ActiveCallerCard from "./features/active-caller-card";
 import {
   earliestSessionDay,
-  SESSION_LEAD_HOURS,
   sessionEnd,
   sessionLeadError,
 } from "@/lib/session-rules";
@@ -61,13 +59,10 @@ import {
   LogIn,
   Download,
   Info,
-  Lock,
-  ArrowUpRight,
   X,
 } from "lucide-react";
 import { OperatorHeader, OperatorFooter } from "./features/operator-shell";
 import AreaNav from "./features/area-nav";
-import DiscordSteps from "./features/discord-steps";
 import {
   Dialog,
   DialogContent,
@@ -300,23 +295,17 @@ function MiniChart({
 export default function CommunityApp({
   initialView,
   signedIn,
-  discordUrl,
   settings,
-  discordLink,
-  discordResult,
 }: {
   initialView: View;
   signedIn: boolean;
-  discordUrl: string;
   /** Regeln für Erinnerungen (nur Profil). */
   settings?: CommitmentSettings;
-  /** Stand der Discord-Verknüpfung (nur Profil). */
-  discordLink?: { available: boolean; link: { name: string; since: string } | null } | null;
-  discordResult?: string;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const modeQuery = searchParams.get("modus");
+  const wantedCall = searchParams.get("call");
   const [cancelSession, setCancelSession] = useState<Session | null>(null);
   const [editSessionId, setEditSessionId] = useState<string | null>(null);
   const [knowledgeTab, setKnowledgeTab] = useState("Austausch");
@@ -429,6 +418,14 @@ export default function CommunityApp({
       window.removeEventListener("focus", sync);
     };
   }, [demo, signedIn, saving, refresh]);
+  const openedCall = useRef<string | null>(null);
+  useEffect(() => {
+    if (!wantedCall || loading || openedCall.current === wantedCall) return;
+    const found = data.sessions.find((s) => s.id === wantedCall);
+    if (!found) return;
+    const timer = window.setTimeout(() => { openedCall.current = wantedCall; setSession(found); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [wantedCall, loading, data.sessions]);
   // Tagesrunde (lib/game.ts) für Fortschritt und Tage: Woche, Tagesmarke,
   // Bestwerte und je Tag volle Runde. Sie kommt mit dem Stand des
   // Tagesabschlusses, den die Serie darunter ohnehin braucht, und wird nach
@@ -609,17 +606,8 @@ export default function CommunityApp({
     setData(blankData);
     void refresh();
   }
-  // Sessions & Roleplay: mit dem Rang „Aktiver Caller“; das Team immer.
-  const sessionsOpen =
-    demo || !!data.viewerTeam || !!data.activeCaller?.active;
-  const discordInvite = data.discord?.invite || discordUrl;
+  const sessionsOpen = true;
   function openNewSession() {
-    if (!sessionsOpen) {
-      toast.info(
-        "Sessions legst du als aktiver Caller an: 5 Calling-Tage am Stück mit mindestens 50 Anwahlen.",
-      );
-      return;
-    }
     if (!data.profile.name) {
       toast.info(
         "Ergänze zuerst deinen Anzeigenamen, damit die anderen sehen, wer die Session anbietet.",
@@ -736,7 +724,7 @@ export default function CommunityApp({
     const esc = (v: string) =>
       v.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/[,;]/g, "\\$&");
     // Roleplay läuft immer im festen Raum, auch im Kalendereintrag.
-    const link = s.kind === "Roleplay" && !demo ? ROLEPLAY_ROOM : s.room || s.url;
+    const link = callRoomOf(s.room, s.url);
     const value = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Deal Operator//Sessions//DE\r\nBEGIN:VEVENT\r\nUID:${s.id}@aktivecaller\r\nDTSTAMP:${fmt(new Date())}\r\nDTSTART:${fmt(start)}\r\nDTEND:${fmt(end)}\r\nSUMMARY:${esc((demo ? "[DEMO] " : "") + s.title)}\r\nDESCRIPTION:${esc(demo ? "Fiktiver Beispieltermin. Keine echte Session." : s.kind + " mit " + s.host)}\r\n${link ? "URL:" + link + "\r\n" : ""}END:VEVENT\r\nEND:VCALENDAR`;
     const url = URL.createObjectURL(
       new Blob([value], { type: "text/calendar" }),
@@ -753,7 +741,7 @@ export default function CommunityApp({
     if (s.cancelled || !upcoming) return false;
     return (
       sessionFilter === "Alle" ||
-      (sessionFilter === "Meine Sessions"
+      (sessionFilter === "Meine Calls"
         ? s.joined || s.mine || s.owner === data.viewerId
         : s.kind === sessionFilter)
     );
@@ -844,23 +832,6 @@ export default function CommunityApp({
             placeholder="Zum Beispiel: einen festen Call-Partner für Dienstag und Donnerstag …"
           />
         </label>
-        <div className="form-grid">
-          <label>
-            Dein Discord-Name (freiwillig)
-            <input
-              maxLength={40}
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              placeholder="zum Beispiel max_muster"
-              value={profile.discordName ?? ""}
-              onChange={(e) =>
-                setProfile({ ...profile, discordName: e.target.value.trim() })
-              }
-            />
-            <small>So finden dich andere im Discord und schreiben dich an.</small>
-          </label>
-        </div>
         <label className="checkbox-row">
           <Checkbox
             checked={profile.listed}
@@ -927,40 +898,12 @@ export default function CommunityApp({
       </form>
     );
   }
-  /** Kontakt über Discord: verknüpftes Profil oder selbst angegebener Name. */
-  function discordContact(m: Member) {
-    if (m.discord)
-      return (
-        <a
-          className="btn primary full"
-          href={m.discord}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <MessageCircle size={17} aria-hidden="true" />
-          Auf Discord schreiben
-          <span className="do-sr">(öffnet Discord)</span>
-        </a>
-      );
-    if (!m.discordName) return null;
-    return (
-      <button
-        className="btn primary full"
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(m.discordName!);
-            toast.success(
-              `„${m.discordName}“ kopiert. Im Discord bei den Direktnachrichten einfügen und anschreiben.`,
-            );
-          } catch {
-            toast.info(`Discord-Name: ${m.discordName}`);
-          }
-        }}
-      >
-        <Copy size={17} aria-hidden="true" />
-        Discord-Namen kopieren
-      </button>
-    );
+  function memberBadges(m: Member) {
+    if (!m.levels?.length && !m.packageName) return null;
+    return <div className="call-profile-badges" aria-label="Profilstatus">
+      {m.levels?.filter((l) => l.level > 0).map((l) => <span key={l.label}>{l.label} · Level {l.level}</span>)}
+      {m.packageName && <span>{m.packageName}</span>}
+    </div>;
   }
   /** Kommende Sessions, bei denen eine Person zugesagt hat. */
   function sessionsOf(ownerId: string) {
@@ -1043,16 +986,7 @@ export default function CommunityApp({
           </div>
         )}
         {memberSessions(own ? data.viewerId : m.id)}
-        {(m.discordName || (own && discordLink?.link)) && (
-          <p className="member-discord">
-            Discord: <strong>{m.discordName || discordLink?.link?.name}</strong>
-          </p>
-        )}
-        {own && !m.discordName && !discordLink?.link && (
-          <p className="member-discord">
-            Ohne Discord-Namen können dich andere nur hier anfragen.
-          </p>
-        )}
+        {memberBadges(m)}
         <div className="member-actions">
           {own ? (
             <button
@@ -1067,7 +1001,6 @@ export default function CommunityApp({
             </button>
           ) : (
             <>
-              {discordContact(m)}
               <button className="btn secondary full" onClick={() => setMember(m)}>
                 Profil ansehen
               </button>
@@ -1207,7 +1140,7 @@ export default function CommunityApp({
   const exchangeView = ["sessions", "wissen"].includes(initialView);
   return (
     <div className="operator-site">
-      <OperatorHeader discordUrl={discordUrl} />
+      <OperatorHeader />
       <main id="inhalt" className="do-page ca-main">
         {/* Call-Partner ist ein eigener Reiter ohne Unterbereiche. */}
         <AreaNav area={exchangeView || initialView === "partner" ? "partner" : "mine"} />
@@ -1426,18 +1359,14 @@ export default function CommunityApp({
                       </button>
                     )}
                   </PageHeading>
-                  {/* Wer Discord noch nicht kennt, sieht hier den Weg hinein. */}
-                  <section className="rb-discord-inline" aria-label="Discord">
-                    <DiscordSteps summary="Verabreden im Discord: so kommst du rein." />
-                    <a
-                      className="do-button do-button-secondary"
-                      href={discordInvite}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Discord öffnen
-                      <span className="do-sr"> (neues Fenster)</span>
-                    </a>
+                  <section className="call-partner-hub" aria-label="Gemeinsame Calls">
+                    <div><span className="call-hub-kicker">Gemeinsam besser werden</span><h2>Einwände üben. Zusammen callen.</h2><p>Such dir einen Partner oder verabrede einen offenen Call. Der Treffpunkt ist Google Meet.</p></div>
+                    <div className="call-hub-actions">
+                      {data.callUrl && <a className="btn primary" href={data.callUrl} target="_blank" rel="noopener noreferrer"><Headphones size={18} />Zum Call<span className="do-sr"> (neues Fenster)</span></a>}
+                      <Link className="btn secondary" href="/sessions?modus=eigen"><CalendarDays size={18} />Calls und Roleplays</Link>
+                      <button className="btn secondary" onClick={openNewSession}><Plus size={18} />Call verabreden</button>
+                    </div>
+                    {data.sessions.filter((s) => !s.cancelled && sessionEnd(s) > new Date()).slice().sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time)).slice(0,3).map((s) => <button className="call-hub-upcoming" key={s.id} onClick={() => setSession(s)}><span><strong>{s.title}</strong><small>{sessionDay(s.date)} · {s.time} Uhr · mit {s.host}</small></span><span>{s.joined ? "Du bist dabei" : "Ansehen"}</span></button>)}
                   </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
@@ -1452,17 +1381,7 @@ export default function CommunityApp({
                       <span>
                         Du bist als Call-Partner sichtbar, deine Karte steht
                         unten als erste.{" "}
-                        {discordLink?.link || data.profile.discordName ? (
-                          "Andere können dich über Discord anschreiben."
-                        ) : (
-                          <>
-                            Damit dich andere im Discord finden,{" "}
-                            <Link href="/profil?modus=eigen">
-                              trag deinen Discord-Namen im Profil ein
-                            </Link>
-                            .
-                          </>
-                        )}
+                        Andere können dich direkt hier anfragen.
                       </span>
                     </p>
                   ) : (
@@ -1514,7 +1433,7 @@ export default function CommunityApp({
                   )}
                   <div className="member-grid">
                     {data.profile.listed &&
-                      memberCard({ id: "self", ...data.profile }, true)}
+                      memberCard({ id: "self", ...data.profile, levels: data.ownLevels, packageName: data.ownPackageName }, true)}
                     {data.members
                       .filter(
                         (m) =>
@@ -1561,35 +1480,29 @@ export default function CommunityApp({
               {initialView === "sessions" && (
                 <>
                   <PageHeading
-                    title="Sessions und Roleplay"
-                    text="Übungstermine und Call-Blöcke, getroffen wird sich im Discord."
+                    title="Calls und Roleplay"
+                    text="Roleplay, Feedback und gemeinsame Call-Blöcke. Treffpunkt: Google Meet."
                   >
                     {sessionsOpen && (
                       <button className="btn primary" onClick={openNewSession}>
                         <Plus size={18} />
-                        Session anlegen
+                        Call verabreden
                       </button>
                     )}
                   </PageHeading>
-                  {!demo && (
-                    <ActiveCallerCard
-                      state={data.activeCaller}
-                      team={data.viewerTeam}
-                    />
-                  )}
                   <Tabs value={sessionFilter} onValueChange={setSessionFilter}>
                     {data.sessions.length > 0 && (
                       <TabsList>
                         {[
                           "Alle",
-                          "Meine Sessions",
+                          "Meine Calls",
                           "Call-Block",
                           "Roleplay",
                           "Reflexion",
                           "Vergangene",
                         ].map((v) => (
                           <TabsTrigger value={v} key={v}>
-                            {v === "Alle" ? "Alle Sessions" : sessionKindLabel(v)}
+                            {v === "Alle" ? "Alle Calls" : sessionKindLabel(v)}
                           </TabsTrigger>
                         ))}
                       </TabsList>
@@ -1633,7 +1546,7 @@ export default function CommunityApp({
                                 )}
                                 {s.team && <Tag tone="blue">Vom Team</Tag>}
                                 {s.room && !s.cancelled && (
-                                  <Tag tone="green">Discord-Raum bereit</Tag>
+                                  <Tag tone="green">Google-Meet-Link bereit</Tag>
                                 )}
                               </div>
                               <button
@@ -1669,13 +1582,13 @@ export default function CommunityApp({
                       title={data.sessions.length ? "Keine Sessions in dieser Auswahl." : "Noch keine Sessions."}
                       text={
                         sessionsOpen
-                          ? "Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an. Den Raum im Discord legen wir dafür an."
-                          : "Sessions legst du als aktiver Caller an: Call-Block, Roleplay oder ein kurzer Rückblick zu zweit."
+                          ? "Leg einen Übungstermin oder Call-Block mit deinen Call-Partnern an. Getroffen wird sich direkt im Google-Call."
+                          : "Verabrede einen Call-Block, Roleplay oder einen kurzen Rückblick zu zweit."
                       }
                     >
                       {sessionsOpen && !data.sessions.length && (
                         <button className="btn primary" onClick={openNewSession}>
-                          Erste Session anlegen
+                          Erste Call verabreden
                         </button>
                       )}
                     </Empty>
@@ -1880,6 +1793,7 @@ export default function CommunityApp({
                         </Link>
                       </section>
                     )}
+                    {memberBadges({ id: "self", ...data.profile, levels: data.ownLevels, packageName: data.ownPackageName })}
                     <AccountSettings
                       key={demo ? "demo" : "own"}
                       demo={demo}
@@ -1894,7 +1808,6 @@ export default function CommunityApp({
                       }
                     />
                     <PushSetup settings={settings} />
-                    <DiscordLink initial={discordLink} result={discordResult} />
                     {!demo && <AccountAccess />}
                   </div>
                 </>
@@ -1902,7 +1815,7 @@ export default function CommunityApp({
             </>
           )}
       </main>
-      <OperatorFooter discordUrl={discordUrl} />
+      <OperatorFooter />
 
       <Dialog open={!!modal} onOpenChange={(open) => !open && setModal(null)}>
         <DialogContent
@@ -1921,7 +1834,7 @@ export default function CommunityApp({
                       : modal === "create-session"
                         ? editSessionId
                           ? "Deine Session bearbeiten"
-                          : "Neue Session anlegen"
+                          : "Neue Call verabreden"
                         : modal === "buddy"
                           ? "Call-Partner anfragen"
                           : "Hier zählt, dass du dranbleibst."}
@@ -2016,13 +1929,13 @@ export default function CommunityApp({
                       ? "Session aktualisiert."
                       : demo
                         ? "Beispielsession angelegt."
-                        : "Deine Session ist jetzt für andere Angemeldete sichtbar. Der Raum im Discord folgt.",
+                        : "Deine Session ist jetzt für andere Angemeldete sichtbar. Der Call ist unter Call-Partner zu finden.",
                   );
                 }
               }}
             >
               <label>
-                Wie heißt deine Session?
+                Wie heißt dein Call?
                 <input
                   required
                   minLength={4}
@@ -2104,12 +2017,9 @@ export default function CommunityApp({
               <div className="session-where">
                 <Headphones size={20} aria-hidden="true" />
                 <div>
-                  <strong>Treffpunkt: Discord</strong>
+                  <strong>Treffpunkt: Google Meet</strong>
                   <p>
-                    Für deine Session entsteht im Discord ein eigener
-                    Sprachkanal mit Chat. Der Link erscheint hier, sobald er
-                    angelegt ist. Leg Sessions spätestens am Vortag an,
-                    mindestens {SESSION_LEAD_HOURS} Stunden vorher.
+                    Der Google-Meet-Link steht direkt beim Termin. Zusagen, zur Startzeit öffnen und loslegen.
                   </p>
                 </div>
               </div>
@@ -2118,7 +2028,7 @@ export default function CommunityApp({
                 {Intl.DateTimeFormat().resolvedOptions().timeZone}).
               </p>
               <button className="btn primary full" disabled={saving}>
-                {editSessionId ? "Änderungen speichern" : "Session anlegen"}{" "}
+                {editSessionId ? "Änderungen speichern" : "Call verabreden"}{" "}
                 <Plus size={17} />
               </button>
             </form>
@@ -2189,7 +2099,7 @@ export default function CommunityApp({
               </label>
               <p className="hint">
                 Die Anfrage erscheint in der Website. Es wird keine Nachricht
-                per Messenger, Discord oder E-Mail verschickt.
+                an einen externen Messenger oder per E-Mail verschickt.
               </p>
               <button className="btn primary" disabled={saving}>
                 <Send size={17} />
@@ -2263,19 +2173,14 @@ export default function CommunityApp({
                   </strong>
                 </span>
               </div>
-              {member.discordName && (
-                <p className="member-discord">
-                  Discord: <strong>{member.discordName}</strong>
-                </p>
-              )}
+              {memberBadges(member)}
               {memberSessions(member.id)}
-              {discordContact(member)}
               <button
-                className={`btn ${member.discord || member.discordName ? "secondary" : "primary"} full`}
+                className="btn primary full"
                 onClick={() => setModal("buddy")}
               >
                 <Send size={17} aria-hidden="true" />
-                {member.discord || member.discordName ? "Hier anfragen" : "Call-Partner anfragen"}
+                Call-Partner anfragen
               </button>
               <p className="privacy-note">
                 <ShieldCheck size={16} />
@@ -2385,20 +2290,8 @@ export default function CommunityApp({
                         ? "Alle Plätze belegt"
                         : demo
                           ? "In der Demo teilnehmen"
-                          : !sessionsOpen
-                            ? "Als aktiver Caller freischalten"
-                            : "Ich bin dabei"}
+                          : "Ich bin dabei"}
               </button>
-              {!sessionsOpen && !session.joined && (
-                <p className="session-locked">
-                  <Lock size={17} aria-hidden="true" />
-                  <span>
-                    Zusagen kannst du als aktiver Caller: 5 Calling-Tage am
-                    Stück mit mindestens 50 Anwahlen. Dein Stand steht oben auf
-                    dieser Seite.
-                  </span>
-                </p>
-              )}
               {(session.mine ||
                 session.owner === data.viewerId ||
                 data.viewerTeam) &&
@@ -2473,101 +2366,11 @@ export default function CommunityApp({
                     Kalendereintrag herunterladen
                   </button>
                 )}
-              {demo ? (
-                <p className="hint">
-                  Der Demo-Termin hat keinen echten Raum im Discord.
-                </p>
-              ) : session.cancelled ? null : session.joined ? (
+              {!session.cancelled && !demo && (
                 <div className="session-guide">
-                  <h3>So kommst du in den Raum</h3>
-                  <ol>
-                    <li>
-                      <div>
-                        <span>
-                          Einmalig dem Deal-Operator-Server im Discord
-                          beitreten, falls du noch nicht drin bist.
-                        </span>
-                        <a
-                          className="btn secondary"
-                          href={discordInvite}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Discord-Server beitreten
-                          <ArrowUpRight size={16} />
-                        </a>
-                      </div>
-                    </li>
-                    <li data-done={session.room ? "" : undefined}>
-                      <div>
-                        {session.room ? (
-                          <>
-                            <span>
-                              {session.kind === "Roleplay"
-                                ? "Roleplay läuft immer im festen Roleplay-Raum im Discord. Geh zur Startzeit hinein."
-                                : "Zur Startzeit in den Raum dieser Session. Dort gibt es Sprache und einen eigenen Chat."}
-                            </span>
-                            <a
-                              className="btn primary"
-                              href={session.room}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Headphones size={17} />
-                              {session.kind === "Roleplay"
-                                ? "Zum Roleplay-Raum im Discord"
-                                : "Zum Session-Raum im Discord"}
-                            </a>
-                            {session.roomEvent && (
-                              <a
-                                className="text-link"
-                                href={session.roomEvent}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                              >
-                                Discord-Event ansehen und erinnern lassen
-                              </a>
-                            )}
-                          </>
-                        ) : (
-                          <span>
-                            {data.discord?.rooms
-                              ? "Der Raum dieser Session entsteht im Discord vor dem Termin. Der Link erscheint dann genau hier."
-                              : "Treffpunkt ist der Discord-Server. Der Link zum Raum dieser Session erscheint hier, sobald er angelegt ist."}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                    <li>
-                      <div>
-                        <span>Termin in den Kalender, damit nichts untergeht.</span>
-                        <button
-                          className="btn secondary"
-                          onClick={() => downloadCalendar(session)}
-                        >
-                          <Download size={17} />
-                          Kalendereintrag herunterladen
-                        </button>
-                      </div>
-                    </li>
-                  </ol>
-                  {session.url && !session.room && (
-                    <a
-                      href={session.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-link"
-                    >
-                      Früher hinterlegten Raum-Link öffnen
-                    </a>
-                  )}
+                  {callRoomOf(session.room, data.callUrl) ? <a className="btn primary full" href={callRoomOf(session.room, data.callUrl)} target="_blank" rel="noopener noreferrer"><Headphones size={18} />Zum Call<span className="do-sr"> (neues Fenster)</span></a> : <p className="hint">Der Google-Meet-Link wird vom Team ergänzt.</p>}
+                  {session.joined && <><PushPrompt variant="call" /><button className="btn secondary full" onClick={() => downloadCalendar(session)}><Download size={17} />Im Kalender speichern</button></>}
                 </div>
-              ) : (
-                <p className="hint">
-                  {session.kind === "Roleplay"
-                    ? "Treffpunkt ist der feste Roleplay-Raum im Discord. Nach deiner Zusage führen wir dich Schritt für Schritt hinein."
-                    : "Treffpunkt ist ein eigener Raum im Discord. Nach deiner Zusage führen wir dich Schritt für Schritt hinein."}
-                </p>
               )}
             </div>
           )}

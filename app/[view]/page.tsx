@@ -1,11 +1,8 @@
 import CommunityApp from "../community-app";
 import { getCurrentUser } from "@/server/auth";
-import { discordDestination } from "@/server/discord";
 import { database, databaseReady } from "@/server/database";
 import { views, type View } from "../data";
 import { notFound, redirect } from "next/navigation";
-import { discordLink } from "@/server/discord-admin";
-import { discordMissing } from "@/server/discord-bridge";
 import { loadCommitmentSettings } from "@/server/settings";
 import type { CommitmentSettings } from "@/lib/commitment";
 export const dynamic = "force-dynamic";
@@ -28,9 +25,8 @@ export default async function Page({
   // Weg, ein Formular.
   if (view === "reflexion") redirect("/tagesabschluss");
   if (view === "partnerregister") {
-    const query = await searchParams;
     redirect(
-      `/so-funktionierts?modus=${query.modus === "eigen" ? "eigen" : "demo"}#discord`,
+      "/partner?modus=eigen",
     );
   }
   const renamed = renamedViews.get(view);
@@ -74,7 +70,6 @@ export default async function Page({
   // Profil und Einstellungen: Erinnerungen und Discord-Verknüpfung liegen
   // hier (nicht mehr im Tagesabschluss).
   let settings: CommitmentSettings | undefined;
-  let link: { available: boolean; link: { name: string; since: string } | null } | null = null;
   if ((view === "profil" || view === "partner") && databaseReady()) {
     const db = database();
     try {
@@ -82,25 +77,12 @@ export default async function Page({
     } catch {
       settings = undefined;
     }
-    // Call-Partner zeigt, ob man über Discord anschreibbar ist.
-    try {
-      link = {
-        available: discordMissing("link").length === 0,
-        link: await discordLink(db, user.userId),
-      };
-    } catch {
-      link = null;
-    }
   }
-  const discordResult = typeof query.discord === "string" ? query.discord : "";
   return (
     <CommunityApp
       initialView={view as View}
       signedIn={!!user}
-      discordUrl={discordDestination().url}
       settings={settings}
-      discordLink={link}
-      discordResult={discordResult}
     />
   );
 }

@@ -86,7 +86,7 @@ try {
     ["/crew", "/partner"],
     ["/community?modus=eigen", "/so-funktionierts?modus=eigen"],
     ["/community", "/so-funktionierts"],
-    ["/partnerregister?modus=eigen", "/so-funktionierts?modus=eigen#discord"],
+    ["/partnerregister?modus=eigen", "/partner?modus=eigen"],
     ["/beitreten", "/starten"],
     ["/beitreten?profil=abc&einladung=x&next=%2Fheute", "/starten?profil=abc&einladung=x&next=%2Fheute"],
   ]) {
@@ -188,9 +188,11 @@ try {
     );
   const html = await (await fetch(base + "/")).text();
   assert.ok(
-    !/kostenlos|dealuno|Beispieldaten|fiktiv|whatsapp|partnerregister/i.test(html),
+    !/kostenlos|Beispieldaten|fiktiv|whatsapp|partnerregister/i.test(html),
     "Unexpected public copy",
   );
+  assert.ok(!/href="https:\/\/(?:discord.gg|discord.com)/.test(html), "Public navigation must not lead to Discord");
+  assert.match(html, /Call-Partner/);
   assert.match(html, /Zusammen callen/);
   assert.match(html, /Gemeinsam dranbleiben/);
   // /reflexionen ohne Anmeldung: Erklärung statt fremder Reflexionen.

@@ -41,6 +41,7 @@ import {
 } from "./admin-shared";
 import { ReviewCases, WinsImport } from "./admin-wins";
 import { RulesPanel } from "./admin-rules";
+import DiscordLink from "./discord-link";
 import { DiscordPanel, NotificationsPanel } from "./admin-status";
 import { TeamPanel } from "./admin-team";
 import ResendConfirmation from "./resend-confirmation";
@@ -329,7 +330,7 @@ export default function AdminPanels({ role }: { role: "admin" | "moderator" }) {
                 <NotificationsPanel status={overview.notifications} />
               )}
               {tab === "discord" && overview.discord && (
-                <DiscordPanel status={overview.discord} />
+                <><DiscordPanel status={overview.discord} /><DiscordLink /></>
               )}
               {tab === "team" && overview.team && (
                 <TeamPanel

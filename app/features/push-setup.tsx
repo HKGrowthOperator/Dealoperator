@@ -12,6 +12,7 @@ import {
 import { defaultCommitmentSettings, type CommitmentSettings } from "@/lib/commitment";
 import { ApiError, getJson, postJson } from "./closing-form";
 import InstallApp from "./install-app";
+import Link from "next/link";
 import "../commitment.css";
 
 /*
@@ -212,7 +213,7 @@ export default function PushSetup({
     setMessage(null);
     try {
       // Zuerst fragen, noch innerhalb des Klicks: Safari verlangt das.
-      const answer = await Notification.requestPermission();
+      const answer = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (answer !== "granted") {
         setMessage(
           answer === "denied"
@@ -476,7 +477,7 @@ export default function PushSetup({
               />
               <span className="cm-switch-track" aria-hidden="true" />
               <span>
-                <strong>Erinnerungen an meinen Tagesabschluss</strong>
+                <strong>Erinnerungen an Tagesabschluss und Calls</strong>
                 <small>Abends und vor der Frist.</small>
               </span>
             </label>
@@ -599,7 +600,7 @@ export function PushPrompt({
 }: {
   settings?: CommitmentSettings;
   /** after-submit: einmaliges Angebot in der Bestätigung nach dem Einreichen. */
-  variant?: "card" | "after-submit";
+  variant?: "card" | "after-submit" | "call";
 }) {
   const env = useEnvironment();
   const [info, setInfo] = useState<PushInfo | null>(null);
@@ -649,7 +650,7 @@ export function PushPrompt({
     setBusy(true);
     try {
       // Noch im Tipp fragen: Safari verlangt das.
-      const answer = await Notification.requestPermission();
+      const answer = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (answer !== "granted") {
         setDone({
           tone: "warn",
@@ -664,7 +665,7 @@ export function PushPrompt({
       setRegistered(true);
       setDone({
         tone: "ok",
-        text: `Erinnerungen sind an. Du bekommst um ${clockText(settings.eveningReminder)} einen Hinweis, wenn dein Tagesabschluss an einem Calling-Tag noch fehlt.`,
+        text: variant === "call" ? "Benachrichtigungen sind an. Wir erinnern dich vor deinen zugesagten Calls." : `Erinnerungen sind an. Du bekommst um ${clockText(settings.eveningReminder)} einen Hinweis, wenn dein Tagesabschluss an einem Calling-Tag noch fehlt.`,
       });
     } catch (e) {
       setDone({
@@ -681,7 +682,7 @@ export function PushPrompt({
 
   function postpone() {
     try {
-      if (variant === "after-submit") localStorage.setItem(DECLINED, "1");
+      if (variant === "after-submit" || variant === "call") localStorage.setItem(DECLINED, "1");
       else localStorage.setItem(LATER, String(Date.now()));
     } catch {
       /* ohne Speicher erscheint die Karte beim nächsten Besuch wieder */
@@ -701,7 +702,9 @@ export function PushPrompt({
       </p>
     );
   if (!info || !info.publicKey || !info.prefs.reminders || later) return null;
+  if (variant === "call" && info.prefs.devices.length > 0) return null;
   // Nur wo Push direkt geht. Keine Aufforderung, die Website irgendwo hinzuzufügen.
+  if (variant === "call" && env.kind === "ios-browser") return <aside className="cm-push-prompt"><div><strong>Möchtest du vor dem Call erinnert werden?</strong><p>Auf dem iPhone aktivierst du Benachrichtigungen über die Website auf deinem Home-Bildschirm.</p><Link href="/profil?modus=eigen#erinnerungen" className="btn secondary">Benachrichtigungen einrichten</Link><button className="btn secondary" onClick={postpone}>Nein, danke</button></div></aside>;
   if (env.kind !== "supported" || env.permission === "denied" || registered !== false) return null;
 
   return (
@@ -711,13 +714,12 @@ export function PushPrompt({
       </span>
       <div>
         <strong>
-          {variant === "after-submit"
+          {variant === "call" ? "Möchtest du vor dem Call erinnert werden?" : variant === "after-submit"
             ? "Soll dich Deal Operator erinnern, wenn ein Abschluss fehlt?"
             : "Erinnerung an deinen Tagesabschluss?"}
         </strong>
         <p>
-          Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um{" "}
-          {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.
+          {variant === "call" ? "Ein Hinweis 15 Minuten vor deinen zugesagten Calls. Einmal einschalten reicht; ändern kannst du das im Profil." : <>Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.</>}
         </p>
         {variant === "after-submit" ? (
           // In der Bestätigung bleibt „Zu den Ergebnissen“ der einzige

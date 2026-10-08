@@ -1,6 +1,6 @@
 # Deal Operator
 
-> Deal Operator ist die kostenfreie Sales-Community von HK Growth (HK Growth UG, Marienheide, Deutschland) fürs gemeinsame Callen: Menschen im Vertrieb halten an jedem Calling-Tag Anwahlen, Settings, Closings, Deals und Learnings fest, sehen ihre Serie und ihr Leistungslevel und bleiben über die Rangliste dran. Reflexionen, Call-Partner und Sessions ergänzen den Alltag; die Discord-Runde liefert Antworten und Austausch.
+> Deal Operator ist die kostenfreie Sales-Community von HK Growth (HK Growth UG, Marienheide, Deutschland) fürs gemeinsame Callen: Menschen im Vertrieb halten an jedem Calling-Tag Anwahlen, Settings, Closings, Deals und Learnings fest, sehen ihre Serie und ihr Leistungslevel und bleiben über die Rangliste dran. Reflexionen, Call-Partner und Sessions ergänzen den Alltag; gemeinsame Google-Meet-Calls machen Übung und Austausch direkt zugänglich.
 
 Canonical URL: https://dealoperator.hk-growthoperator.de/
 Sprache: Deutsch
@@ -11,10 +11,10 @@ Volltext der öffentlichen Seiten: https://dealoperator.hk-growthoperator.de/llm
 ## Öffentliche Seiten
 
 - [Startseite](https://dealoperator.hk-growthoperator.de/): Ergebnisse, Rangliste, Einstieg
-- [Für wen](https://dealoperator.hk-growthoperator.de/fuer-wen): Sales-Community für Opener, Setter, Closer, Selbstständige und kleine Teams; Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste, Discord
+- [Für wen](https://dealoperator.hk-growthoperator.de/fuer-wen): Sales-Community für Opener, Setter, Closer, Selbstständige und kleine Teams; Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste, Call-Partner
 - [So funktioniert’s](https://dealoperator.hk-growthoperator.de/so-funktionierts): Tagesabschluss, Serie, aktive Calling-Tage, Leistungslevel, wer was sieht
 - [Mitmachen](https://dealoperator.hk-growthoperator.de/starten): Konto anlegen oder vorbereitetes Profil übernehmen
-- [Discord](https://discord.gg/NjkFJtBkZm): offizielle Runde
+- [Call-Partner](https://dealoperator.hk-growthoperator.de/partner?modus=eigen): Partner finden, Roleplay verabreden und gemeinsame Calls öffnen
 - [Impressum](https://dealoperator.hk-growthoperator.de/impressum), [Datenschutz](https://dealoperator.hk-growthoperator.de/datenschutz)
 
 ## Verwandte Angebote von HK Growth

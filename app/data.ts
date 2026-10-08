@@ -16,7 +16,7 @@ export const labels: Record<View, string> = {
   zahlen: "Meine Tage",
   reflexion: "Tägliche Reflexion",
   partner: "Call-Partner",
-  sessions: "Sessions und Roleplay",
+  sessions: "Calls und Roleplay",
   wissen: "Wissen und Feedback",
   profil: "Mein Profil",
 };
@@ -65,6 +65,8 @@ export type Member = Profile & {
   /** Discord-Profil zum Anschreiben, nur wenn gezeigt und verknüpft. */
   discord?: string;
   latest?: RecordDay;
+  levels?: { label: string; level: number }[];
+  packageName?: string;
 };
 export type Session = {
   startsAt?: string;
@@ -112,7 +114,10 @@ export type AppData = WorkflowData & {
   bookmarks: string[];
   buddies: Buddy[];
   interest: boolean;
-  /** Treffpunkt Discord: Einladung und ob Session-Räume angelegt werden. */
+  callUrl?: string;
+  ownPackageName?: string;
+  ownLevels?: { label: string; level: number }[];
+  /** Interne Kompatibilität für ältere Daten. */
   discord?: { invite: string; rooms: boolean };
   /** Admin oder Moderator: darf alle Sessions bearbeiten und absagen. */
   viewerTeam?: boolean;

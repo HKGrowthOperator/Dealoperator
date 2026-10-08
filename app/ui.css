@@ -4581,3 +4581,35 @@ li[data-medal="gold"] .rb-bar i {
   color: var(--do-ink-2);
   font-size: var(--text-label);
 }
+
+/* Calls live on the website; Discord stays in team administration. */
+.call-partner-hub { border:1px solid #d9e4f3; border-radius:24px; padding:28px; margin:0 0 28px; background:linear-gradient(135deg,#f0f6ff,#fff); box-shadow:0 12px 35px #17386d0a; }
+.call-hub-kicker,.hw-eyebrow { display:block; color:#315ed0; font-size:.8rem; font-weight:700; letter-spacing:.04em; margin-bottom:12px; }
+.call-partner-hub h2 { font-size:clamp(1.4rem,3vw,2rem); margin:0 0 12px; line-height:1.2; }
+.call-partner-hub p { max-width:55ch; line-height:1.6; color:#536078; }
+.call-hub-actions { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0; }
+.call-hub-upcoming { display:flex; width:100%; text-align:left; justify-content:space-between; gap:16px; align-items:center; border:0; border-top:1px solid #d9e4f3; background:transparent; padding:16px 0; cursor:pointer; color:inherit; }
+.call-hub-upcoming small { display:block; margin-top:5px; font-size:.9rem; color:#536078; }
+.call-hub-upcoming > span:last-child { font-size:.85rem; color:#315ed0; font-weight:600; }
+.call-profile-badges { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0; }
+.call-profile-badges span { background:#f1f5fb; color:#5d6c85; padding:4px 8px; border-radius:6px; font-size:.75rem; font-weight:500; }
+.hw-simple .hw-head { max-width:800px; padding-bottom:10px; }
+.hw-simple .hw-head h1 { font-size:clamp(2rem,5vw,3.5rem); line-height:1.1; letter-spacing:-.045em; }
+.hw-simple .hw-section { margin-top:48px; }
+.hw-simple .hw-step-text > svg { color:#315ed0; margin-bottom:12px; }
+.hw-benefits { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+.hw-benefits article { border:1px solid #dce5f2; border-radius:20px; padding:24px; background:linear-gradient(145deg,#fff,#f2f6ff); }
+.hw-benefits article > svg { color:#315ed0; margin-bottom:14px; }
+.hw-benefits h3 { margin:0 0 10px; font-size:1.15rem; }
+.hw-benefits p { font-size:1rem; line-height:1.6; color:#536078; margin-bottom:16px; }
+@media(max-width:640px) {
+ .call-partner-hub { padding:20px; border-radius:18px; }
+ .call-hub-actions { display:grid; grid-template-columns:1fr; }
+ .call-hub-actions .btn { justify-content:center; min-height:46px; }
+ .call-hub-upcoming { align-items:flex-start; }
+ .hw-benefits { grid-template-columns:1fr; gap:12px; }
+ .hw-benefits article { padding:22px; }
+ .hw-simple .hw-section { margin-top:34px; }
+ .hw-simple .hw-step-text p,.hw-simple .hw-details p { font-size:1rem; line-height:1.6; }
+ .hw-simple .hw-cta { display:grid; gap:10px; }
+}

@@ -1,4 +1,3 @@
-import { discordDestination } from "@/server/discord";
 import { viewerState } from "@/server/home";
 import { database, databaseReady } from "@/server/database";
 import { upcomingSessions, type PublicSession } from "@/server/sessions";
@@ -16,7 +15,7 @@ export const metadata: Metadata = { alternates: { canonical: "/" } };
 export default async function Page() {
   const [{ viewer, home }, sessions] = await Promise.all([viewerState({ game: true }), nextSessions()]);
   return (
-    <RankingBoard discordUrl={discordDestination().url} viewer={viewer} home={home} sessions={sessions} />
+    <RankingBoard viewer={viewer} home={home} sessions={sessions} />
   );
 }
 

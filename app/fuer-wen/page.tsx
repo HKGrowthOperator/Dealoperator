@@ -75,7 +75,7 @@ export default function Page() {
           <p>
             Für alle, die im Vertrieb telefonieren und wissen, dass Dranbleiben das eigentliche
             Problem ist. Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen:
-            eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und einer Discord-Runde,
+            eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und einer gemeinsamen Übungsrunde,
             die Fragen beantwortet, bevor der nächste Anruf ansteht.
           </p>
           <nav className="hw-jump" aria-label="Auf dieser Seite">
@@ -174,7 +174,7 @@ export default function Page() {
                 <h3>Dranbleiben, weil andere es sehen</h3>
                 <p>
                   Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein Tag
-                  liest du, was bei anderen funktioniert hat. Im Discord fragst du, bevor du aufgibst.
+                  liest du, was bei anderen funktioniert hat. Mit einem Call-Partner übst du, was noch nicht klappt.
                 </p>
               </div>
             </li>
@@ -227,8 +227,7 @@ export default function Page() {
                 <h3>Leistungslevel und Aktiver Caller</h3>
                 <p>
                   Level gibt es getrennt für Anwahlen, Settings, Closings und Deals. Wer genug
-                  Calling-Tage am Stück aktiv ist, wird Aktiver Caller und bekommt Sessions, Roleplay
-                  und die Rolle im Discord.
+                  Calling-Tage am Stück aktiv ist, wird Aktiver Caller. Calls und Roleplay stehen unabhängig davon allen offen.
                 </p>
               </div>
             </article>

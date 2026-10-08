@@ -14,7 +14,7 @@ import { approvedPauses, loadCommitmentSettings, trackingStart } from "./setting
 import { applicantRecheck, dispatch, enqueue, teamEvent, type Recheck } from "./notify";
 import { markEligibleMembers, toClosings, toImported, ownClosings } from "./closing";
 import { pruneEvidence } from "./evidence";
-import { runDiscordRooms } from "./discord-sessions";
+import { planCallReminders, recheckCallReminder } from "./call-reminders";
 import { isTeamMember } from "./roles";
 
 /**
@@ -155,6 +155,7 @@ export async function planTeamReviews(
 
 /** Zustand vor dem Versand erneut prüfen. Liefert einen Grund zum Auslassen. */
 export const recheck: Recheck = async (db, n) => {
+  if (n.kind === "call:reminder") return recheckCallReminder(db, n);
   if (n.kind.startsWith("reminder:")) {
     const [participant, day] = n.ref.split(":");
     const settings = await loadCommitmentSettings(db);
@@ -212,6 +213,7 @@ export async function tick(db: Database, now = new Date()) {
     );
     if (!locked) return { skipped: true, reminders: 0, reviews: 0 };
     const reminders = await planReminders(tx, now, settings);
+    const calls = await planCallReminders(tx, now);
     // Teamprüfung höchstens einmal pro Stunde; der Zeitpunkt der letzten
     // Prüfung steht in app_settings, damit kein Takt ausgelassen wird.
     const [last] = await tx.query("SELECT value FROM app_settings WHERE key='scheduler'");
@@ -225,15 +227,12 @@ export async function tick(db: Database, now = new Date()) {
         [JSON.stringify({ lastReview: now.toISOString() })],
       );
     }
-    return { skipped: false, reminders, reviews };
+    return { skipped: false, reminders, calls, reviews };
   });
   const delivery = await dispatch(db, recheck, now);
-  // Discord ist für Calls da: Session-Räume und Ränge, höchstens alle 15
-  // Minuten. Tagesabschlüsse werden dort nicht mehr geteilt.
-  const rooms = await runDiscordRooms(db, { now, auto: true }).catch((e: Error) => ({ error: e.message }));
   // Alte Screenshots löschen (nach Migration 0005); nie den Takt aufhalten.
   const pruned = await pruneEvidence(db, now).catch(() => 0);
-  return { ...plan, ...delivery, rooms, pruned };
+  return { ...plan, ...delivery, pruned };
 }
 
 // ---------------------------------------------------------------------------

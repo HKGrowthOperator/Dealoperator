@@ -1,4 +1,3 @@
-import { discordDestination } from "@/server/discord";
 import RankingBoard from "../features/ranking-board";
 import { viewerState } from "@/server/home";
 import type { Metadata } from "next";
@@ -13,6 +12,6 @@ export const metadata: Metadata = { title: "Rangliste · Deal Operator", alterna
 export default async function Page() {
   const { viewer, home } = await viewerState({ game: true });
   return (
-    <RankingBoard onlyRanking discordUrl={discordDestination().url} viewer={viewer} home={home} />
+    <RankingBoard onlyRanking viewer={viewer} home={home} />
   );
 }

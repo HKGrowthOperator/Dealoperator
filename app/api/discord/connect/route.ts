@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
 import { rateLimit } from "@/server/operator";
@@ -19,6 +19,7 @@ export async function GET() {
   try {
     const actor = await getCurrentUser();
     if (!actor) return json({ error: "Bitte melde dich zuerst an." }, 401);
+    if (!isTeam(actor)) return json({ error: "Discord wird ausschließlich intern vom Team genutzt." }, 403);
     const missing = discordMissing("link");
     return json({
       available: missing.length === 0,
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     const db = database();
     await rateLimit(db, `discord-link:${actor.userId}`, 10, 3600);
     if (raw?.action === "unlink") return json(await unlinkDiscord(db, actor));
+    if (!isTeam(actor)) return json({ error: "Discord wird ausschließlich intern vom Team genutzt." }, 403);
     const missing = discordMissing("link");
     if (missing.length)
       return json({ error: "Die Discord-Verknüpfung ist noch nicht eingerichtet." }, 503);

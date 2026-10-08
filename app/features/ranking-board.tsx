@@ -12,7 +12,6 @@ import {
   CircleCheck,
   CircleDashed,
   Clock3,
-  ExternalLink,
   Handshake,
   Headphones,
   Link2,
@@ -50,14 +49,12 @@ import {
   type RankingMonth,
 } from "@/lib/ranking-history";
 import { isoWeekday } from "@/lib/commitment";
-import { DISCORD_INVITE } from "@/lib/discord";
 import { GAME_TEXT, flameState, weekStartOf } from "@/lib/game";
 import { SPLIT_NOTE, jointReport, splitOrigin } from "@/lib/joint-reports";
 import type { HomeState } from "@/server/home";
 import { OperatorHeader, OperatorFooter, type Viewer } from "./operator-shell";
 import { dayState, earlierState, type DayState } from "./day-state";
 import { PushPrompt } from "./push-setup";
-import DiscordSteps from "./discord-steps";
 import { takeSubmitted, type SubmittedNote } from "./submitted-note";
 import { Flame as SeriesFlame } from "./game-parts";
 import {
@@ -198,13 +195,11 @@ function shiftMonth(month: string, n: number) {
 }
 
 export default function RankingBoard({
-  discordUrl,
   onlyRanking = false,
   viewer = null,
   home = null,
   sessions = [],
 }: {
-  discordUrl?: string;
   /** Kommende Sessions, für alle sichtbar. */
   sessions?: PublicSession[];
   /** /ranking: nur Ergebnisse, ohne Einstieg und Erklärung. */
@@ -215,7 +210,6 @@ export default function RankingBoard({
   home?: HomeState | null;
 }) {
   const params = useSearchParams();
-  const discord = discordUrl || DISCORD_INVITE;
   const today = berlinDate();
   const parsedDay = daySchema.safeParse(params.get("day"));
   const parsedMonth = monthSchema.safeParse(params.get("month"));
@@ -505,7 +499,7 @@ export default function RankingBoard({
 
   return (
     <div className="operator-site">
-      <OperatorHeader discordUrl={discord} viewer={viewer} />
+      <OperatorHeader viewer={viewer} />
       <main id="inhalt" className="do-page rb">
         {!onlyRanking && !signedIn && (
           <section className="rb-intro" aria-labelledby="rb-title">
@@ -860,7 +854,7 @@ export default function RankingBoard({
 
         {!onlyRanking && <UpcomingSessions sessions={sessions} signedIn={signedIn} />}
 
-        {signedIn && home?.participant && <DiscordPanel url={discord} />}
+        {signedIn && home?.participant && <CallPartnerPanel />}
 
         {!onlyRanking && !signedIn && (
           <section className="rb-how" id="so-funktionierts" aria-labelledby="rb-how-title">
@@ -882,7 +876,7 @@ export default function RankingBoard({
           </section>
         )}
       </main>
-      <OperatorFooter discordUrl={discord} showAdmin={!!viewer?.team || !!home?.team} />
+      <OperatorFooter showAdmin={!!viewer?.team || !!home?.team} />
     </div>
   );
 }
@@ -1005,29 +999,16 @@ function PersonalPanel({
  * Discord ist für Calls da: ein Satz, ein Knopf, und für alle, die Discord
  * noch nicht kennen, der Weg hinein in drei Schritten.
  */
-function DiscordPanel({ url }: { url: string }) {
+function CallPartnerPanel() {
   return (
-    <section className="rb-discord" aria-labelledby="rb-discord-title">
-      <span className="rb-discord-icon" aria-hidden="true">
-        <Headphones size={22} />
-      </span>
+    <section className="rb-discord" aria-labelledby="rb-call-title">
+      <span className="rb-discord-icon" aria-hidden="true"><Headphones size={22} /></span>
       <div className="rb-me-text">
-        <p className="rb-me-kicker">Discord</p>
-        <h2 id="rb-discord-title">Calls, Sessions und Roleplay laufen im Discord.</h2>
-        <p>Dort findet ihr euch zum Üben und pusht euch gegenseitig. Zahlen bleiben hier.</p>
+        <p className="rb-me-kicker">Zusammen üben</p>
+        <h2 id="rb-call-title">Ein Call-Partner für deinen nächsten Block.</h2>
+        <p>Roleplay verabreden, Einwände üben oder gemeinsam callen.</p>
       </div>
-      <a className="do-button do-button-secondary" href={url} target="_blank" rel="noopener noreferrer">
-        Discord öffnen
-        <ExternalLink size={16} aria-hidden="true" />
-        <span className="do-sr">(neues Fenster)</span>
-      </a>
-      <div className="rb-me-more rb-discord-more">
-        <DiscordSteps />
-        <Link className="do-link" href="/partner?modus=eigen">
-          <UsersRound size={16} aria-hidden="true" />
-          Wer sucht gerade einen Call-Partner?
-        </Link>
-      </div>
+      <Link className="do-button do-button-secondary" href="/partner?modus=eigen">Call-Partner finden</Link>
     </section>
   );
 }

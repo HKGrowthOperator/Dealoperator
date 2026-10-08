@@ -6,7 +6,7 @@ import { Database, type Executor } from "../server/database";
 import {
   addSessionGuest,
   createSession,
-  discordRoomLink,
+  googleRoomLink,
   editSession,
   removeSessionGuest,
   setSessionRoom,
@@ -99,16 +99,16 @@ test("Wer vorgemerkt war und mit eigenem Konto zusagt, behält den Platz", async
   await assert.rejects(addSessionGuest(db, team, id, { participant: "p-carina" }), /schon dabei/);
 });
 
-test("Raum-Link: nur Discord, nur Host oder Team", async () => {
+test("Raum-Link: nur Google Meet, nur Host oder Team", async () => {
   const id = await session();
-  assert.equal(discordRoomLink(""), "");
-  assert.equal(discordRoomLink(" https://discord.gg/abc "), "https://discord.gg/abc");
-  assert.equal(discordRoomLink("https://discord.com/channels/1/2"), "https://discord.com/channels/1/2");
-  for (const bad of ["http://discord.gg/abc", "https://discord.gg.evil.example/x", "https://evil.example/discord.gg", "javascript:alert(1)", "https://user:pw@discord.com/x"])
-    assert.throws(() => discordRoomLink(bad), /Discord|discord/, bad);
-  await assert.rejects(setSessionRoom(db, other, id, "https://discord.gg/abc"), /Host oder das Team/);
-  await setSessionRoom(db, host, id, "https://discord.gg/abc");
-  assert.equal((await stored(id)).roomUrl, "https://discord.gg/abc");
+  assert.equal(googleRoomLink(""), "");
+  assert.equal(googleRoomLink(" https://meet.google.com/abc-defg-hij "), "https://meet.google.com/abc-defg-hij");
+  assert.equal(googleRoomLink("https://meet.google.com/xyz-abcd-efg"), "https://meet.google.com/xyz-abcd-efg");
+  for (const bad of ["http://meet.google.com/abc-defg-hij", "https://meet.google.com.evil.example/abc-defg-hij", "https://evil.example/discord.gg", "javascript:alert(1)", "https://user:pw@discord.com/x"])
+    assert.throws(() => googleRoomLink(bad), /Google-Meet/, bad);
+  await assert.rejects(setSessionRoom(db, other, id, "https://meet.google.com/abc-defg-hij"), /Host oder das Team/);
+  await setSessionRoom(db, host, id, "https://meet.google.com/abc-defg-hij");
+  assert.equal((await stored(id)).roomUrl, "https://meet.google.com/abc-defg-hij");
   await setSessionRoom(db, team, id, "");
   assert.equal((await stored(id)).roomUrl, "");
 });

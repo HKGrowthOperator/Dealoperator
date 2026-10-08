@@ -8,9 +8,9 @@ import "./ranking.css";
 import "./ui.css";
 import "./game.css";
 
-const TITLE = "Deal Operator: kostenfreie Sales-Community zum Callen";
+const TITLE = "Deal Operator: Zahlen tracken und gemeinsam callen";
 const DESCRIPTION =
-  "Kostenfreie Sales-Community von HK Growth fürs gemeinsame Callen: Zahlen je Calling-Tag festhalten, Serie und Rangliste, dranbleiben. Mit Discord-Runde.";
+  "Kostenfreies Calling-Tool von HK Growth: Zahlen je Calling-Tag festhalten, Serie und Rangliste, dranbleiben. Mit Call-Partnern und gemeinsamen Übungsterminen.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -64,7 +64,7 @@ const structuredData = {
       "@type": "WebApplication",
       "@id": `${SITE_URL}/#app`,
       name: "Deal Operator",
-      alternateName: "Deal Operator Sales-Community",
+      alternateName: "Deal Operator Calling-Tool",
       url: `${SITE_URL}/`,
       image: `${SITE_URL}/icon-512.png`,
       applicationCategory: "BusinessApplication",
@@ -80,10 +80,10 @@ const structuredData = {
         "Serie und Leistungslevel fürs Dranbleiben",
         "Reflexionen und Learnings je Calling-Tag",
         "Call-Partner und Sessions",
-        "Discord-Runde für Antworten und Austausch",
+        "Call-Partner und Google-Meet-Calls zum Üben und Austausch",
       ],
       keywords:
-        "Sales-Community, Kaltakquise, Cold Calling, Calling, Vertrieb, Opener, Setter, Closer, Rangliste, Dranbleiben, Discord",
+        "Calling-Tool, Kaltakquise, Cold Calling, Calling, Vertrieb, Opener, Setter, Closer, Rangliste, Dranbleiben, Roleplay",
       audience: { "@type": "BusinessAudience", audienceType: "Menschen im Vertrieb, die callen: Opener, Setter, Closer" },
       provider: { "@id": ORGANIZATION_ID },
       publisher: { "@id": ORGANIZATION_ID },

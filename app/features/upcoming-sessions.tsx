@@ -40,9 +40,9 @@ export default function UpcomingSessions({
   return (
     <section className="rb-sessions" aria-labelledby="rb-sessions-title">
       <div className="rb-sessions-head">
-        <h2 id="rb-sessions-title">Nächste Sessions</h2>
+        <h2 id="rb-sessions-title">Nächste Calls</h2>
         <Link className="do-link" href={signedIn ? target : `/anmelden?next=${encodeURIComponent(target)}`}>
-          {signedIn ? "Alle Sessions" : "Anmelden und zusagen"}
+          {signedIn ? "Alle Calls" : "Anmelden und zusagen"}
         </Link>
       </div>
       <ul>

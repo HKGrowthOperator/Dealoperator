@@ -47,7 +47,7 @@ export default function ActiveCallerCard({
           <strong>Du bist Aktiver Caller</strong>
           <p>
             {state.since ? `Freigeschaltet am ${day(state.since)}. ` : ""}
-            Sessions und Roleplay stehen dir offen, im Discord trägst du den Rang.
+            Dein Rang zeigt, dass du regelmäßig callst.
           </p>
           {state.idle > 0 && (
             <p className="ac-warn">
@@ -80,9 +80,9 @@ export default function ActiveCallerCard({
         </div>
         {!compact && (
           <p>
-            Damit stehen dir Sessions und Roleplay offen, im Discord bekommst du den Rang.
+            Der Rang zeigt deine Routine. Calls und Roleplay stehen allen offen.
             Nach {ACTIVE_LOST_AFTER_IDLE} Calling-Tagen in Folge ohne Anwahlen ist er wieder weg.
-            {team ? " Als Team hast du schon jetzt Zugang zu allen Sessions." : ""}
+            {team ? " Calls und Roleplay stehen allen offen." : ""}
           </p>
         )}
         {state.lostAt && (

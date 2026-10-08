@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Database } from "./database";
 import { AppError } from "./operator";
 import { sessionEnd, sessionLeadError, sessionStart } from "../lib/session-rules";
+import { googleCallLink } from "../lib/call-room";
 import { normaliseName } from "../lib/wins-parser";
 
 /** Vom Team vorgemerkte Teilnehmer: Profile aus der Rangliste, auch ohne Konto. */
@@ -257,24 +258,12 @@ export async function removeSessionGuest(db: Database, editor: TeamEditor, id: s
   });
 }
 
-/** Nur Einladungs- oder Kanallinks in den Discord, sonst nichts. */
-export function discordRoomLink(value: string) {
-  const text = value.trim();
-  if (!text) return "";
-  let url: URL;
-  try {
-    url = new URL(text);
-  } catch {
-    throw new AppError("Bitte einen Discord-Link einfügen, zum Beispiel https://discord.gg/…");
-  }
-  const host = url.hostname.toLowerCase();
-  const ok =
-    url.protocol === "https:" &&
-    !url.username &&
-    !url.password &&
-    (host === "discord.gg" || host === "discord.com" || host.endsWith(".discord.com"));
-  if (!ok) throw new AppError("Bitte einen Link zu discord.gg oder discord.com einfügen.");
-  return url.toString();
+/** Gemeinsame Calls verwenden ausschließlich Google Meet. */
+export function googleRoomLink(value: string) {
+  if (!value.trim()) return "";
+  const url = googleCallLink(value);
+  if (!url) throw new AppError("Bitte einen gültigen Google-Meet-Link einfügen, zum Beispiel https://meet.google.com/abc-defg-hij.");
+  return url;
 }
 
 /**
@@ -282,7 +271,7 @@ export function discordRoomLink(value: string) {
  * Host oder vom Team. Ein vom Abgleich angelegter Raum hat Vorrang.
  */
 export async function setSessionRoom(db: Database, editor: TeamEditor, id: string, link: string) {
-  const roomUrl = discordRoomLink(link);
+  const roomUrl = googleRoomLink(link);
   return db.transaction(async (tx) => {
     const { owner, data } = await lockOpenSession(tx, id);
     if (owner !== editor.userId && !editor.team)

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CircleAlert,
-  ExternalLink,
   LoaderCircle,
   MessageCircle,
   RefreshCw,
@@ -131,11 +130,10 @@ function Card({ card, own = false }: { card: ReflectionCard; own?: boolean }) {
 
       {!own && (
         <footer className="rf-reply">
-          <a href={card.reply.url} target="_blank" rel="noopener noreferrer">
+          <Link href="/partner?modus=eigen">
             <MessageCircle size={16} aria-hidden="true" />
-            Auf Discord antworten
-            <ExternalLink size={14} aria-hidden="true" />
-          </a>
+            Zum Austausch verabreden
+          </Link>
         </footer>
       )}
     </article>

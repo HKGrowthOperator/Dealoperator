@@ -1,6 +1,6 @@
 # Deal Operator
 
-> Deal Operator ist die kostenfreie Sales-Community von HK Growth (HK Growth UG, Marienheide, Deutschland) fürs gemeinsame Callen: Menschen im Vertrieb halten an jedem Calling-Tag Anwahlen, Settings, Closings, Deals und Learnings fest, sehen ihre Serie und ihr Leistungslevel und bleiben über die Rangliste dran. Reflexionen, Call-Partner und Sessions ergänzen den Alltag; die Discord-Runde liefert Antworten und Austausch.
+> Deal Operator ist die kostenfreie Sales-Community von HK Growth (HK Growth UG, Marienheide, Deutschland) fürs gemeinsame Callen: Menschen im Vertrieb halten an jedem Calling-Tag Anwahlen, Settings, Closings, Deals und Learnings fest, sehen ihre Serie und ihr Leistungslevel und bleiben über die Rangliste dran. Reflexionen, Call-Partner und Sessions ergänzen den Alltag; gemeinsame Google-Meet-Calls machen Übung und Austausch direkt zugänglich.
 
 Canonical URL: https://dealoperator.hk-growthoperator.de/
 Sprache: Deutsch
@@ -14,9 +14,9 @@ Diese Datei enthält den Text der öffentlichen Seiten. Konkrete Zahlen zu Calli
 ## Für wen ist Deal Operator?
 
 URL: https://dealoperator.hk-growthoperator.de/fuer-wen
-Kurz gesagt: Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen: eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und Discord-Runde. Für Opener, Setter, Closer, Selbstständige und kleine Vertriebsteams, die dranbleiben wollen.
+Kurz gesagt: Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen: eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und gemeinsamen Google-Meet-Calls. Für Opener, Setter, Closer, Selbstständige und kleine Vertriebsteams, die dranbleiben wollen.
 
-Für alle, die im Vertrieb telefonieren und wissen, dass Dranbleiben das eigentliche Problem ist. Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen: eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und einer Discord-Runde, die Fragen beantwortet, bevor der nächste Anruf ansteht.
+Für alle, die im Vertrieb telefonieren und wissen, dass Dranbleiben das eigentliche Problem ist. Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen: eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und gemeinsamen Google-Meet-Calls zum Üben und Austauschen.
 
 ### Vier Gruppen, ein Calling-Tag
 
@@ -29,13 +29,13 @@ Für alle, die im Vertrieb telefonieren und wissen, dass Dranbleiben das eigentl
 
 1. **Callen wie gewohnt.** Deal Operator ersetzt kein Telefon und kein CRM. Du callst mit deinen Werkzeugen, an den Calling-Tagen der Community oder an jedem anderen Tag.
 2. **Tagesabschluss in zwei Minuten.** Anwahlen, Settings, Closings eintragen, Energie wählen, zwei Fragen beantworten: Was lief gut? Was machst du beim nächsten Calling-Tag besser?
-3. **Dranbleiben, weil andere es sehen.** Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein Tag liest du, was bei anderen funktioniert hat. Im Discord fragst du, bevor du aufgibst.
+3. **Dranbleiben, weil andere es sehen.** Deine Zahlen zählen in der gemeinsamen Summe und in der Rangliste. Unter Mein Tag liest du, was bei anderen funktioniert hat. Mit Call-Partnern übst du, was noch nicht klappt.
 
 ### Die Challenge, die nicht endet
 
 - **Serie:** Jeder rechtzeitige Tagesabschluss an einem Calling-Tag verlängert deine Serie, auch mit null Anwahlen. Eingetragene Pausen unterbrechen sie nicht.
 - **Rangliste:** Gleichstand ist gleicher Platz. Die Rangliste zeigt, wer dranbleibt, nicht nur, wer die größte Liste hat. Abschlüsse wiegen mehr als Anwahlen.
-- **Leistungslevel und Aktiver Caller:** Level gibt es getrennt für Anwahlen, Settings, Closings und Deals. Wer genug Calling-Tage am Stück aktiv ist, wird Aktiver Caller und bekommt Sessions, Roleplay und die Rolle im Discord.
+- **Leistungslevel und Aktiver Caller:** Level gibt es getrennt für Anwahlen, Settings, Closings und Deals. Wer genug Calling-Tage am Stück aktiv ist, wird Aktiver Caller. Calls und Roleplay stehen allen unabhängig vom Level offen.
 
 ### Häufige Fragen
 

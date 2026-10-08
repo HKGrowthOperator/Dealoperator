@@ -21,7 +21,7 @@ const AREAS = {
     label: "Austausch",
     items: [
       { path: "/partner", href: "/partner?modus=eigen", label: "Call-Partner" },
-      { path: "/sessions", href: "/sessions?modus=eigen", label: "Sessions" },
+      { path: "/sessions", href: "/sessions?modus=eigen", label: "Calls" },
       { path: "/wissen", href: "/wissen?modus=eigen", label: "Wissen" },
     ],
   },

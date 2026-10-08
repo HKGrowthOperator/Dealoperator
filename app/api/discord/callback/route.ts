@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
-import { getCurrentUser } from "@/server/auth";
+import { getCurrentUser, isTeam } from "@/server/auth";
 import { database } from "@/server/database";
 import { AppError } from "@/server/operator";
 import { DISCORD_STATE_COOKIE, linkDiscord } from "@/server/discord-admin";
@@ -9,8 +9,8 @@ export const dynamic = "force-dynamic";
 
 function back(result: string) {
   // Die Verknüpfung liegt unter Profil und Einstellungen.
-  const url = new URL("/profil", process.env.APP_URL || "http://localhost:3000");
-  url.searchParams.set("modus", "eigen");
+  const url = new URL("/verwaltung", process.env.APP_URL || "http://localhost:3000");
+  url.searchParams.set("bereich", "discord");
   url.searchParams.set("discord", result);
   return Response.redirect(url.toString(), 303);
 }
@@ -28,6 +28,7 @@ export async function GET(request: Request) {
     return back("abgebrochen");
   const actor = await getCurrentUser();
   if (!actor) return back("anmelden");
+  if (!isTeam(actor)) return back("intern");
   try {
     await linkDiscord(database(), actor, code.slice(0, 200));
     return back("verbunden");
