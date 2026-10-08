@@ -6,6 +6,7 @@ import { AppError, rateLimit, refusePersonalUse } from "./operator";
 import { notifyApplicant, teamEvent, teamPushText, type ApplicantNotice, type Reach } from "./notify";
 import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
+import { preparedMemberForEmail } from "./member-directory";
 
 /**
  * Gemeinsame Meldungen sind keine persönlichen Konten. Der Text steht an
@@ -86,6 +87,21 @@ export async function suggestProfiles(
   actor: Actor,
   fullName = "",
 ): Promise<{ name: string; profiles: SuggestedProfile[] }> {
+  // Eine bestätigte Adresse darf ihr eigenes internes Profil finden. Das
+  // Mitgliederverzeichnis selbst bleibt unsichtbar und wird nicht aufgezählt.
+  const prepared = await preparedMemberForEmail(db, actor.email);
+  if (prepared && !("ambiguous" in prepared) && !prepared.owner)
+    return {
+      name: prepared.name,
+      profiles: [
+        {
+          id: prepared.id,
+          name: prepared.name,
+          company: prepared.company,
+          role: prepared.role,
+        },
+      ],
+    };
   let name = fullName.trim();
   if (!name) {
     const [r] = await db.query(
@@ -500,6 +516,29 @@ export async function bindConfirmedRequest(
       );
       await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits eine offene Übernahme.");
       return null;
+    }
+    // Erst nach Mailbestätigung: vorhandene historische Zahlen bleiben eine
+    // Profilübernahme mit Teamprüfung, statt ein zweites Profil anzulegen.
+    if (request.kind === "new" && !via) {
+      const prepared = await preparedMemberForEmail(tx, actor.email);
+      if (prepared && "ambiguous" in prepared)
+        throw new AppError(
+          "Zu deiner E-Mail gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.",
+          409,
+        );
+      if (prepared && (prepared.hasReports || prepared.owner)) {
+        await tx.query(
+          `UPDATE onboarding_requests SET status='superseded',updated_at=now()
+           WHERE lower(email)=$1 AND status='awaiting_email' AND id<>$2`,
+          [actor.email, request.id],
+        );
+        await tx.query(
+          "UPDATE onboarding_requests SET kind='claim',participant=$2 WHERE id=$1",
+          [request.id, prepared.id],
+        );
+        request.kind = "claim";
+        request.participant = prepared.id;
+      }
     }
     // Die Bindung an das Konto ist die Stelle, an der aus einer anonymen
     // Eingabe eine belegte Anfrage wird.
@@ -1051,7 +1090,15 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
     let p: { id: string } | null = null;
     if (wanted) {
       // Prüft: noch frei, persönliches Profil, auffindbar oder gültige Einladung.
-      p = await profileForSelection(tx, wanted, v.invite);
+      const prepared = await preparedMemberForEmail(tx, actor.email);
+      const ownDirectorySelection =
+        !!prepared && !("ambiguous" in prepared) && prepared.id === wanted;
+      p = await profileForSelection(
+        tx,
+        wanted,
+        v.invite,
+        ownDirectorySelection,
+      );
       // Wartet auf eine gerade laufende Freigabe und sieht danach deren Ergebnis.
       const [still] = await tx.query("SELECT owner FROM participants WHERE id=$1 FOR SHARE", [p.id]);
       if (still?.owner)

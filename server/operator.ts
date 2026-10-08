@@ -4,6 +4,7 @@ import type { Database } from "./database";
 import { isTeam, type Actor } from "./auth";
 import { teamEvent, teamPushText } from "./notify";
 import { normalisePhone } from "../lib/phone";
+import { preparedMemberForEmail } from "./member-directory";
 import {
   aggregate,
   countsSchema,
@@ -222,19 +223,53 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
     );
     if (existing) return { ok: true, id: existing.id };
     await refuseDuringOpenClaim(tx, actor);
-    const id = randomUUID();
-    await tx.query(
-      "INSERT INTO participants(id,name,company,role,email,owner,public_consent,claimed_at) VALUES($1,$2,$3,$4,$5,$6,$7,now())",
-      [
-        id,
-        value.name,
-        value.company,
-        value.role,
-        actor.email,
-        actor.userId,
-        true,
-      ],
-    );
+    const prepared = await preparedMemberForEmail(tx, actor.email);
+    if (prepared && "ambiguous" in prepared)
+      throw new AppError(
+        "Zu deiner E-Mail gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.",
+        409,
+      );
+    if (prepared && (prepared.owner || prepared.hasReports))
+      throw new AppError(
+        "Zu deiner E-Mail gibt es bereits ein Profil. Bitte übernimm dieses Profil, damit deine Zahlen zusammenbleiben.",
+        409,
+      );
+    const id = prepared?.id ?? randomUUID();
+    const name = prepared?.name ?? value.name;
+    if (prepared) {
+      const [locked] = await tx.query(
+        "SELECT owner FROM participants WHERE id=$1 FOR UPDATE",
+        [id],
+      );
+      const reports = await tx.query(
+        "SELECT 1 FROM checkins WHERE participant=$1 LIMIT 1",
+        [id],
+      );
+      if (!locked || locked.owner || reports.length)
+        throw new AppError(
+          "Dieses Profil wurde inzwischen zugeordnet oder hat bereits Zahlen. Bitte übernimm das vorhandene Profil.",
+          409,
+        );
+      // Erst bestätigte E-Mail, dann Besitzer setzen. Keine Mail beim Import.
+      // Eine Zeilensperre/bedingte Änderung verhindert parallele Übernahmen.
+      const linked = await tx.query(
+        `UPDATE participants SET owner=$2,claimed_at=now()
+         WHERE id=$1 AND owner IS NULL
+           AND NOT EXISTS(SELECT 1 FROM checkins WHERE participant=$1)
+         RETURNING id`,
+        [id, actor.userId],
+      );
+      if (!linked.length)
+        throw new AppError(
+          "Dieses Profil wurde inzwischen zugeordnet oder hat bereits Zahlen. Bitte übernimm das vorhandene Profil.",
+          409,
+        );
+    } else {
+      await tx.query(
+        "INSERT INTO participants(id,name,company,role,email,owner,public_consent,claimed_at) VALUES($1,$2,$3,$4,$5,$6,$7,now())",
+        [id, name, value.company, value.role, actor.email, actor.userId, true],
+      );
+    }
     const [old] = await tx.query("SELECT data FROM profiles WHERE id=$1", [
       actor.userId,
     ]);
@@ -247,7 +282,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
       listed: false,
       channel: "Discord",
       ...(old ? JSON.parse(old.data) : {}),
-      name: value.name,
+      name,
       role: value.role,
     };
     await tx.query(
@@ -274,7 +309,7 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         ref: id,
         state: "confirmed",
         done: true,
-        title: `Neues Profil angelegt: ${value.name}`,
+        title: `Neues Profil angelegt: ${name}`,
         body: phone
           ? "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer angegeben (nicht geprüft)."
           : "Ohne Registrierungsanfrage über „Anmelden“ gekommen. E-Mail bestätigt; Telefonnummer fehlt noch.",
@@ -490,10 +525,9 @@ export async function issueClaim(db: Database, actor: Actor, id: string) {
     return { token, expiresInDays: 7 };
   });
 }
-// Die frühere direkte Übernahme über passende E-Mail oder Einmalcode ist
-// entfallen. Ein vorbereitetes Profil wird ausschließlich über eine Anfrage in
-// server/onboarding.ts und die anschließende Freigabe durch das
-// Deal-Operator-Team mit einem Konto verbunden.
+// Historische Zahlen werden ausschließlich nach einer Anfrage und Teamprüfung
+// übernommen. Interne Verzeichnisprofile ohne Zahlen dürfen nach bestätigter
+// E-Mail in createMember mit demselben Profil verbunden werden.
 export async function updateAccount(db: Database, actor: Actor, raw: unknown) {
   const v = z
     .object({
@@ -583,6 +617,15 @@ export async function setSearchable(db: Database, actor: Actor, raw: unknown) {
 export async function adminContacts(db: Database, actor: Actor) {
   if (!actor.admin) throw new AppError("Nur für die Verwaltung.", 403);
   return db.query(
-    "SELECT p.id,p.name,p.company,p.role,p.kind,p.email AS imported_email,a.email AS verified_email,a.phone,a.contact_opt_in,p.searchable,p.owner IS NOT NULL AS registered FROM participants p LEFT JOIN account_private a ON a.owner=p.owner ORDER BY p.name",
+    `SELECT p.id,p.name,p.company,p.role,p.kind,p.email AS imported_email,
+       a.email AS verified_email,a.phone,d.phone AS imported_phone,
+       a.contact_opt_in,p.searchable,p.owner IS NOT NULL AS registered
+     FROM participants p LEFT JOIN account_private a ON a.owner=p.owner
+     LEFT JOIN LATERAL (
+       SELECT e.value->>'phone' AS phone FROM app_settings s
+       CROSS JOIN LATERAL jsonb_each(CASE WHEN jsonb_typeof(s.value)='object' THEN s.value ELSE '{}'::jsonb END) e
+       WHERE s.key='akquise_member_directory' AND e.value->>'participantId'=p.id
+         AND coalesce(e.value->>'phone','')<>'' LIMIT 1
+     ) d ON true ORDER BY p.name`,
   );
 }

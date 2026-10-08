@@ -30,6 +30,7 @@ type Contact = {
   verified_email: string | null;
   imported_email: string | null;
   phone: string | null;
+  imported_phone?: string | null;
 };
 function template() {
   return [
@@ -441,7 +442,10 @@ export default function ImportConsole({
                           ? " · importiert"
                           : ""}
                     </td>
-                    <td>{c.phone || "–"}</td>
+                    <td>
+                      {c.phone || c.imported_phone || "–"}
+                      {!c.phone && c.imported_phone ? " · importiert" : ""}
+                    </td>
                   </tr>
                 ))}
               </tbody>
