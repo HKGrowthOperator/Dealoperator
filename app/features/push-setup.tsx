@@ -665,7 +665,7 @@ export function PushPrompt({
       setRegistered(true);
       setDone({
         tone: "ok",
-        text: variant === "call" ? "Benachrichtigungen sind an. Wir erinnern dich vor deinen zugesagten Calls." : `Erinnerungen sind an. Du bekommst um ${clockText(settings.eveningReminder)} einen Hinweis, wenn dein Tagesabschluss an einem Calling-Tag noch fehlt.`,
+        text: variant === "call" ? "Benachrichtigungen sind an. Am Tag des Calls erinnern wir dich 15 Minuten vor Beginn." : `Erinnerungen sind an. Du bekommst um ${clockText(settings.eveningReminder)} einen Hinweis, wenn dein Tagesabschluss an einem Calling-Tag noch fehlt.`,
       });
     } catch (e) {
       setDone({
@@ -719,7 +719,7 @@ export function PushPrompt({
             : "Erinnerung an deinen Tagesabschluss?"}
         </strong>
         <p>
-          {variant === "call" ? "Ein Hinweis 15 Minuten vor deinen zugesagten Calls. Einmal einschalten reicht; ändern kannst du das im Profil." : <>Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.</>}
+          {variant === "call" ? "Am Tag des Calls bekommst du 15 Minuten vor Beginn einen Hinweis. Einmal einschalten reicht; ändern kannst du das im Profil." : <>Um {clockText(settings.eveningReminder)}, wenn dein Abschluss noch fehlt, und um {clockText(settings.streakWarning)} vor Fristende. Nur an Calling-Tagen.</>}
         </p>
         {variant === "after-submit" ? (
           // In der Bestätigung bleibt „Zu den Ergebnissen“ der einzige

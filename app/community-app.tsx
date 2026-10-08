@@ -607,6 +607,10 @@ export default function CommunityApp({
     void refresh();
   }
   const sessionsOpen = true;
+  const upcomingCalls = data.sessions
+    .filter((s) => !s.cancelled && sessionEnd(s) > new Date())
+    .slice()
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
   function openNewSession() {
     if (!data.profile.name) {
       toast.info(
@@ -1360,13 +1364,14 @@ export default function CommunityApp({
                     )}
                   </PageHeading>
                   <section className="call-partner-hub" aria-label="Gemeinsame Calls">
-                    <div><span className="call-hub-kicker">Gemeinsam besser werden</span><h2>Einwände üben. Zusammen callen.</h2><p>Such dir einen Partner oder verabrede einen offenen Call. Der Treffpunkt ist Google Meet.</p></div>
+                    <div><span className="call-hub-kicker">Gemeinsam besser werden</span><h2>Einwände üben. Zusammen callen.</h2><p>Verabrede deinen Call am besten hier in Deal Operator. So können andere zusagen und sich am Tag des Calls erinnern lassen. Spontan könnt ihr auch direkt in Google Meet zusammenkommen.</p></div>
                     <div className="call-hub-actions">
-                      {data.callUrl && <a className="btn primary" href={data.callUrl} target="_blank" rel="noopener noreferrer"><Headphones size={18} />Zum Call<span className="do-sr"> (neues Fenster)</span></a>}
+                      <button className="btn primary" onClick={openNewSession}><Plus size={18} />Call verabreden</button>
+                      {data.callUrl && <a className="btn secondary" href={data.callUrl} target="_blank" rel="noopener noreferrer"><Headphones size={18} />Direkt zum Call<span className="do-sr"> (neues Fenster)</span></a>}
                       <Link className="btn secondary" href="/sessions?modus=eigen"><CalendarDays size={18} />Calls und Roleplays</Link>
-                      <button className="btn secondary" onClick={openNewSession}><Plus size={18} />Call verabreden</button>
                     </div>
-                    {data.sessions.filter((s) => !s.cancelled && sessionEnd(s) > new Date()).slice().sort((a,b) => (a.date+a.time).localeCompare(b.date+b.time)).slice(0,3).map((s) => <button className="call-hub-upcoming" key={s.id} onClick={() => setSession(s)}><span><strong>{s.title}</strong><small>{sessionDay(s.date)} · {s.time} Uhr · mit {s.host}</small></span><span>{s.joined ? "Du bist dabei" : "Ansehen"}</span></button>)}
+                    {upcomingCalls.length === 0 && <p>Aktuell sind keine Calls verabredet.</p>}
+                    {upcomingCalls.slice(0,3).map((s) => <button className="call-hub-upcoming" key={s.id} onClick={() => setSession(s)}><span><strong>{s.title}</strong><small>{sessionDay(s.date)} · {s.time} Uhr · mit {s.host}</small></span><span>{s.joined ? "Du bist dabei" : "Ansehen"}</span></button>)}
                   </section>
                   {data.viewerTeam && (
                     <p className="ca-team-note">
@@ -1588,7 +1593,7 @@ export default function CommunityApp({
                     >
                       {sessionsOpen && !data.sessions.length && (
                         <button className="btn primary" onClick={openNewSession}>
-                          Erste Call verabreden
+                          Ersten Call verabreden
                         </button>
                       )}
                     </Empty>
@@ -1834,7 +1839,7 @@ export default function CommunityApp({
                       : modal === "create-session"
                         ? editSessionId
                           ? "Deine Session bearbeiten"
-                          : "Neue Call verabreden"
+                          : "Call verabreden"
                         : modal === "buddy"
                           ? "Call-Partner anfragen"
                           : "Hier zählt, dass du dranbleibst."}
@@ -2484,4 +2489,3 @@ function PageHeading({
     </div>
   );
 }
-
