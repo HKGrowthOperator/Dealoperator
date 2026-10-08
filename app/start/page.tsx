@@ -6,6 +6,7 @@ import { ownState } from "@/server/operator";
 import { homeState } from "@/server/home";
 import {
   bindConfirmedRequest,
+  finishPreparedRegistration,
   noteConfirmedAccount,
   ONBOARDING_COOKIE,
   requestIdFromCookie,
@@ -50,6 +51,7 @@ export default async function Page({
   // Das Team sieht das Konto auch dann, wenn die Übernahme nicht abgeschickt
   // wird; Push und E-Mail kommen in diesem Fall erst mit der Anfrage.
   if (!bound) await noteConfirmedAccount(db, actor, toClaim);
+  if (!toClaim) await finishPreparedRegistration(db, actor);
   const state = await ownState(db, actor);
 
   // Team-Konten mit Ziel Verwaltung (etwa aus einem Team-Push) direkt dorthin,
@@ -108,7 +110,7 @@ export default async function Page({
       : [];
   // Wer schon in der Rangliste steht, soll sein Profil erkennen, statt ein
   // zweites anzulegen: Vorschläge zum Namen aus der Registrierung.
-  const suggested = lost ? { profiles: [] } : await suggestProfiles(db, actor, bound?.fullName || "");
+  const suggested = lost ? { name: "", profiles: [] } : await suggestProfiles(db, actor, bound?.fullName || "");
 
   return (
     <div className="operator-site">
@@ -116,7 +118,7 @@ export default async function Page({
       <main className="auth-layout">
         <MemberOnboarding
           next={next}
-          presetName={bound?.fullName || ""}
+          presetName={suggested.name || bound?.fullName || ""}
           needsPhone={!phone}
           takenProfile={(lost?.name as string | undefined) || ""}
           discordUrl={discordDestination().url}

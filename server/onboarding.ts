@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
-import { AppError, rateLimit, refusePersonalUse } from "./operator";
+import { AppError, createMember, rateLimit, refusePersonalUse } from "./operator";
 import { notifyApplicant, teamEvent, teamPushText, type ApplicantNotice, type Reach } from "./notify";
 import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
@@ -90,6 +90,8 @@ export async function suggestProfiles(
   // Eine bestätigte Adresse darf ihr eigenes internes Profil finden. Das
   // Mitgliederverzeichnis selbst bleibt unsichtbar und wird nicht aufgezählt.
   const prepared = await preparedMemberForEmail(db, actor.email);
+  if (prepared && !("ambiguous" in prepared) && !prepared.owner && !prepared.hasReports)
+    return { name: prepared.name, profiles: [] };
   if (prepared && !("ambiguous" in prepared) && !prepared.owner)
     return {
       name: prepared.name,
@@ -618,6 +620,25 @@ export async function bindConfirmedRequest(
       participant: request.participant as string | null,
       fullName: request.full_name as string,
     };
+  });
+}
+
+/** Interne Profile ohne Zahlen brauchen nach bestätigter Registrierung keine Übernahme. */
+export async function finishPreparedRegistration(db: Database, actor: Actor) {
+  const [request] = await db.query(
+    `SELECT r.full_name,a.phone FROM onboarding_requests r
+     JOIN account_private a ON a.owner=r.owner
+     WHERE r.owner=$1 AND lower(r.email)=$2 AND r.kind='new' AND r.status='approved'
+       AND a.phone<>'' ORDER BY r.updated_at DESC LIMIT 1`,
+    [actor.userId, actor.email],
+  );
+  if (!request) return null;
+  const prepared = await preparedMemberForEmail(db, actor.email);
+  if (!prepared || "ambiguous" in prepared || prepared.owner || prepared.hasReports) return null;
+  return createMember(db, actor, {
+    name: String(request.full_name),
+    company: prepared.company,
+    role: prepared.role,
   });
 }
 

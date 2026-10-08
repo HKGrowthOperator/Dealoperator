@@ -10,6 +10,7 @@ import {
 import { adminContacts, createMember, publicRanking } from "../server/operator";
 import {
   bindConfirmedRequest,
+  finishPreparedRegistration,
   requestClaimSignedIn,
   searchProfiles,
   startRequest,
@@ -153,6 +154,7 @@ test("historical numbers turn registration into a team-reviewed takeover and sta
 });
 test("only the confirmed matching address can select a hidden directory profile", async () => {
   const id = await prepared();
+  await db.query("INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,'2026-10-07','{\"attempts\":15}','import','import')", [id]);
   const mine = await suggestProfiles(db, alice);
   assert.equal(mine.profiles[0].id, id);
   assert.deepEqual(Object.keys(mine.profiles[0]).sort(), [
@@ -228,4 +230,26 @@ test("malformed directory settings do not expose or assign a profile", async () 
     MEMBER_DIRECTORY_KEY,
   ]);
   assert.equal(await preparedMemberForEmail(db, alice.email), null);
+});
+
+test("registration finishes on the prepared profile without a ranked-profile prompt or extra notification", async () => {
+  const id = await prepared();
+  assert.deepEqual(await suggestProfiles(db, alice), { name: "Alice Beispiel", profiles: [] });
+  assert.equal(await finishPreparedRegistration(db, alice), null);
+  const r = await registration();
+  await bindConfirmedRequest(db, alice, r.id);
+  const notificationsBefore = (await db.query("SELECT count(*)::int AS n FROM notifications"))[0].n;
+  assert.equal((await finishPreparedRegistration(db, alice))?.id, id);
+  assert.equal(await finishPreparedRegistration(db, alice), null);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM participants"))[0].n, 1);
+  assert.equal((await db.query("SELECT phone FROM account_private WHERE owner=$1", [alice.userId]))[0].phone, form.phone);
+  assert.equal((await db.query("SELECT count(*)::int AS n FROM notifications"))[0].n, notificationsBefore);
+});
+test("automatic completion never assigns historical reports", async () => {
+  const id = await prepared();
+  await db.query("INSERT INTO checkins(participant,day,counts,source,origin) VALUES($1,'2026-10-07','{\"attempts\":15}','import','import')", [id]);
+  const r = await registration();
+  await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(await finishPreparedRegistration(db, alice), null);
+  assert.equal((await db.query("SELECT owner FROM participants WHERE id=$1", [id]))[0].owner, null);
 });
