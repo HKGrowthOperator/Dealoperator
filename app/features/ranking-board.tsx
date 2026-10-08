@@ -500,7 +500,7 @@ export default function RankingBoard({
     { key: "attempts", label: "Anwahlen", value: totals.attempts, note: totals.attempts === null ? "Noch nicht gemeldet" : monthly ? "im Monat" : "an diesem Tag" },
     { key: "settingsBooked", label: "Settings", value: totals.settingsBooked, note: totals.settingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
     { key: "closingsBooked", label: "Closings", value: totals.closingsBooked, note: totals.closingsBooked === null ? "Noch nicht gemeldet" : "vereinbart" },
-    { key: "people", label: "Dabei", value: people.length, note: people.length === 1 ? "mit Meldung" : "mit Meldungen" },
+    { key: "people", label: "Personen", value: people.length, note: monthly ? "mit Tagesbericht im Monat" : "mit Tagesbericht" },
   ];
 
   return (
