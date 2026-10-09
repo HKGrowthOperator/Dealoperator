@@ -1,0 +1,82 @@
+{
+ "cta": {
+  "id": "cta",
+  "text": "Schreib Discord in die Kommentare, und ich schick dir den Link."
+ },
+ "reels": [
+  {
+   "slug": "1-allein",
+   "title": "Callen alleine ist brutal",
+   "lines": [
+    "Callen alleine ist brutal.",
+    "Liste offen, Telefon in der Hand, und niemand, der mitzieht.",
+    "Bei Deal Operator callst du nicht allein.",
+    "Wir callen zusammen im Discord.",
+    "Feste Sessions. Roleplays. Call-Partner.",
+    "Und abends siehst du, was alle zusammen geschafft haben.",
+    "Kostenfrei."
+   ]
+  },
+  {
+   "slug": "2-merkt",
+   "title": "Keiner merkt, wenn du aufhörst",
+   "lines": [
+    "Du hörst nicht wegen der Absagen auf.",
+    "Sondern, weil keiner merkt, wenn du aufhörst.",
+    "Bei Deal Operator merkt es jemand.",
+    "Jeder Calling-Tag endet mit deinem Tagesabschluss.",
+    "Anwahlen, Settings, Closings. Zwei Minuten.",
+    "Deine Serie wächst mit jedem Tag.",
+    "Und in der Rangliste sehen alle, wer dranbleibt."
+   ]
+  },
+  {
+   "slug": "3-einwand",
+   "title": "Einwand-Training im Roleplay",
+   "lines": [
+    "Schicken Sie mir einfach mal Infos per Mail.",
+    "Was sagst du jetzt?",
+    "Wenn du kurz überlegen musstest: Genau das üben wir.",
+    "Im Discord spielt einer den Kunden, du antwortest, und die anderen geben dir Feedback.",
+    "So sitzt der Einwand, bevor er im echten Call kommt."
+   ]
+  },
+  {
+   "slug": "4-pov",
+   "title": "POV: 8:59, gleich startet die Session",
+   "lines": [
+    "Es ist acht Uhr neunundfünfzig.",
+    "Gleich startet die Call-Session.",
+    "Rein in den Raum, Liste auf, und alle wählen gleichzeitig.",
+    "Einer legt das erste Setting, und der ganze Raum zieht mit.",
+    "Und abends: Zahlen eintragen. Serie verlängert.",
+    "So fühlt sich Callen an, wenn du nicht allein bist."
+   ]
+  },
+  {
+   "slug": "5-ehrlich",
+   "title": "Wie viele Anwahlen? Ehrlich.",
+   "lines": [
+    "Wie viele Anwahlen hast du diese Woche gemacht?",
+    "Ehrlich. Ohne nachzuschauen.",
+    "Wenn du es nicht genau weißt, liegt genau da das Problem.",
+    "Bei Deal Operator trägst du jeden Calling-Tag in zwei Minuten ein.",
+    "Du bekommst deine Tagesmarke, deine Serie wächst, und du siehst schwarz auf weiß, wo du stehst.",
+    "Und im Discord callst du mit Leuten, die genauso dranbleiben."
+   ]
+  },
+  {
+   "slug": "6-rollen",
+   "title": "Opener. Setter. Closer.",
+   "lines": [
+    "Opener. Setter. Closer. Selbstständig.",
+    "Egal, wo du gerade stehst.",
+    "Bei Deal Operator callen Leute wie du zusammen.",
+    "Du findest Call-Partner für deine Zielgruppe.",
+    "Du übst Einwände im Roleplay.",
+    "Und in der Rangliste siehst du, wer dranbleibt.",
+    "Alles kostenfrei."
+   ]
+  }
+ ]
+}
