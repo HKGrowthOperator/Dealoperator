@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { Database, type Executor } from "../server/database";
 import { planCallReminders, recheckCallReminder } from "../server/call-reminders";
+import { callEntryDestination } from "../server/call-entry";
 
 let pg: PGlite, db: Database;
 const now = new Date("2026-10-08T15:00:00Z");
@@ -28,10 +29,35 @@ test("reminds only confirmed attendees with an enabled device, once per start ti
   assert.equal(await planCallReminders(db, now), 0);
   const [notification] = await db.query("SELECT recipient,kind,ref,url,not_after FROM notifications");
   assert.equal(notification.recipient,"alice");
-  assert.equal(notification.url,"/sessions?modus=eigen&call=call");
+  assert.equal(notification.url,"/call/call");
   assert.equal(new Date(notification.not_after).toISOString(),start);
   assert.equal(await recheckCallReminder(db,{kind:String(notification.kind),recipient:String(notification.recipient),ref:String(notification.ref)}),null);
   assert.equal(await planCallReminders(db,new Date(start)),0);
+});
+
+test("push entry opens the current validated room and stops cancelled or expired calls", async () => {
+  assert.equal(await callEntryDestination(db,"call",now),"https://meet.google.com/dki-umso-umr");
+  await db.query("UPDATE sessions SET data=(data::jsonb || $1::jsonb)::text",[JSON.stringify({roomUrl:"https://meet.google.com/abc-defg-hij"})]);
+  assert.equal(await callEntryDestination(db,"call",now),"https://meet.google.com/abc-defg-hij");
+  await db.query("UPDATE sessions SET data=(data::jsonb || $1::jsonb)::text",[JSON.stringify({roomUrl:"https://attacker.example/room",url:"javascript:alert(1)"})]);
+  assert.equal(await callEntryDestination(db,"call",now),"https://meet.google.com/dki-umso-umr");
+  assert.equal(await callEntryDestination(db,"missing",now),null);
+  assert.equal(await callEntryDestination(db,"call",new Date("2026-10-08T15:40:00Z")),null);
+  await db.query("UPDATE sessions SET data=(data::jsonb || '{\"cancelled\":true}'::jsonb)::text");
+  assert.equal(await callEntryDestination(db,"call",now),null);
+});
+
+test("Sunday roleplay reminds at fifteen minutes and respects opt-out and disabled devices",async () => {
+  await db.query("UPDATE sessions SET data=(data::jsonb || $1::jsonb)::text",[JSON.stringify({date:"2026-10-18",time:"09:00",startsAt:"2026-10-18T07:00:00.000Z",minutes:45,capacity:25})]);
+  assert.equal(await planCallReminders(db,new Date("2026-10-18T06:44:59Z")),0);
+  assert.equal(await planCallReminders(db,new Date("2026-10-18T06:45:00Z")),1);
+  assert.equal(await planCallReminders(db,new Date("2026-10-18T06:46:00Z")),0);
+  await db.query("DELETE FROM notifications");
+  await db.query("UPDATE push_subscriptions SET disabled_at=now()");
+  assert.equal(await planCallReminders(db,new Date("2026-10-18T06:45:00Z")),0);
+  await db.query("UPDATE push_subscriptions SET disabled_at=null");
+  await db.query("INSERT INTO notification_prefs(owner,reminders) VALUES('alice',false)");
+  assert.equal(await planCallReminders(db,new Date("2026-10-18T06:45:00Z")),0);
 });
 
 test("withdrawn RSVP, cancelled call, changed start and disabled reminders invalidate queued reminders", async () => {

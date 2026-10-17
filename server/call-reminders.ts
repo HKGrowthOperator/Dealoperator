@@ -22,8 +22,8 @@ export async function planCallReminders(db: Database, now = new Date()) {
       recipient: row.owner, channel: "push", kind: "call:reminder",
       ref: JSON.stringify({ id: row.id, start: stamp }),
       title: "Dein Call beginnt gleich",
-      body: `${call.title} · ${new Intl.DateTimeFormat("de-DE", {hour:"2-digit", minute:"2-digit", timeZone:"Europe/Berlin"}).format(start)} Uhr.`,
-      url: `/sessions?modus=eigen&call=${encodeURIComponent(row.id)}`, notAfter: start,
+      body: `${call.title} · ${new Intl.DateTimeFormat("de-DE", {hour:"2-digit", minute:"2-digit", timeZone:"Europe/Berlin"}).format(start)} Uhr. Antippen und direkt zum Call.`,
+      url: `/call/${encodeURIComponent(row.id)}`, notAfter: start,
     })) planned++;
   }
   return planned;
