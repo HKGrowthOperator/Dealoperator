@@ -4,16 +4,16 @@ import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import { SITE_URL, ORGANIZATION_ID } from "@/lib/site";
 
 export const metadata: Metadata = {
-  title: "Für wen ist Deal Operator? Sales-Community für Caller",
+  title: "Für wen ist Deal Operator? Zahlen und Calling-Routine",
   description:
-    "Kostenfreie Sales-Community fürs gemeinsame Callen: Calling-Routine mit Tagesabschluss, Serie und Rangliste. Für Opener, Setter, Closer und Selbstständige.",
+    "Kostenfreies Werkzeug für deine Calling-Routine: Tageszahlen, Reflexionen, Rangliste und gemeinsame Übungstermine. Für Opener, Setter, Closer und Selbstständige.",
   alternates: { canonical: "/fuer-wen" },
 };
 
 const FAQ: [string, string][] = [
   [
     "Was kostet Deal Operator?",
-    "Nichts. Deal Operator ist kostenfrei, ohne Testphase und ohne Paket dahinter. HK Growth aus Marienheide bei Köln betreibt die Community, weil wir selbst callen und aus der gleichen Vertriebsarbeit die Sales-App DealUno entwickelt haben.",
+    "Deal Operator ist kostenfrei. Du kannst deine Tageszahlen und Reflexionen festhalten, deinen Fortschritt vergleichen und gemeinsame Calls verabreden.",
   ],
   [
     "Ist Deal Operator eine Kaltakquise-Challenge?",
@@ -25,11 +25,11 @@ const FAQ: [string, string][] = [
   ],
   [
     "Wer sieht meine Zahlen?",
-    "Die Rangliste zeigt deine Platzierung und Kennzahlen den anderen Mitgliedern, deine Reflexionen bleiben in deinem Bereich und für die Runde, mit der du sie teilst. Was genau wer sieht, steht unter „So funktioniert’s“.",
+    "Die Rangliste zeigt deine Platzierung und Kennzahlen den anderen Teilnehmern, deine Reflexionen bleiben in deinem Bereich und für die Runde, mit der du sie teilst. Was genau wer sieht, steht unter „So funktioniert’s“.",
   ],
   [
-    "Was ist der Unterschied zu DealUno?",
-    "Deal Operator ist die Community und die Routine: Zahlen festhalten, dranbleiben, austauschen. DealUno ist die Sales-App und das CRM für Teams: Lead Radar, Anrufsession mit Power Dialer, Vertriebsprozess. Viele nutzen beides, nötig ist es nicht.",
+    "Brauche ich ein bestimmtes CRM?",
+    "Nein. Du callst mit deinen gewohnten Werkzeugen und hältst deine Tageszahlen in Deal Operator fest. Ein bestimmtes CRM oder eine zusätzliche Software ist dafür nicht nötig.",
   ],
 ];
 
@@ -59,8 +59,7 @@ const faqJsonLd = {
 };
 
 /**
- * Öffentliche Seite für die Suche nach „Sales Community“, „Cold Calling
- * Community“, „Kaltakquise Challenge“ und „Setter Closer Community“. Erklärt,
+ * Öffentliche Seite für Calling-Routine, Tageszahlen und gemeinsames Üben. Erklärt,
  * für wen Deal Operator gedacht ist, und führt zu /starten. Zahlen zu
  * Calling-Tagen und Schwellen stehen bewusst nicht hier, sondern unter
  * /so-funktionierts, wo sie aus den echten Einstellungen kommen.
@@ -74,7 +73,7 @@ export default function Page() {
           <h1>Für wen ist Deal Operator?</h1>
           <p>
             Für alle, die im Vertrieb telefonieren und wissen, dass Dranbleiben das eigentliche
-            Problem ist. Deal Operator ist die kostenfreie Sales-Community fürs gemeinsame Callen:
+            Problem ist. Deal Operator ist die kostenfreie Anwendung für Tageszahlen und gemeinsame Calls:
             eine Cold-Calling-Routine mit Tagesabschluss, Serie, Rangliste und einer gemeinsamen Übungsrunde,
             die Fragen beantwortet, bevor der nächste Anruf ansteht.
           </p>
@@ -140,8 +139,8 @@ export default function Page() {
                 <h3>Selbstständige, Gründer, kleine Teams</h3>
                 <p>
                   Du machst Akquise neben allem anderen und hast niemanden, der dich fragt, ob du
-                  heute gecallt hast. Die Community übernimmt das: Serie, Rangliste und Call-Partner
-                  ersetzen das Vertriebsteam, das du nicht hast.
+                  heute gecallt hast. Mit Serie, Rangliste und Call-Partnern behältst du deine Routine im Blick
+                  und findest Unterstützung für den nächsten Call.
                 </p>
               </div>
             </article>
@@ -156,7 +155,7 @@ export default function Page() {
                 <h3>Callen wie gewohnt</h3>
                 <p>
                   Deal Operator ersetzt kein Telefon und kein CRM. Du callst mit deinen Werkzeugen,
-                  an den Calling-Tagen der Community oder an jedem anderen Tag.
+                  an deinen Calling-Tagen oder an jedem anderen Tag.
                 </p>
               </div>
             </li>
@@ -248,9 +247,9 @@ export default function Page() {
             <Link className="do-button do-button-primary" href="/starten">
               Kostenfrei mitmachen
             </Link>
-            <a className="do-button do-button-secondary" href="https://dealuno.hk-growthoperator.de/">
-              DealUno für Teams ansehen
-            </a>
+            <Link className="do-button do-button-secondary" href="/partner?modus=eigen">
+              Call-Partner finden
+            </Link>
           </p>
         </section>
       </main>

@@ -218,7 +218,6 @@ export function OperatorFooter({
           <Link href="/fuer-wen">Für wen</Link>
           <Link href="/so-funktionierts">So funktioniert’s</Link>
           <Link href="/partner?modus=eigen">Call-Partner</Link>
-          <a href="https://dealuno.hk-growthoperator.de/">DealUno</a>
           <a href="https://website.hk-growthoperator.de/">Webstudio</a>
           <a href="https://hk-growthoperator.de/">HK Growth</a>
           {showAdmin && <Link href="/verwaltung">Verwaltung</Link>}

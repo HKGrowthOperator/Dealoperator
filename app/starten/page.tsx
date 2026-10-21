@@ -16,7 +16,7 @@ import { AppError } from "@/server/operator";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Mitmachen · Deal Operator",
-  description: "Kostenfrei in die Sales-Community einsteigen: Konto anlegen oder vorbereitetes Profil übernehmen und beim gemeinsamen Callen dranbleiben.",
+  description: "Kostenfrei deine Zahlen festhalten: Konto anlegen oder vorbereitetes Profil übernehmen und deine Calling-Routine fortsetzen.",
   alternates: { canonical: "/starten" },
 };
 
