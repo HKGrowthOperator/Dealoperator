@@ -239,7 +239,7 @@ export function ProfileSearch({
   return (
     <div className="flow-search">
       <div className="flow-field">
-        <label htmlFor={`${id}-q`}>Dein Name in der Rangliste</label>
+        <label htmlFor={`${id}-q`}>Vor- und Nachname</label>
         <div className="flow-search-input">
           <Search size={18} aria-hidden="true" />
           <input
@@ -600,7 +600,7 @@ export function PrivacyNote() {
   return (
     <p className="flow-privacy">
       <Lock size={15} aria-hidden="true" />
-      E-Mail und Nummer sind nur für dich und das Team sichtbar.
+      Deine Angaben werden mit deiner Anfrage gespeichert.
     </p>
   );
 }

@@ -467,12 +467,7 @@ test("rejection and a follow-up question keep the numbers untouched", async () =
 test("the public search never exposes contact data or claimed profiles", async () => {
   const id = await imported();
   const [found] = await searchProfiles(db, "Alice");
-  assert.deepEqual(Object.keys(found).sort(), [
-    "company",
-    "id",
-    "name",
-    "role",
-  ]);
+  assert.deepEqual(Object.keys(found).sort(), ["id", "name"]);
   assert.equal(found.id, id);
   // Zu kurze Eingaben liefern nichts, damit die Liste nicht abgegrast wird.
   assert.deepEqual(await searchProfiles(db, "A"), []);
@@ -1007,7 +1002,7 @@ test("a new profile is in the ranking from the first closing; an old opt-out fla
   assert.equal((await publicRanking(db, today, today)).length, 1);
 });
 
-test("the selection step exposes the role text but never contact data", async () => {
+test("the selection step exposes only the name, never business or contact data", async () => {
   // Rollentext allein macht noch keine gemeinsame Meldung: darüber
   // entscheidet kind. Dieses Profil gehört einer Person und bleibt wählbar.
   const id = await imported([row({ role: "Team · A und B", email: "" })]);
@@ -1018,7 +1013,8 @@ test("the selection step exposes the role text but never contact data", async ()
     "name",
     "role",
   ]);
-  assert.match(String(profile.role), /^Team/);
+  assert.equal(profile.role, "");
+  assert.equal(profile.company, "");
 });
 
 test("month history separates daily winners from monthly totals and excludes other months", async () => {

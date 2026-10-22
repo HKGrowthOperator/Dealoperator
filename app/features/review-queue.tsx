@@ -141,7 +141,9 @@ export default function ReviewQueue({
           value: {
             id,
             decision,
-            ...(decision === "approve" && assignTo ? { participantId: assignTo } : {}),
+            ...(decision === "approve" && assignTo
+              ? { participantId: assignTo }
+              : {}),
             internalNote: note,
             applicantMessage: reply,
           },
@@ -152,8 +154,15 @@ export default function ReviewQueue({
       // Der Server nennt nur Wege, auf denen der Hinweis voraussichtlich
       // ankommt (Gerät mit Push, E-Mail-Versand eingerichtet).
       const reach = Array.isArray(d.notified) ? (d.notified as string[]) : [];
-      const ways = [reach.includes("push") && "Push", reach.includes("email") && "E-Mail"].filter(Boolean);
-      setNotice(ways.length ? `Die Person bekommt einen Hinweis per ${ways.join(" und ")}.` : "");
+      const ways = [
+        reach.includes("push") && "Push",
+        reach.includes("email") && "E-Mail",
+      ].filter(Boolean);
+      setNotice(
+        ways.length
+          ? `Die Person bekommt einen Hinweis per ${ways.join(" und ")}.`
+          : "",
+      );
       setOpen("");
       setNote("");
       setReply("");
@@ -193,7 +202,9 @@ export default function ReviewQueue({
   const waiting = rows.filter((r) =>
     ["pending", "info_needed"].includes(r.status),
   );
-  const rest = rows.filter((r) => !["pending", "info_needed"].includes(r.status));
+  const rest = rows.filter(
+    (r) => !["pending", "info_needed"].includes(r.status),
+  );
 
   return (
     <section className="card review-queue">
@@ -364,7 +375,8 @@ export default function ReviewQueue({
 
             {r.applicant_answer && (
               <p className="review-note">
-                <strong>Antwort auf eure Rückfrage:</strong> {r.applicant_answer}
+                <strong>Antwort auf eure Rückfrage:</strong>{" "}
+                {r.applicant_answer}
               </p>
             )}
             {r.internal_note && (
@@ -374,7 +386,11 @@ export default function ReviewQueue({
             )}
 
             {r.status === "awaiting_email" && (
-              <ResendConfirmation id={r.id} lastMailAt={r.last_mail_at} onSent={load} />
+              <ResendConfirmation
+                id={r.id}
+                lastMailAt={r.last_mail_at}
+                onSent={load}
+              />
             )}
 
             {decidable &&
@@ -401,11 +417,13 @@ export default function ReviewQueue({
                     />
                     <small>
                       Die Person sieht diese Nachricht auf ihrer Statusseite und
-                      kann dort auf eine Rückfrage antworten. Per Push und E-Mail
-                      bekommt sie nur einen kurzen Hinweis, ohne diesen Text.
+                      kann dort auf eine Rückfrage antworten. Per Push und
+                      E-Mail bekommt sie nur einen kurzen Hinweis, ohne diesen
+                      Text.
                     </small>
                   </label>
-                  {r.kind === "claim" && !r.participant && (
+                  {(r.kind === "new" ||
+                    (r.kind === "claim" && !r.participant)) && (
                     <div className="review-picker">
                       <label>
                         Profil zuordnen
@@ -442,8 +460,8 @@ export default function ReviewQueue({
                           ))}
                       </ul>
                       <small>
-                        Nur freie, persönliche Profile. Freigeben ordnet das gewählte
-                        Profil diesem Konto zu.
+                        Nur freie, persönliche Profile. Freigeben ordnet das
+                        gewählte Profil diesem Konto zu.
                       </small>
                     </div>
                   )}

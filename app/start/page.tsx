@@ -14,6 +14,7 @@ import {
 } from "@/server/onboarding";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberOnboarding from "../features/member-onboarding";
+import AccessRequest from "../features/access-request";
 import { discordDestination } from "@/server/discord";
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,9 @@ export default async function Page({
   // Übernahme statt doppelt.
   const target = new URL(next, "https://operator.invalid");
   const toClaim = target.pathname === "/profil-uebernehmen";
-  const requestId = requestIdFromCookie((await cookies()).get(ONBOARDING_COOKIE)?.value);
+  const requestId = requestIdFromCookie(
+    (await cookies()).get(ONBOARDING_COOKIE)?.value,
+  );
   // Aus der Übernahme heraus nur eine Anfrage für genau das gewählte Profil
   // binden; dann geht es direkt zum Status.
   const bound = await bindConfirmedRequest(
@@ -56,7 +59,8 @@ export default async function Page({
 
   // Team-Konten mit Ziel Verwaltung (etwa aus einem Team-Push) direkt dorthin,
   // auch ohne eigenes Profil.
-  if (isTeam(actor) && target.pathname === "/verwaltung" && !bound) redirect(next);
+  if (isTeam(actor) && target.pathname === "/verwaltung" && !bound)
+    redirect(next);
 
   // Aus „Passwort vergessen oder noch keins?“: zuerst das Passwort festlegen,
   // danach führt /passwort wieder hierher.
@@ -68,7 +72,10 @@ export default async function Page({
   if (state.participant) {
     if (next === "/") {
       const home = await homeState(db, actor);
-      if (home.today?.due && (home.today.status === "open" || home.today.status === "draft"))
+      if (
+        home.today?.due &&
+        (home.today.status === "open" || home.today.status === "draft")
+      )
         redirect("/tagesabschluss");
     }
     redirect(next);
@@ -80,21 +87,22 @@ export default async function Page({
   // eigenen Profil.
   const request = state.request as { kind?: string; status?: string } | null;
   const status = String(request?.status ?? "pending");
-  const claim = bound?.kind === "claim" || request?.kind === "claim";
-  if (claim && ["pending", "info_needed"].includes(status)) redirect("/status");
+  if (request && ["pending", "info_needed"].includes(status))
+    redirect("/status");
 
   // Anmeldung aus der Profilübernahme heraus: dorthin zurück, mit Auswahl
   // und Einladung, auch nach einer früheren Ablehnung.
   if (toClaim) redirect(next);
 
-  if (claim && ["rejected", "superseded"].includes(status) && search.weiter !== "eigen")
+  if (request && ["rejected", "superseded"].includes(status))
     redirect("/status");
 
   // Nur fragen, was fehlt: eine Nummer liegt vor, wenn sie beim Start
   // angegeben wurde; wer über „Anmelden“ mit neuer Adresse kam, hat keine.
-  const [contact] = await db.query("SELECT phone FROM account_private WHERE owner=$1", [
-    actor.userId,
-  ]);
+  const [contact] = await db.query(
+    "SELECT phone FROM account_private WHERE owner=$1",
+    [actor.userId],
+  );
   const phone = (contact?.phone as string | undefined) || "";
   // Die Übernahme aus diesem Browser lief ins Leere, weil das Profil
   // inzwischen jemand anderem zugeordnet wurde: das sagen, statt nur ein
@@ -110,21 +118,30 @@ export default async function Page({
       : [];
   // Wer schon in der Rangliste steht, soll sein Profil erkennen, statt ein
   // zweites anzulegen: Vorschläge zum Namen aus der Registrierung.
-  const suggested = lost ? { name: "", profiles: [] } : await suggestProfiles(db, actor, bound?.fullName || "");
+  const suggested = lost
+    ? { name: "", profiles: [] }
+    : await suggestProfiles(db, actor, bound?.fullName || "");
 
   return (
     <div className="operator-site">
       <OperatorHeader viewer={{ ...viewerOf(actor), hasProfile: false }} />
       <main className="auth-layout">
-        <MemberOnboarding
-          next={next}
-          presetName={suggested.name || bound?.fullName || ""}
-          needsPhone={!phone}
-          takenProfile={(lost?.name as string | undefined) || ""}
-          discordUrl={discordDestination().url}
-          suggestions={suggested.profiles}
-          fromRegistration={!!bound}
-        />
+        {!request || request.status !== "approved" ? (
+          <AccessRequest
+            name={suggested.name || bound?.fullName || ""}
+            email={actor.email}
+          />
+        ) : (
+          <MemberOnboarding
+            next={next}
+            presetName={suggested.name || bound?.fullName || ""}
+            needsPhone={!phone}
+            takenProfile={(lost?.name as string | undefined) || ""}
+            discordUrl={discordDestination().url}
+            suggestions={suggested.profiles}
+            fromRegistration={!!bound}
+          />
+        )}
       </main>
       <OperatorFooter />
     </div>

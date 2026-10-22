@@ -21,11 +21,11 @@ export type OwnRequest = {
 };
 
 /** Stand der Anfrage: Konto, Anfrage, Prüfung, Ergebnis. */
-function steps(status: string, assign: boolean) {
+function steps(status: string, assign: boolean, fresh = false) {
   const decided = ["approved", "rejected", "superseded"].includes(status);
   return [
     { label: "Angemeldet", state: "done" },
-    { label: assign ? "Zuordnung angefragt" : "Übernahme angefragt", state: "done" },
+    { label: fresh ? "Zugang angefragt" : assign ? "Zuordnung angefragt" : "Übernahme angefragt", state: "done" },
     {
       label: status === "info_needed" ? "Rückfrage an dich" : "Prüfung durch das Team",
       state: decided ? "done" : "current",
@@ -109,7 +109,7 @@ export default function RequestStatus({
           <p className="flow-lead">
             {request.participantName
               ? `„${request.participantName}“ gehört jetzt zu deinem Konto. Deine bisherigen Zahlen sind da.`
-              : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
+              : request.kind === "new" ? "Dein Zugang ist freigegeben. Du kannst jetzt dein Profil ergänzen." : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
           </p>
           <div className="flow-actions">
             <Link className="btn primary full" href="/tagesabschluss">
@@ -137,18 +137,18 @@ export default function RequestStatus({
           {status === "info_needed"
             ? "Rückfrage vom Team."
             : status === "rejected"
-              ? "Diese Übernahme wurde nicht freigegeben."
+              ? "Diese Anfrage wurde nicht freigegeben."
               : status === "superseded"
                 ? "Dieses Profil ist bereits zugeordnet."
                 : assign
                   ? "Das Team sucht dein Profil heraus."
-                  : "Deine Profilübernahme wird geprüft."}
+                  : request.kind === "new" ? "Deine Zugangsanfrage wird geprüft." : "Deine Profilübernahme wird geprüft."}
         </h1>
         <p className="flow-lead">
           {status === "info_needed"
             ? "Beantworte sie hier. Danach geht deine Anfrage zurück in die Prüfung."
             : status === "rejected"
-              ? "Das Team konnte die Übernahme nicht bestätigen. Hier sind deine Möglichkeiten."
+              ? "Das Team konnte die Anfrage nicht bestätigen. Hier sind deine Möglichkeiten."
               : status === "superseded"
                 ? "Ein anderes Konto wurde dafür freigegeben. Hier sind deine Möglichkeiten."
                 : "Das Team prüft deine Angaben. Sobald es freigibt, geht es hier weiter."}
@@ -160,7 +160,7 @@ export default function RequestStatus({
         )}
 
         <ol className="flow-steps" aria-label="Stand deiner Anfrage">
-          {steps(status, assign).map((s) => (
+          {steps(status, assign, request.kind === "new").map((s) => (
             <li
               key={s.label}
               data-state={s.state}

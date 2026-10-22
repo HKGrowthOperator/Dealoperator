@@ -1,3 +1,4 @@
+import { requireMember } from "@/server/member-access";
 import {
   addSessionGuest,
   cancelSession,
@@ -33,7 +34,10 @@ const profileSchema = z.object({
   // ältere Namen mit #1234). Freiwillig, nur für Angemeldete sichtbar.
   discordName: s
     .max(40)
-    .regex(/^(|[A-Za-z0-9_.]{2,32}(#\d{4})?)$/, "Bitte gib deinen Discord-Namen ohne Leerzeichen an, zum Beispiel max_muster.")
+    .regex(
+      /^(|[A-Za-z0-9_.]{2,32}(#\d{4})?)$/,
+      "Bitte gib deinen Discord-Namen ohne Leerzeichen an, zum Beispiel max_muster.",
+    )
     .optional()
     .default(""),
   // Ein früher gespeicherter „bevorzugter Kanal“ wird beim Lesen und Speichern
@@ -75,6 +79,7 @@ export async function GET() {
   if (!user) return json({ error: "Bitte melde dich zuerst an." }, 401);
   try {
     const database = db();
+    await requireMember(database, user);
     const [
       profile,
       records,
@@ -124,17 +129,25 @@ export async function GET() {
       ...new Set(
         sessions.results.flatMap((r: any) => {
           const g = JSON.parse(r.data).guests;
-          return Array.isArray(g) ? g.filter((x: unknown) => typeof x === "string") : [];
+          return Array.isArray(g)
+            ? g.filter((x: unknown) => typeof x === "string")
+            : [];
         }),
       ),
     ] as string[];
     const guestRows = guestIds.length
-      ? await database.query("SELECT id,name FROM participants WHERE id = ANY($1::text[])", [guestIds])
+      ? await database.query(
+          "SELECT id,name FROM participants WHERE id = ANY($1::text[])",
+          [guestIds],
+        )
       : [];
-    const guestName = (id: string) => (guestRows.find((g) => g.id === id)?.name as string) || "Caller";
+    const guestName = (id: string) =>
+      (guestRows.find((g) => g.id === id)?.name as string) || "Caller";
     // Fürs Team: Profile zum Vormerken (Name und Kennung, sonst nichts).
     const people = isTeam(user)
-      ? await database.query("SELECT id,name FROM participants WHERE kind='person' ORDER BY lower(name)")
+      ? await database.query(
+          "SELECT id,name FROM participants WHERE kind='person' ORDER BY lower(name)",
+        )
       : [];
     // Name und Rolle gibt es nur einmal: aus dem eigenen Profil in der
     // Rangliste. Das Call-Profil ergänzt nur Zielgruppe, Zeit und Tage.
@@ -142,19 +155,38 @@ export async function GET() {
       "SELECT name,role FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
       [user.userId],
     );
+    const rosterNames = rsvps.results.length
+      ? await database.query(
+          "SELECT owner,name FROM participants WHERE owner=ANY($1::text[]) AND kind='person'",
+          [[...new Set(rsvps.results.map((r: any) => String(r.owner)))]],
+        )
+      : [];
     const stored = profile ? JSON.parse(profile.data) : emptyProfile;
-    const [verifiedPackages] = await database.query("SELECT value FROM app_settings WHERE key='dealuno_profiles'");
+    const [verifiedPackages] = await database.query(
+      "SELECT value FROM app_settings WHERE key='dealuno_profiles'",
+    );
     const packageOf = (owner: string) => {
       const entry = verifiedPackages?.value?.[owner];
-      return entry?.active === true && typeof entry.packageName === "string" ? entry.packageName.slice(0,60) : undefined;
+      return entry?.active === true && typeof entry.packageName === "string"
+        ? entry.packageName.slice(0, 60)
+        : undefined;
     };
-    const shownOwners = [...new Set([user.userId, ...crew.results.map((p: any) => String(p.id))])];
+    const shownOwners = [
+      ...new Set([user.userId, ...crew.results.map((p: any) => String(p.id))]),
+    ];
     const levelRows = await database.query(
       `SELECT p.owner,c.counts FROM participants p JOIN checkins c ON c.participant=p.id
-       WHERE p.owner=ANY($1::text[]) AND p.kind='person'`, [shownOwners],
+       WHERE p.owner=ANY($1::text[]) AND p.kind='person'`,
+      [shownOwners],
     );
-    const levelsOf = (owner: string) => progress(aggregate(levelRows.filter((v) => v.owner === owner).map((v) => v.counts)))
-      .filter((v) => v.level > 0).map((v) => ({ label: v.label, level: v.level }));
+    const levelsOf = (owner: string) =>
+      progress(
+        aggregate(
+          levelRows.filter((v) => v.owner === owner).map((v) => v.counts),
+        ),
+      )
+        .filter((v) => v.level > 0)
+        .map((v) => ({ label: v.label, level: v.level }));
     return json({
       ...workflows,
       ownLevels: levelsOf(user.userId),
@@ -166,7 +198,12 @@ export async function GET() {
       // Der Rang ist ein Profilstatus und keine Zugriffshürde.
       activeCaller: active,
       profile: own
-        ? { ...stored, discordName: "", name: own.name as string, role: (own.role as string) || "" }
+        ? {
+            ...stored,
+            discordName: "",
+            name: own.name as string,
+            role: (own.role as string) || "",
+          }
         : { ...stored, discordName: "" },
       ownProfile: !!own,
       records: records.results.map((r: any) => JSON.parse(r.data)),
@@ -178,57 +215,81 @@ export async function GET() {
           const parsed = profileSchema.safeParse(JSON.parse(r.data));
           return parsed.success ? [{ row: r, profile: parsed.data }] : [];
         })
-        .map(({ row: r, profile: p }: { row: any; profile: z.infer<typeof profileSchema> }) => ({
-          id: r.id,
-          ...p,
-          levels: levelsOf(r.id),
-          packageName: packageOf(r.id),
-          discordName: undefined,
-          latest: (() => {
-            const record = shared.results.find((x: any) => x.owner === r.id);
-            if (!record) return undefined;
-            const v = JSON.parse(record.data as string);
-            return {
-              date: v.date,
-              attempts: v.attempts,
-              conversations: v.conversations,
-              meetings: v.meetings,
-            };
-          })(),
-        })),
-      people: people.map((p) => ({ id: p.id as string, name: p.name as string })),
+        .map(
+          ({
+            row: r,
+            profile: p,
+          }: {
+            row: any;
+            profile: z.infer<typeof profileSchema>;
+          }) => ({
+            id: r.id,
+            ...p,
+            levels: levelsOf(r.id),
+            packageName: packageOf(r.id),
+            discordName: undefined,
+            latest: (() => {
+              const record = shared.results.find((x: any) => x.owner === r.id);
+              if (!record) return undefined;
+              const v = JSON.parse(record.data as string);
+              return {
+                date: v.date,
+                attempts: v.attempts,
+                conversations: v.conversations,
+                meetings: v.meetings,
+              };
+            })(),
+          }),
+        ),
+      people: people.map((p) => ({
+        id: p.id as string,
+        name: p.name as string,
+      })),
       sessions: sessions.results.map((r: any) => {
         const { guests: rawGuests, roomUrl, ...data } = JSON.parse(r.data);
-        const guests: string[] = Array.isArray(rawGuests) ? rawGuests.filter((x: unknown) => typeof x === "string") : [];
+        const guests: string[] = Array.isArray(rawGuests)
+          ? rawGuests.filter((x: unknown) => typeof x === "string")
+          : [];
         return {
-        ...data,
-        discord: undefined,
-        // Ein terminbezogener Google-Link geht vor dem gemeinsamen Raum.
-        room: callRoomOf(roomUrl, data.url),
-        roomManual: !!roomUrl,
-        guests: guests.map((g) => ({ id: g, name: guestName(g) })),
+          ...data,
+          discord: undefined,
+          // Ein terminbezogener Google-Link geht vor dem gemeinsamen Raum.
+          room: callRoomOf(roomUrl, data.url),
+          roomManual: !!roomUrl,
+          guests: guests.map((g) => ({ id: g, name: guestName(g) })),
 
-        team: team.includes(r.owner),
-        id: r.id,
-        owner: r.owner,
-        mine: r.owner === user.userId,
-        roster: rsvps.results
-          .filter((x: any) => x.session === r.id)
-          .map((x: any) => ({
-            id: x.owner,
-            name: crew.results.find((p: any) => p.id === x.owner)
-              ? JSON.parse(
-                  (crew.results.find((p: any) => p.id === x.owner) as any).data,
-                ).name
-              : x.owner === user.userId
-                ? "Du"
-                : "Caller",
-          }))
-          .concat(guests.map((g) => ({ id: `p:${g}`, name: guestName(g), guest: true }))),
-        attendees: rsvps.results.filter((x: any) => x.session === r.id).length + guests.length,
-        joined: rsvps.results.some(
-          (x: any) => x.session === r.id && x.owner === user.userId,
-        ),
+          team: team.includes(r.owner),
+          id: r.id,
+          owner: r.owner,
+          mine: r.owner === user.userId,
+          roster: rsvps.results
+            .filter((x: any) => x.session === r.id)
+            .map((x: any) => ({
+              id: x.owner,
+              name:
+                rosterNames.find((p) => p.owner === x.owner)?.name ||
+                (crew.results.find((p: any) => p.id === x.owner)
+                  ? JSON.parse(
+                      (crew.results.find((p: any) => p.id === x.owner) as any)
+                        .data,
+                    ).name
+                  : x.owner === user.userId
+                    ? "Du"
+                    : "Caller"),
+            }))
+            .concat(
+              guests.map((g) => ({
+                id: `p:${g}`,
+                name: guestName(g),
+                guest: true,
+              })),
+            ),
+          attendees:
+            rsvps.results.filter((x: any) => x.session === r.id).length +
+            guests.length,
+          joined: rsvps.results.some(
+            (x: any) => x.session === r.id && x.owner === user.userId,
+          ),
         };
       }),
       buddies: buddies.results.map((r: any) => ({
@@ -254,6 +315,7 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return json({ error: "Bitte melde dich zuerst an." }, 401);
   try {
+    await requireMember(db(), user);
     const body = await readBody(request, 20000);
     const database = db();
     const id = user.userId;
@@ -269,7 +331,16 @@ export async function POST(request: Request) {
           "SELECT name,role FROM participants WHERE owner=$1 AND kind='person' LIMIT 1",
           [id],
         );
-        const data = own ? { ...value, name: own.name, role: own.role || "" } : value;
+        const [previous] = await tx.query(
+          "SELECT data FROM profiles WHERE id=$1 FOR UPDATE",
+          [id],
+        );
+        const old = previous ? JSON.parse(previous.data) : {};
+        const data = {
+          ...old,
+          ...value,
+          ...(own ? { name: own.name, role: own.role || "" } : {}),
+        };
         await tx.query(
           "INSERT INTO profiles (id,data) VALUES ($1,$2) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
           [id, JSON.stringify(data)],
@@ -314,9 +385,19 @@ export async function POST(request: Request) {
         );
       if (body.action === "editSession") {
         const sid = s.min(1).parse(body.value.id);
-        await editSession(database, { userId: id, team: isTeam(user) }, sid, value);
+        await editSession(
+          database,
+          { userId: id, team: isTeam(user) },
+          sid,
+          value,
+        );
       } else {
-        const created = await createSession(database, id, JSON.parse(profile.data).name, value);
+        const created = await createSession(
+          database,
+          id,
+          JSON.parse(profile.data).name,
+          value,
+        );
         return json({ ok: true, id: created.id });
       }
     } else if (body.action === "sessionGuest") {
@@ -328,14 +409,33 @@ export async function POST(request: Request) {
         })
         .refine((v) => !!v.participant !== !!v.name)
         .parse(body.value);
-      const added = await addSessionGuest(database, { userId: id, team: isTeam(user) }, value.id, value);
+      const added = await addSessionGuest(
+        database,
+        { userId: id, team: isTeam(user) },
+        value.id,
+        value,
+      );
       return json({ ok: true, ...added });
     } else if (body.action === "removeSessionGuest") {
-      const value = z.object({ id: s.min(1).max(100), participant: s.min(1).max(100) }).parse(body.value);
-      await removeSessionGuest(database, { userId: id, team: isTeam(user) }, value.id, value.participant);
+      const value = z
+        .object({ id: s.min(1).max(100), participant: s.min(1).max(100) })
+        .parse(body.value);
+      await removeSessionGuest(
+        database,
+        { userId: id, team: isTeam(user) },
+        value.id,
+        value.participant,
+      );
     } else if (body.action === "sessionRoom") {
-      const value = z.object({ id: s.min(1).max(100), url: z.string().trim().max(300) }).parse(body.value);
-      await setSessionRoom(database, { userId: id, team: isTeam(user) }, value.id, value.url);
+      const value = z
+        .object({ id: s.min(1).max(100), url: z.string().trim().max(300) })
+        .parse(body.value);
+      await setSessionRoom(
+        database,
+        { userId: id, team: isTeam(user) },
+        value.id,
+        value.url,
+      );
     } else if (body.action === "cancelSession") {
       const sid = s.min(1).parse(body.value);
       await cancelSession(database, { userId: id, team: isTeam(user) }, sid);

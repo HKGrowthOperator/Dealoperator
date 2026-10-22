@@ -30,9 +30,17 @@ export function loadViewer(): Promise<Viewer | null> {
             signedIn: !!data.signedIn,
             hasPassword: !!data.hasPassword,
             team: !!data.team,
-            role: data.role === "admin" || data.role === "moderator" ? data.role : null,
-            hasProfile: typeof data.hasProfile === "boolean" ? data.hasProfile : undefined,
-            today: ["open", "draft", "done", "imported"].includes(data.today) ? data.today : null,
+            role:
+              data.role === "admin" || data.role === "moderator"
+                ? data.role
+                : null,
+            hasProfile:
+              typeof data.hasProfile === "boolean"
+                ? data.hasProfile
+                : undefined,
+            today: ["open", "draft", "done", "imported"].includes(data.today)
+              ? data.today
+              : null,
           }
         : null,
     )
@@ -58,11 +66,22 @@ function useViewer(initial?: Viewer | null) {
  * Call-Partner umfasst Sessions und Wissen. Abgemeldet steht statt der
  * eigenen Bereiche „So funktioniert’s“.
  */
-type Area = "results" | "day" | "partner" | "how" | "profile" | "admin" | "";
+type Area =
+  | "results"
+  | "members"
+  | "day"
+  | "partner"
+  | "how"
+  | "profile"
+  | "admin"
+  | "";
 function areaOf(path: string): Area {
+  if (path.startsWith("/mitglieder")) return "members";
+  if (path.startsWith("/calls")) return "partner";
   if (path === "/" || path.startsWith("/ranking")) return "results";
   if (/^\/verwaltung(\/|$)/.test(path)) return "admin";
-  if (/^\/(tagesabschluss|heute|zahlen|reflexion|reflexionen)(\/|$)/.test(path)) return "day";
+  if (/^\/(tagesabschluss|heute|zahlen|reflexion|reflexionen)(\/|$)/.test(path))
+    return "day";
   if (/^\/(partner|sessions|wissen)(\/|$)/.test(path)) return "partner";
   if (/^\/so-funktionierts(\/|$)/.test(path)) return "how";
   if (/^\/(profil|passwort)(\/|$)/.test(path)) return "profile";
@@ -72,8 +91,14 @@ function areaOf(path: string): Area {
 const MAIN = [
   { area: "results", href: "/", label: "Ergebnisse" },
   { area: "day", href: "/tagesabschluss", label: "Mein Tag", only: "in" },
-  { area: "partner", href: "/partner?modus=eigen", label: "Call-Partner" },
-  { area: "how", href: "/so-funktionierts", label: "So funktioniert’s", only: "out" },
+  { area: "members", href: "/mitglieder", label: "Mitglieder", only: "in" },
+  { area: "partner", href: "/calls", label: "Calls", only: "in" },
+  {
+    area: "how",
+    href: "/so-funktionierts",
+    label: "So funktioniert’s",
+    only: "out",
+  },
 ] as const;
 
 /**
@@ -97,7 +122,8 @@ export function OperatorHeader({
   // den Benachrichtigungs-Einstellungen, dort wird das Angebot verwendet.
   useEffect(() => {
     window.addEventListener("beforeinstallprompt", keepInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", keepInstallPrompt);
+    return () =>
+      window.removeEventListener("beforeinstallprompt", keepInstallPrompt);
   }, []);
   const signedIn = !!viewer?.signedIn;
   // Zahlen eintragen führt zum Formular unter Mein Tag; dort und in den
@@ -108,15 +134,27 @@ export function OperatorHeader({
   // soll beim Öffnen sichtbar sein, nicht hinter dem Rand.
   const strip = useRef<HTMLElement>(null);
   useEffect(() => {
-    const current = strip.current?.querySelector<HTMLElement>('[aria-current="page"]');
-    if (current && strip.current && strip.current.scrollWidth > strip.current.clientWidth)
+    const current = strip.current?.querySelector<HTMLElement>(
+      '[aria-current="page"]',
+    );
+    if (
+      current &&
+      strip.current &&
+      strip.current.scrollWidth > strip.current.clientWidth
+    )
       current.scrollIntoView({ inline: "nearest", block: "nearest" });
   }, [area]);
   // Abgemeldet entfallen die eigenen Bereiche; „Anmelden“ steht rechts im
   // Kopf, außer wo das Formular oder die Zeile „Schon registriert?“ schon
   // steht. Solange der Anmeldestand noch lädt, bleibt die angemeldete Leiste.
-  const areas = MAIN.filter((item) =>
-    !("only" in item) ? true : viewer ? (item.only === "in") === signedIn : item.only === "in",
+  const areas = (
+    signedIn && (viewer?.hasProfile !== false || viewer?.team) ? MAIN : []
+  ).filter((item) =>
+    !("only" in item)
+      ? true
+      : viewer
+        ? (item.only === "in") === signedIn
+        : item.only === "in",
   );
   const links = (
     <>
@@ -148,7 +186,11 @@ export function OperatorHeader({
       </a>
       <header className="do-header">
         <div className="do-header-inner">
-          <Link className="do-logo" href="/" aria-label="Deal Operator – Startseite">
+          <Link
+            className="do-logo"
+            href="/"
+            aria-label="Deal Operator – Startseite"
+          >
             <OperatorWordmark />
           </Link>
           <nav className="do-nav" aria-label="Hauptnavigation">
@@ -158,12 +200,18 @@ export function OperatorHeader({
             {viewer && !signedIn && (
               <>
                 {path !== "/" && (
-                  <Link className="do-button do-button-quiet do-hide-mobile" href="/starten">
+                  <Link
+                    className="do-button do-button-quiet do-hide-mobile"
+                    href="/starten"
+                  >
                     Kostenfrei starten
                   </Link>
                 )}
                 {path !== "/anmelden" && path !== "/starten" && (
-                  <Link className="do-button do-button-secondary" href="/anmelden">
+                  <Link
+                    className="do-button do-button-secondary"
+                    href="/anmelden"
+                  >
                     Anmelden
                   </Link>
                 )}
@@ -176,19 +224,20 @@ export function OperatorHeader({
               viewer?.hasProfile !== false &&
               viewer?.today !== "done" &&
               viewer?.today !== "imported" && (
-              <Link
-                className={`do-button do-button-primary do-header-cta${
-                  path === "/" && (viewer?.today === "open" || viewer?.today === "draft")
-                    ? " do-header-cta-home"
-                    : ""
-                }`}
-                href="/tagesabschluss"
-              >
-                <PencilLine size={17} aria-hidden="true" />
-                <span className="do-cta-long">Zahlen eintragen</span>
-                <span className="do-cta-short">Eintragen</span>
-              </Link>
-            )}
+                <Link
+                  className={`do-button do-button-primary do-header-cta${
+                    path === "/" &&
+                    (viewer?.today === "open" || viewer?.today === "draft")
+                      ? " do-header-cta-home"
+                      : ""
+                  }`}
+                  href="/tagesabschluss"
+                >
+                  <PencilLine size={17} aria-hidden="true" />
+                  <span className="do-cta-long">Zahlen eintragen</span>
+                  <span className="do-cta-short">Eintragen</span>
+                </Link>
+              )}
             {signedIn && <AccountMenu viewer={viewer} />}
           </div>
         </div>
@@ -211,7 +260,11 @@ export function OperatorFooter({
   return (
     <footer className="do-footer">
       <div className="do-footer-inner">
-        <Link className="do-logo" href="/" aria-label="Deal Operator – Startseite">
+        <Link
+          className="do-logo"
+          href="/"
+          aria-label="Deal Operator – Startseite"
+        >
           <OperatorWordmark />
         </Link>
         <nav aria-label="Weitere Seiten">

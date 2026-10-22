@@ -202,7 +202,7 @@ test("Link: nachsehen ohne Einlösen, einlösen bestätigt und bindet die Regist
   const bound = await bindConfirmedRequest(db, { userId: done.userId, email: done.email, admin: false }, done.request!);
   assert.equal(bound?.kind, "new");
   const [req] = await db.query("SELECT status,owner FROM onboarding_requests WHERE id=$1", [r.id]);
-  assert.deepEqual({ ...req }, { status: "approved", owner: userId });
+  assert.deepEqual({ ...req }, { status: "pending", owner: userId });
   const [ev] = await db.query("SELECT action FROM onboarding_events WHERE request=$1 AND action='email_confirmed'", [r.id]);
   assert.ok(ev, "als echte Bestätigung durch das Postfach festgehalten");
   await assert.rejects(redeemLink(db, key, "confirm", confirm), (e: AppError) => e.status === 410);

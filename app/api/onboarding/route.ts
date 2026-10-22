@@ -27,13 +27,18 @@ import {
   requestIdFromCookie,
   searchProfiles,
   startRequest,
+  bindConfirmedRequest,
 } from "@/server/onboarding";
 
 /**
  * Eigene Bestätigungsmail für eine Registrierung. Scheitert sie (Resend nicht
  * erreichbar, zu viele Mails), bleibt es bei der Mail von Supabase.
  */
-async function sendOwn(db: ReturnType<typeof database>, email: string, request: string) {
+async function sendOwn(
+  db: ReturnType<typeof database>,
+  email: string,
+  request: string,
+) {
   try {
     await sendEmailCode(db, { email, purpose: "confirm", request });
   } catch {
@@ -103,21 +108,54 @@ export async function POST(request: Request) {
     // in keinem Zugriffsprotokoll.
     if (raw?.action === "search") {
       if (!databaseReady()) return json({ ready: false, profiles: [] });
+      const ip =
+        request.headers.get("x-real-ip") ||
+        request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        "unknown";
+      await rateLimit(database(), `profile-lookup:${ip}`, 60, 60);
       return json({
         ready: true,
-        profiles: await searchProfiles(database(), z.string().max(200).parse(raw.q ?? "")),
+        profiles: await searchProfiles(
+          database(),
+          z
+            .string()
+            .max(200)
+            .parse(raw.q ?? ""),
+        ),
       });
     }
     if (!authReady() || !databaseReady())
       return json(
         {
           error:
-            "Die Anmeldung wird gerade eingerichtet. Die öffentlichen Ergebnisse kannst du schon ansehen.",
+            "Die Anmeldung ist gerade nicht verfügbar. Bitte versuche es später erneut.",
         },
         503,
       );
     // Angemeldet: Übernahme mit dem bestehenden Konto anfragen oder auf eine
     // Rückfrage antworten. Keine zweite Bestätigungsmail.
+    if (raw?.action === "access") {
+      const actor = await getCurrentUser();
+      if (!actor) throw new AppError("Bitte melde dich an.", 401);
+      const { fullName, phone, phoneCountry, hint } = z
+        .object({
+          fullName: z.string(),
+          phone: z.string(),
+          phoneCountry: z.string().optional(),
+          hint: z.string().optional(),
+        })
+        .parse(raw.value);
+      const started = await startRequest(database(), {
+        kind: "new",
+        fullName,
+        email: actor.email,
+        phone,
+        phoneCountry,
+        hint,
+      });
+      await bindConfirmedRequest(database(), actor, started.id);
+      return json({ ok: true, next: "/status" });
+    }
     if (raw?.action === "claim" || raw?.action === "answer") {
       const actor = await getCurrentUser();
       if (!actor) throw new AppError("Bitte melde dich zuerst an.", 401);
@@ -136,7 +174,8 @@ export async function POST(request: Request) {
       const cookie = (await cookies()).get(ONBOARDING_COOKIE)?.value;
       const pending = await pendingForBrowser(db, cookie);
       const id = requestIdFromCookie(cookie);
-      if (!pending || !id) throw new AppError("Bitte gib deine Angaben noch einmal ein.", 409);
+      if (!pending || !id)
+        throw new AppError("Bitte gib deine Angaben noch einmal ein.", 409);
       await rateLimit(
         db,
         `onboarding:${pending.email}`,
@@ -157,21 +196,35 @@ export async function POST(request: Request) {
       const { error } = await client.auth.resend({
         type: "signup",
         email: pending.email,
-        options: { emailRedirectTo: emailRedirect("/tagesabschluss", "starten", id) },
+        options: {
+          emailRedirectTo: emailRedirect("/tagesabschluss", "starten", id),
+        },
       });
       if (error) throw sendFailure(error);
       await markMailSent(db, id, pending.email);
       await clearRateLimit(db, `verify:${pending.email}`);
-      return json({ ok: true, resendAfter: RESEND_SECONDS, code: emailCodeEnabled() });
+      return json({
+        ok: true,
+        resendAfter: RESEND_SECONDS,
+        code: emailCodeEnabled(),
+      });
     }
 
     if (raw?.action !== "start") throw new AppError("Unbekannte Aktion.");
 
     // Das Passwort geht nur an Supabase und wird hier nirgends gespeichert.
-    const { password: rawPassword, ...value } = (raw.value ?? {}) as Record<string, unknown>;
+    const { password: rawPassword, ...value } = (raw.value ?? {}) as Record<
+      string,
+      unknown
+    >;
     const password = passwordSchema.safeParse(rawPassword);
     if (!password.success)
-      throw new AppError(password.error.issues[0]?.message || "Bitte prüfe dein Passwort.", 400, undefined, "password");
+      throw new AppError(
+        password.error.issues[0]?.message || "Bitte prüfe dein Passwort.",
+        400,
+        undefined,
+        "password",
+      );
     // Merkt sich in diesem Browser, welche Anfrage gerade gestellt wurde:
     // Der Bestätigungslink bindet genau diese Anfrage, und /starten zeigt ihre
     // Angaben wieder an, aber nur diesem Browser (Geheimnis im Cookie, Beleg
@@ -179,13 +232,17 @@ export async function POST(request: Request) {
     // einem abgelehnten Versand nicht verloren sind.
     const browser = browserSecret();
     const created = await startRequest(db, value, browser.proof);
-    (await cookies()).set(ONBOARDING_COOKIE, `${created.id}.${browser.secret}`, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.APP_URL?.startsWith("https://") ?? false,
-      path: "/",
-      maxAge: 60 * 60 * 24 * 2,
-    });
+    (await cookies()).set(
+      ONBOARDING_COOKIE,
+      `${created.id}.${browser.secret}`,
+      {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.APP_URL?.startsWith("https://") ?? false,
+        path: "/",
+        maxAge: 60 * 60 * 24 * 2,
+      },
+    );
 
     // Erst nach erfolgreich gespeicherter Anfrage das Konto anlegen. Supabase
     // schickt dabei die Bestätigungsmail. Die Auswahl liegt serverseitig und
@@ -197,13 +254,18 @@ export async function POST(request: Request) {
       options: {
         // Neue Profile landen nach der Einrichtung beim ersten Tagesabschluss;
         // Übernahmen führt /start zum Prüfstatus.
-        emailRedirectTo: emailRedirect("/tagesabschluss", "starten", created.id),
+        emailRedirectTo: emailRedirect(
+          "/tagesabschluss",
+          "starten",
+          created.id,
+        ),
         // Wird in der Vorlage nur angezeigt, nie für Zugriffsentscheidungen
         // verwendet. Die Berechtigung entsteht ausschließlich serverseitig.
         data: { onboarding_kind: created.kind, has_password: true },
       },
     });
-    if (error?.code === "weak_password" || error?.code === "same_password") throw passwordFailure(error);
+    if (error?.code === "weak_password" || error?.code === "same_password")
+      throw passwordFailure(error);
     if (error) throw sendFailure(error);
     // Adresse gehört schon zu einem bestätigten Konto: Supabase verrät das
     // bewusst nicht per Fehler, sondern mit einem Nutzer ohne Identitäten.
@@ -218,13 +280,19 @@ export async function POST(request: Request) {
       );
     // Ohne Bestätigungspflicht ist die Sitzung sofort da.
     if (data.session)
-      return json({ ok: true, signedIn: true, next: "/start?next=%2Ftagesabschluss" });
+      return json({
+        ok: true,
+        signedIn: true,
+        next: "/start?next=%2Ftagesabschluss",
+      });
     // Beleg für „Mail geschickt“ (Übergabe an Supabase), und ein neuer Code
     // hebt die Sperre für Codeversuche auf.
     await markMailSent(db, created.id, created.email);
     // Zusätzlich die eigene Mail mit Code und Link: sie kommt auch dort an,
     // wo die Mail von Supabase im Spam landet. Beide bestätigen die Adresse.
-    const own = (await ownMailReady(db)) && (await sendOwn(db, created.email, created.id));
+    const own =
+      (await ownMailReady(db)) &&
+      (await sendOwn(db, created.email, created.id));
     await clearRateLimit(db, `verify:${created.email}`);
     return json({
       ok: true,

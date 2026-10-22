@@ -4,7 +4,10 @@ import type { Database } from "./database";
 import { isTeam, type Actor } from "./auth";
 import { teamEvent, teamPushText } from "./notify";
 import { normalisePhone } from "../lib/phone";
-import { preparedMemberForEmail, preparedMemberWithoutEmail } from "./member-directory";
+import {
+  preparedMemberForEmail,
+  preparedMemberWithoutEmail,
+} from "./member-directory";
 import {
   aggregate,
   countsSchema,
@@ -146,7 +149,8 @@ export async function publicRanking(db: Database, from: string, to: string) {
         kind: participantKind(r.kind),
         claimed: r.claimed,
         counts: countsSchema.parse(r.counts),
-        source: r.origin === "closing" ? "Tagesabschluss" : "Übernommene Meldung",
+        source:
+          r.origin === "closing" ? "Tagesabschluss" : "Übernommene Meldung",
         updatedAt: new Date(r.updated_at).toISOString(),
       });
   }
@@ -192,7 +196,12 @@ export async function ownState(db: Database, actor: Actor) {
 // Eigene Tageszahlen entstehen ausschließlich über den vollständigen
 // Tagesabschluss in server/closing.ts (Zahlen plus Reflexion). Den früheren
 // direkten Check-in ohne Reflexion gibt es nicht mehr.
-export async function createMember(db: Database, actor: Actor, raw: unknown) {
+export async function createMember(
+  db: Database,
+  actor: Actor,
+  raw: unknown,
+  inTransaction = false,
+) {
   const value = z
     .object({
       name: z.string().trim().min(2).max(60),
@@ -210,10 +219,11 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
   let phone = "";
   if (value.phone) {
     const checked = normalisePhone(value.phone, value.phoneCountry);
-    if (!checked.ok) throw new AppError(checked.reason, 400, undefined, "phone");
+    if (!checked.ok)
+      throw new AppError(checked.reason, 400, undefined, "phone");
     phone = checked.value;
   }
-  return db.transaction(async (tx) => {
+  const create = async (tx: Database) => {
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `owner:${actor.userId}`,
     ]);
@@ -234,8 +244,11 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         "Zu deiner E-Mail gibt es bereits ein Profil. Bitte übernimm dieses Profil, damit deine Zahlen zusammenbleiben.",
         409,
       );
-    if (!prepared && await preparedMemberWithoutEmail(tx, value.name))
-      throw new AppError("Für diesen Namen gibt es ein vorbereitetes Profil ohne bestätigte Zuordnung. Bitte lass das Team dein vorhandenes Profil zuordnen.", 409);
+    if (!prepared && (await preparedMemberWithoutEmail(tx, value.name)))
+      throw new AppError(
+        "Für diesen Namen gibt es ein vorbereitetes Profil ohne bestätigte Zuordnung. Bitte lass das Team dein vorhandenes Profil zuordnen.",
+        409,
+      );
     const id = prepared?.id ?? randomUUID();
     const name = prepared?.name ?? value.name;
     if (prepared) {
@@ -322,7 +335,8 @@ export async function createMember(db: Database, actor: Actor, raw: unknown) {
         },
       });
     return { ok: true, id };
-  });
+  };
+  return inTransaction ? create(db) : db.transaction(create);
 }
 /**
  * Ein Import überschreibt nie einen eigenen Tagesabschluss. Für ein
@@ -418,7 +432,9 @@ export async function commitImport(db: Database, actor: Actor, raw: unknown) {
     }
     let skipped = 0;
     for (const r of v.rows) {
-      if (current.find((c) => c.key === `${r.participantKey}:${r.date}`)?.blocked) {
+      if (
+        current.find((c) => c.key === `${r.participantKey}:${r.date}`)?.blocked
+      ) {
         skipped++;
         continue;
       }
@@ -593,7 +609,11 @@ export async function rateLimit(
   );
   // Feste Zeitfenster: frei wird es mit dem nächsten Fenster.
   if (r.hits > max)
-    throw new AppError(message, 429, windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds));
+    throw new AppError(
+      message,
+      429,
+      windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds),
+    );
 }
 
 /**
@@ -603,7 +623,10 @@ export async function rateLimit(
  */
 export async function setSearchable(db: Database, actor: Actor, raw: unknown) {
   if (!actor.admin)
-    throw new AppError("Nur die Verwaltung kann die Auffindbarkeit ändern.", 403);
+    throw new AppError(
+      "Nur die Verwaltung kann die Auffindbarkeit ändern.",
+      403,
+    );
   const v = z
     .object({ id: z.string().trim().min(1).max(100), searchable: z.boolean() })
     .strict()

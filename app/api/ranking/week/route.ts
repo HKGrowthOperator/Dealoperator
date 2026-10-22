@@ -1,3 +1,4 @@
+import { requireCurrentMember } from "@/server/member-session";
 import { database, databaseReady } from "@/server/database";
 import { communityWeekState } from "@/server/game";
 import { errorResponse, json } from "@/server/http";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
+    await requireCurrentMember();
     // Ohne Datenbank gibt es keine echte Wochensumme; nichts erfinden.
     if (!databaseReady()) return json({ ready: false });
     const week = await communityWeekState(database());

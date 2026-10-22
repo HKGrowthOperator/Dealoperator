@@ -11,8 +11,7 @@ import {
 import { communityGoalState, communityWeekState } from "../server/game";
 import { GET } from "../app/api/ranking/week/route";
 import { addDays } from "../lib/commitment";
-import { berlinDate, emptyCounts } from "../lib/kpis";
-import { weekStartOf } from "../lib/game";
+import {emptyCounts} from "../lib/kpis";
 
 // Gemeinsames Wochenziel: Einstellungen 'community', Summe der Woche und die
 // öffentliche Route. Fiktive Namen; 2026-03-11 ist ein Mittwoch.
@@ -207,42 +206,8 @@ test("week sum is cached for a minute, a new team value applies at once", async 
   assert.deepEqual([fresh.attempts, fresh.goal], [150, 5000]);
 });
 
-test("public route: only sums, no names and no IDs", async () => {
-  const shared = globalThis as { __dealOperatorDatabase?: Database };
-  const url = process.env.DATABASE_URL;
-  delete process.env.DATABASE_URL;
-  try {
-    // Ohne Datenbank keine erfundene Summe.
-    assert.deepEqual(await (await GET()).json(), { ready: false });
-    process.env.DATABASE_URL = "postgres://test.invalid/operator";
-    shared.__dealOperatorDatabase = db;
-    const today = berlinDate();
-    await person("participant-secret-id", "Anna Geheimname");
-    await person("joint-secret-id", "Duo Geheimname", "joint");
-    await reported("participant-secret-id", today, 140);
-    await reported("joint-secret-id", today, 60);
-    await reported("participant-secret-id", addDays(weekStartOf(today), -7), 900);
-    const response = await GET();
-    assert.equal(response.status, 200);
-    const body = await response.json();
-    assert.deepEqual(Object.keys(body).sort(), [
-      "attempts",
-      "auto",
-      "goal",
-      "lastWeek",
-      "people",
-      "reached",
-      "ready",
-      "weekStart",
-    ]);
-    assert.equal(body.weekStart, weekStartOf(today));
-    assert.equal(body.attempts, 200);
-    assert.equal(body.people, 1);
-    const text = JSON.stringify(body);
-    assert.doesNotMatch(text, /Geheimname|secret-id|Anna|Duo/);
-  } finally {
-    if (url === undefined) delete process.env.DATABASE_URL;
-    else process.env.DATABASE_URL = url;
-    delete shared.__dealOperatorDatabase;
-  }
+test("week API rejects anonymous reads without returning names, IDs or totals", async () => {
+  const response=await GET();
+  assert.equal(response.status,401);
+  assert.deepEqual(await response.json(),{error:"Bitte melde dich an."});
 });

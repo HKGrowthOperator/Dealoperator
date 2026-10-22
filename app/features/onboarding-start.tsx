@@ -25,7 +25,6 @@ import {
   isTeamProfile,
   linkErrorText,
   PasswordField,
-  PrivacyNote,
   ProfileCard,
   ProfileSearch,
   RequestError,
@@ -59,7 +58,7 @@ export type PendingStart = {
 const STEPS: Record<Mode, string[]> = {
   claim: ["Profil finden", "Deine Angaben", "E-Mail bestätigen", "Prüfung durch das Team"],
   assign: ["Profil suchen", "Deine Angaben", "E-Mail bestätigen", "Zuordnung durch das Team"],
-  new: ["Deine Angaben", "E-Mail bestätigen", "Profil anlegen"],
+  new: ["Deine Angaben", "E-Mail bestätigen", "Freigabe"],
 };
 // Der Weg „neu“ hat keinen Suchschritt; seine Zählung beginnt bei den Angaben.
 const STEP_INDEX: Record<Mode, Partial<Record<Step, number>>> = {
@@ -160,7 +159,7 @@ export default function OnboardingStart({
           ? "search"
           : initialMode
             ? "contact"
-            : "choice";
+            : "search";
 
   const [mode, setMode] = useState<Mode | null>(initialMode);
   const [step, setStep] = useState<Step>(initialStep);
@@ -561,8 +560,8 @@ export default function OnboardingStart({
       <button type="button" className="flow-option" onClick={() => switchTo("new", searched)}>
         <UserPlus aria-hidden="true" />
         <span>
-          <strong>Ich habe noch keine Zahlen</strong>
-          <small>Leg ein neues Profil an und trag deinen ersten Tag ein.</small>
+          <strong>Zugang anfragen</strong>
+          <small>Frag deinen Zugang mit deinen Kontaktdaten an.</small>
         </span>
         <ChevronRight size={18} aria-hidden="true" />
       </button>
@@ -578,7 +577,7 @@ export default function OnboardingStart({
           <div className="flow-notice">
             <strong>Die Anmeldung öffnet in Kürze.</strong>
             <p>
-              Die öffentliche Rangliste zeigt schon jetzt den gemeldeten Stand.
+              Bitte versuche es später erneut.
             </p>
           </div>
         )}
@@ -761,11 +760,10 @@ export default function OnboardingStart({
         {step === "search" && (
           <>
             <h1 ref={heading} tabIndex={-1}>
-              Finde dein Profil.
+              Wie heißt du?
             </h1>
             <p className="flow-lead">
-              So, wie du in der Rangliste stehst. Danach gehört das Profil mit
-              allen Tagen zu dir.
+              Wähle dein vorhandenes Profil oder frage einen neuen Zugang an.
             </p>
             {message && (
               <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
@@ -773,9 +771,7 @@ export default function OnboardingStart({
               </p>
             )}
             <ProfileSearch query={query} onQuery={setQuery} onPick={pick} notFound={missing} />
-            <button type="button" className="flow-link" onClick={() => go("choice", null, null)}>
-              Zurück
-            </button>
+            <SignInLine />
           </>
         )}
 
@@ -786,7 +782,7 @@ export default function OnboardingStart({
                 ? "Profil übernehmen."
                 : mode === "assign"
                   ? "Team um Zuordnung bitten."
-                  : "Konto anlegen."}
+                  : "Zugang anfragen."}
             </h1>
             {mode === "claim" && selected && (
               <ProfileCard profile={selected} onChange={() => go("search", "claim", null)} />
@@ -796,7 +792,7 @@ export default function OnboardingStart({
                 ? "Noch deine Kontaktdaten und ein Passwort, dann bestätigst du einmal deine E-Mail."
                 : mode === "assign"
                   ? "Das Team sucht dein Profil heraus und ordnet es dir zu. Ein Hinweis hilft dabei."
-                  : "Danach bestätigst du einmal deine E-Mail, dann geht es los."}
+                  : "Bestätige deine E-Mail. Das Team prüft danach deine Anfrage."}
             </p>
             {isTeamProfile(selected) && mode === "claim" && (
               <div className="flow-notice">
@@ -843,7 +839,7 @@ export default function OnboardingStart({
               )}
               <button className="btn primary full" disabled={!ready || busy || blocked}>
                 {busy ? <LoaderCircle className="spin" size={18} /> : <Mail size={18} />}
-                Registrieren
+                {mode === "new" ? "Zugang anfragen" : "Übernahme anfragen"}
                 {blocked && (
                   <span className="flow-wait">
                     {" "}
@@ -852,7 +848,6 @@ export default function OnboardingStart({
                 )}
               </button>
             </form>
-            <PrivacyNote />
             <button
               type="button"
               className="flow-link"

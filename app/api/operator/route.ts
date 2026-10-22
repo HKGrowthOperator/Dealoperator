@@ -63,8 +63,13 @@ export async function POST(request: Request) {
     const value = await body(request);
     const db = database();
     await rateLimit(db, actor.userId, 30);
-    if (value.action === "onboard")
+    if (value.action === "onboard") {
+      if (!(actor.admin || actor.moderator)) {
+        const [approval] = await db.query("SELECT id FROM onboarding_requests WHERE owner=$1 AND kind='new' AND status='approved' LIMIT 1",[actor.userId]);
+        if (!approval) throw new AppError("Bitte frage zuerst deinen Zugang an.",403);
+      }
       return json(await createMember(db, actor, value.value));
+    }
     if (value.action === "checkin")
       throw new AppError(
         "Tageszahlen gehen jetzt über den Tagesabschluss mit kurzer Reflexion.",

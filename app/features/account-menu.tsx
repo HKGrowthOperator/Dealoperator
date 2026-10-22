@@ -71,7 +71,7 @@ export default function AccountMenu({ viewer }: { viewer: Viewer }) {
           <Link href="/zahlen?modus=eigen" onClick={close}>
             Tage
           </Link>
-          <Link href="/profil?modus=eigen" onClick={close}>
+          <Link href="/mitglieder/mein-profil" onClick={close}>
             Profil
           </Link>
           {viewer.team && (

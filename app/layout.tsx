@@ -7,6 +7,7 @@ import "./operator-glass.css";
 import "./ranking.css";
 import "./ui.css";
 import "./game.css";
+import "./members.css";
 
 const TITLE = "Deal Operator: Zahlen tracken und gemeinsam callen";
 const DESCRIPTION =
@@ -15,6 +16,7 @@ const DESCRIPTION =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: "Deal Operator",
+  robots: { index: false, follow: false },
   title: TITLE,
   description: DESCRIPTION,
   icons: { icon: "/favicon.svg" },

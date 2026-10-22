@@ -1,9 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isPublicEntry } from "./lib/member-access";
+import { database } from "./server/database";
+import { memberAccess } from "./server/member-access";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_PUBLISHABLE_KEY)
-    return response;
+    return isPublicEntry(request.nextUrl.pathname)
+      ? response
+      : NextResponse.json(
+          { error: "Die Anmeldung ist gerade nicht verfügbar." },
+          { status: 503, headers: { "Cache-Control": "private, no-store" } },
+        );
   const client = createServerClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_PUBLISHABLE_KEY,
@@ -28,11 +36,62 @@ export async function proxy(request: NextRequest) {
       },
     },
   );
-  await client.auth.getClaims();
-  return response;
+  const path = request.nextUrl.pathname;
+  if (isPublicEntry(path)) {
+    await client.auth.getClaims();
+    return response;
+  }
+  const {
+    data: { user },
+    error,
+  } = await client.auth.getUser();
+  let destination = "/starten";
+  let status = 401;
+  if (!error && user?.email_confirmed_at && user.email) {
+    const db = database();
+    const [role] = await db.query(
+      "SELECT role FROM team_roles WHERE owner=$1",
+      [user.id],
+    );
+    const admin =
+      (process.env.OPERATOR_ADMIN_IDS || "")
+        .split(",")
+        .map((v) => v.trim())
+        .includes(user.id) || role?.role === "admin";
+    const access = await memberAccess(db, {
+      userId: user.id,
+      email: user.email,
+      admin,
+      moderator: role?.role === "moderator",
+    });
+    if (access.allowed) {
+      response.headers.set("Cache-Control", "private, no-store");
+      return response;
+    }
+    destination = access.next;
+    status = 403;
+  }
+  const blocked = path.startsWith("/api/")
+    ? NextResponse.json(
+        {
+          error:
+            status === 401
+              ? "Bitte melde dich an."
+              : "Dein Zugang ist noch nicht freigegeben.",
+        },
+        { status },
+      )
+    : NextResponse.redirect(
+        new URL(
+          destination === "/starten"
+            ? `/starten?next=${encodeURIComponent(path + request.nextUrl.search)}`
+            : destination,
+          request.url,
+        ),
+      );
+  response.cookies.getAll().forEach((cookie) => blocked.cookies.set(cookie));
+  blocked.headers.set("Cache-Control", "private, no-store");
+  blocked.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return blocked;
 }
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|api/health|api/ready|fonts/|favicon.svg|.*\\.(?:png|jpg|svg|css|js|ttf|woff2)$).*)",
-  ],
-};
+export const config = { matcher: ["/((?!_next/static).*)"] };

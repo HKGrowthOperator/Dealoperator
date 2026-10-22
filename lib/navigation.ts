@@ -1,5 +1,8 @@
 const destinations = new Set([
   "/",
+  "/mitglieder",
+  "/mitglieder/mein-profil",
+  "/calls",
   "/heute",
   "/zahlen",
   "/reflexion",

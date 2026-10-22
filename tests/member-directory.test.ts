@@ -15,6 +15,7 @@ import {
   searchProfiles,
   startRequest,
   suggestProfiles,
+  decideRequest,
 } from "../server/onboarding";
 
 const alice = { userId: "alice", email: "alice@example.invalid", admin: false };
@@ -232,14 +233,16 @@ test("malformed directory settings do not expose or assign a profile", async () 
   assert.equal(await preparedMemberForEmail(db, alice.email), null);
 });
 
-test("registration finishes on the prepared profile without a ranked-profile prompt or extra notification", async () => {
+test("prepared profiles require approval before the full history is assigned", async () => {
   const id = await prepared();
   assert.deepEqual(await suggestProfiles(db, alice), { name: "Alice Beispiel", profiles: [] });
   assert.equal(await finishPreparedRegistration(db, alice), null);
   const r = await registration();
   await bindConfirmedRequest(db, alice, r.id);
+  assert.equal(await finishPreparedRegistration(db, alice), null);
+  await decideRequest(db, {userId:"admin",email:"admin@example.invalid",admin:true}, {id:r.id,decision:"approve"});
   const notificationsBefore = (await db.query("SELECT count(*)::int AS n FROM notifications"))[0].n;
-  assert.equal((await finishPreparedRegistration(db, alice))?.id, id);
+  assert.equal((await db.query("SELECT id FROM participants WHERE owner=$1",[alice.userId]))[0].id, id);
   assert.equal(await finishPreparedRegistration(db, alice), null);
   assert.equal((await db.query("SELECT count(*)::int AS n FROM participants"))[0].n, 1);
   assert.equal((await db.query("SELECT phone FROM account_private WHERE owner=$1", [alice.userId]))[0].phone, form.phone);

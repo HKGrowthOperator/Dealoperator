@@ -1,3 +1,4 @@
+import { requireCurrentMember } from "@/server/member-session";
 import { getCurrentUser } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { errorResponse, json } from "@/server/http";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
+    await requireCurrentMember();
     const actor = await getCurrentUser();
     if (!actor)
       return json({ allowed: false, missing: ["login"], cards: [], people: [] }, 401);

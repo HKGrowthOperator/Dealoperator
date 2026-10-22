@@ -112,12 +112,12 @@ export default function Page() {
         </section>
 
         <section>
-          <h2>6. Gemeldete Zahlen, Reflexionen und öffentliche Rangliste</h2>
+          <h2>6. Gemeldete Zahlen, Reflexionen und interne Rangliste</h2>
           <p>
             Im persönlichen Bereich lassen sich Tageszahlen, persönliche Ziele und
             Reflexionen festhalten. E-Mail-Adressen, Telefonnummern, Notizen und
             Entwürfe sind privat, Unterstützungswünsche sieht nur das Team. Nichts
-            davon erscheint in der öffentlichen Rangliste.
+            davon erscheint in der internen Rangliste.
           </p>
           <p>
             Ein eingereichter Tagesabschluss (Anzeigename, Tag, Energie, was gut
@@ -132,7 +132,7 @@ export default function Page() {
             eines Profils stehen deshalb Anzeigename, Firma und Rolle, die
             gemeldeten Kennzahlen mit Meldedatum sowie in der
             Dranbleiben-Übersicht die Serie und die Zahl aktiver und
-            abgeschlossener Tage in der öffentlichen Rangliste; darauf weist
+            abgeschlossener Tage in der internen Rangliste; darauf weist
             das Profilformular hin. Eine Anzeige nur für dich gibt es nicht.
             Wer nicht mehr in der Rangliste stehen möchte, wendet sich an das
             Team; das Profil wird dann entfernt. Rechtsgrundlage ist Art. 6
@@ -149,6 +149,27 @@ export default function Page() {
           </p>
         </section>
 
+        <section>
+          <h2>Mitgliederprofile und Zusammenarbeit</h2>
+          <p>
+            Ergebnisse, Mitgliederprofile und Call-Verabredungen sind nur nach
+            Anmeldung und Freigabe des Zugangs erreichbar. Vor der Anmeldung
+            liefert die Namenssuche ausschließlich den Namen und die Kennung
+            noch nicht zugeordneter, dafür freigegebener Profile.
+          </p>
+          <p>
+            Im Mitgliederprofil kannst du ein Foto, deine Tätigkeit, Angebote,
+            Branchen, Projekte, Gesuche und Referenzen sowie Kontaktmöglichkeiten
+            selbst ergänzen. Wenn du dein Profil für Mitglieder anzeigst, können
+            andere freigeschaltete Personen diese Angaben sehen und dich über die
+            angegebene Telefonnummer oder E-Mail kontaktieren. Die Kontaktfelder
+            werden getrennt von den Angaben deiner Zugangsanfrage gespeichert.
+            Alte Import- und Anmeldedaten werden nicht automatisch übernommen.
+            Du kannst dein Profil aus der Liste nehmen, Angaben ändern oder dein
+            Foto entfernen. Profilfotos werden verkleinert und über einen
+            zugriffsgeschützten Endpunkt ausgeliefert.
+          </p>
+        </section>
         <section>
           <h2>7. Cookies</h2>
           <p>

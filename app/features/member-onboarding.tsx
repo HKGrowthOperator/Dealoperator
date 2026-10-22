@@ -232,7 +232,7 @@ export default function MemberOnboarding({
               aria-describedby={`${id}-name-note`}
             />
             <p id={`${id}-name-note`} className={errors.name ? "flow-field-error" : "flow-note"}>
-              {errors.name || "So stehst du in der Rangliste. E-Mail und Nummer bleiben privat."}
+              {errors.name || "So stehst du in der Rangliste."}
             </p>
           </div>
 

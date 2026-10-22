@@ -2,11 +2,25 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Database } from "./database";
 import { isTeam, ownerIds, type Actor } from "./auth";
-import { AppError, createMember, rateLimit, refusePersonalUse } from "./operator";
-import { notifyApplicant, teamEvent, teamPushText, type ApplicantNotice, type Reach } from "./notify";
+import {
+  AppError,
+  createMember,
+  rateLimit,
+  refusePersonalUse,
+} from "./operator";
+import {
+  notifyApplicant,
+  teamEvent,
+  teamPushText,
+  type ApplicantNotice,
+  type Reach,
+} from "./notify";
 import { activateDesignation, DESIGNATIONS_KEY } from "./roles";
 import { normalisePhone } from "../lib/phone";
-import { preparedMemberForEmail, preparedMemberWithoutEmail } from "./member-directory";
+import {
+  preparedMemberForEmail,
+  preparedMemberWithoutEmail,
+} from "./member-directory";
 
 /**
  * Gemeinsame Meldungen sind keine persönlichen Konten. Der Text steht an
@@ -20,7 +34,11 @@ const JOINT_NOT_CLAIMABLE =
 // das Profil, bestätigt ihre E-Mail und das Deal-Operator-Team gibt die
 // Zuordnung nach eigenem Abgleich frei. Weder eine passende E-Mail noch ein
 // Einladungscode ersetzen diese Freigabe.
-export const OPEN_STATUS = ["awaiting_email", "pending", "info_needed"] as const;
+export const OPEN_STATUS = [
+  "awaiting_email",
+  "pending",
+  "info_needed",
+] as const;
 const OPEN_LIST = OPEN_STATUS.map((s) => `'${s}'`).join(",");
 
 export type RequestKind = "claim" | "new";
@@ -64,16 +82,21 @@ export async function searchProfiles(db: Database, rawQuery: string) {
   const query = (rawQuery || "").trim().slice(0, 80);
   if (query.length < 2) return [];
   return db.query(
-    `SELECT id,name,company,role FROM participants
+    `SELECT id,name FROM participants
      WHERE owner IS NULL AND searchable=true AND kind='person'
-       AND (name ILIKE $1 OR company ILIKE $1)
+       AND name ILIKE $1
      ORDER BY name LIMIT 25`,
     [`%${query.replace(/[%_\\]/g, (c) => `\\${c}`)}%`],
   );
 }
 
 /** Öffentliche Profilangaben, wie sie die Auswahl zeigt. */
-export type SuggestedProfile = { id: string; name: string; company: string; role: string };
+export type SuggestedProfile = {
+  id: string;
+  name: string;
+  company: string;
+  role: string;
+};
 
 /**
  * Konto ohne Profil: Profile aus der Rangliste, die zum Namen der Person
@@ -90,7 +113,12 @@ export async function suggestProfiles(
   // Eine bestätigte Adresse darf ihr eigenes internes Profil finden. Das
   // Mitgliederverzeichnis selbst bleibt unsichtbar und wird nicht aufgezählt.
   const prepared = await preparedMemberForEmail(db, actor.email);
-  if (prepared && !("ambiguous" in prepared) && !prepared.owner && !prepared.hasReports)
+  if (
+    prepared &&
+    !("ambiguous" in prepared) &&
+    !prepared.owner &&
+    !prepared.hasReports
+  )
     return { name: prepared.name, profiles: [] };
   if (prepared && !("ambiguous" in prepared) && !prepared.owner)
     return {
@@ -117,10 +145,16 @@ export async function suggestProfiles(
   const words = name.split(/\s+/).filter((w) => w.length >= 2);
   if (!words.length) return { name, profiles: [] };
   // Erst der volle Name, dann Nachname, dann Vorname (ab drei Zeichen).
-  const tries = [...new Set([name, ...(words.length > 1 ? [words[words.length - 1], words[0]] : [])])]
-    .filter((q, i) => i === 0 || q.length >= 3);
+  const tries = [
+    ...new Set([
+      name,
+      ...(words.length > 1 ? [words[words.length - 1], words[0]] : []),
+    ]),
+  ].filter((q, i) => i === 0 || q.length >= 3);
   for (const q of tries) {
-    const found = (await searchProfiles(db, q)).filter((p) => !/^team\b/i.test(String(p.role ?? "")));
+    const found = (await searchProfiles(db, q)).filter(
+      (p) => !/^team\b/i.test(String(p.role ?? "")),
+    );
     if (found.length)
       return {
         name,
@@ -172,7 +206,7 @@ export async function profileForSelection(
         403,
       );
   }
-  return { id: p.id, name: p.name, company: p.company, role: p.role };
+  return { id: p.id, name: p.name, company: "", role: "" };
 }
 
 function inviteHash(value: string) {
@@ -219,7 +253,9 @@ export async function startRequest(
     // Dieselbe Adresssperre wie bei der Übernahme mit Konto: gleichzeitige
     // Anfragen derselben Adresse laufen nacheinander statt in den
     // Eindeutigkeitsindex.
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${v.email}`]);
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `email:${v.email}`,
+    ]);
     let participant: string | null = null;
     if (v.kind === "claim" && v.participantId) {
       // Erneutes Senden derselben Anfrage (etwa nach einem Link-Fehler) braucht
@@ -230,7 +266,12 @@ export async function startRequest(
           WHERE lower(email)=$1 AND participant=$2 AND status IN (${OPEN_LIST}) LIMIT 1`,
         [v.email, v.participantId],
       );
-      const p = await profileForSelection(tx, v.participantId, v.invite, Boolean(prior));
+      const p = await profileForSelection(
+        tx,
+        v.participantId,
+        v.invite,
+        Boolean(prior),
+      );
       participant = p.id;
     }
     const [existing] = await tx.query(
@@ -243,7 +284,13 @@ export async function startRequest(
     // sonst könnte jeder, der die Adresse kennt, die Angaben überschreiben,
     // die das Team gerade prüft.
     if (existing && existing.status !== "awaiting_email")
-      return { id: existing.id as string, email: v.email, kind: v.kind, participant, resubmitted: true };
+      return {
+        id: existing.id as string,
+        email: v.email,
+        kind: v.kind,
+        participant,
+        resubmitted: true,
+      };
     if (existing) {
       // Erneutes Absenden aktualisiert die Angaben, statt eine zweite offene
       // Anfrage für dieselbe Person und dasselbe Profil anzulegen.
@@ -256,20 +303,41 @@ export async function startRequest(
         [existing.id, v.fullName, phone.value, v.phone, v.hint, v.kind],
       );
       await log(tx, existing.id, v.email, "resubmitted", note);
-      return { id: existing.id as string, email: v.email, kind: v.kind, participant, resubmitted: true };
+      return {
+        id: existing.id as string,
+        email: v.email,
+        kind: v.kind,
+        participant,
+        resubmitted: true,
+      };
     }
     const id = randomUUID();
     await tx.query(
       `INSERT INTO onboarding_requests(id,kind,participant,email,full_name,phone,phone_input,hint)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, v.kind, participant, v.email, v.fullName, phone.value, v.phone, v.hint],
+      [
+        id,
+        v.kind,
+        participant,
+        v.email,
+        v.fullName,
+        phone.value,
+        v.phone,
+        v.hint,
+      ],
     );
     await log(tx, id, v.email, "submitted", note);
     // Noch kein Team-Eintrag: die E-Mail ist unbestätigt und kann vertippt
     // oder fremd sein. Die Verwaltung sieht unbestätigte Registrierungen
     // gesammelt (siehe unconfirmedRegistrations); Eintrag, Push und E-Mail
     // entstehen erst bei der Bestätigung in bindConfirmedRequest.
-    return { id, email: v.email, kind: v.kind, participant, resubmitted: false };
+    return {
+      id,
+      email: v.email,
+      kind: v.kind,
+      participant,
+      resubmitted: false,
+    };
   });
 }
 
@@ -287,7 +355,8 @@ export function requestIdFromCookie(value: string | undefined) {
   const id = (value || "").split(".")[0];
   return /^[0-9a-f-]{36}$/i.test(id) ? id : undefined;
 }
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+const sha256 = (value: string) =>
+  createHash("sha256").update(value).digest("hex");
 
 /**
  * Angaben der noch unbestätigten Anfrage aus DIESEM Browser, damit /starten
@@ -299,7 +368,10 @@ const sha256 = (value: string) => createHash("sha256").update(value).digest("hex
  * Ein inzwischen an jemand anderen vergebenes Profil erscheint als
  * profileTaken statt still zu verschwinden.
  */
-export async function pendingForBrowser(db: Database, cookie: string | undefined) {
+export async function pendingForBrowser(
+  db: Database,
+  cookie: string | undefined,
+) {
   const [id, secret] = (cookie || "").split(".");
   if (!requestIdFromCookie(id) || !secret || secret.length > 100) return null;
   const [r] = await db.query(
@@ -322,9 +394,15 @@ export async function pendingForBrowser(db: Database, cookie: string | undefined
   const taken = Boolean(r.participant && r.owner);
   return {
     kind: r.kind as RequestKind,
-    profile: r.participant && !r.owner
-      ? { id: r.participant as string, name: r.name as string, company: r.company as string, role: r.role as string }
-      : null,
+    profile:
+      r.participant && !r.owner
+        ? {
+            id: r.participant as string,
+            name: r.name as string,
+            company: r.company as string,
+            role: r.role as string,
+          }
+        : null,
     profileTaken: taken,
     takenName: taken ? (r.name as string) : "",
     email: r.email as string,
@@ -346,9 +424,13 @@ export async function pendingForBrowser(db: Database, cookie: string | undefined
  * wirklich bestätigt ist, entscheidet dabei Supabase. Nur mit passendem
  * Browser-Geheimnis, sonst „none“.
  */
-export async function browserRequestState(db: Database, cookie: string | undefined) {
+export async function browserRequestState(
+  db: Database,
+  cookie: string | undefined,
+) {
   const [id, secret] = (cookie || "").split(".");
-  if (!requestIdFromCookie(id) || !secret || secret.length > 100) return "none" as const;
+  if (!requestIdFromCookie(id) || !secret || secret.length > 100)
+    return "none" as const;
   const [r] = await db.query(
     `SELECT r.status,
             (SELECT e.note FROM onboarding_events e
@@ -408,10 +490,16 @@ export async function resendConfirmationByTeam(
 ) {
   if (!isTeam(actor)) throw new AppError("Nur für das Team.", 403);
   const { id } = z.object({ id: z.string().uuid() }).strict().parse(raw);
-  const [r] = await db.query("SELECT id,email,status FROM onboarding_requests WHERE id=$1", [id]);
+  const [r] = await db.query(
+    "SELECT id,email,status FROM onboarding_requests WHERE id=$1",
+    [id],
+  );
   if (!r) throw new AppError("Diese Anfrage gibt es nicht mehr.", 404);
   if (r.status !== "awaiting_email")
-    throw new AppError("Die E-Mail dieser Anfrage ist schon bestätigt oder die Anfrage ist erledigt.", 409);
+    throw new AppError(
+      "Die E-Mail dieser Anfrage ist schon bestätigt oder die Anfrage ist erledigt.",
+      409,
+    );
   await rateLimit(
     db,
     `team-resend:${id}`,
@@ -489,17 +577,28 @@ export async function bindConfirmedRequest(
           [actor.email, TEAM_RESEND_DAYS],
         );
     if (!request) return null;
-    if (onlyParticipant !== undefined && request.participant !== onlyParticipant) return null;
+    if (
+      onlyParticipant !== undefined &&
+      request.participant !== onlyParticipant
+    )
+      return null;
     // Wer schon ein eigenes Profil hat, bekommt keine zweite Übernahme.
-    const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
-      actor.userId,
-    ]);
+    const [owned] = await tx.query(
+      "SELECT id FROM participants WHERE owner=$1",
+      [actor.userId],
+    );
     if (owned) {
       await tx.query(
         `UPDATE onboarding_requests SET owner=$2,status='superseded',updated_at=now() WHERE id=$1`,
         [request.id, actor.userId],
       );
-      await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits ein Profil.");
+      await log(
+        tx,
+        request.id,
+        actor.userId,
+        "superseded",
+        "Konto hat bereits ein Profil.",
+      );
       return null;
     }
     // Läuft für dieses Konto schon eine Übernahme (z. B. angemeldet gestellt),
@@ -516,7 +615,13 @@ export async function bindConfirmedRequest(
         `UPDATE onboarding_requests SET status='superseded',updated_at=now() WHERE id=$1`,
         [request.id],
       );
-      await log(tx, request.id, actor.userId, "superseded", "Konto hat bereits eine offene Übernahme.");
+      await log(
+        tx,
+        request.id,
+        actor.userId,
+        "superseded",
+        "Konto hat bereits eine offene Übernahme.",
+      );
       return null;
     }
     // Erst nach Mailbestätigung: vorhandene historische Zahlen bleiben eine
@@ -528,11 +633,20 @@ export async function bindConfirmedRequest(
           "Zu deiner E-Mail gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.",
           409,
         );
-      const missingAddress = !prepared ? await preparedMemberWithoutEmail(tx, String(request.full_name)) : null;
+      const missingAddress = !prepared
+        ? await preparedMemberWithoutEmail(tx, String(request.full_name))
+        : null;
       if (missingAddress && "ambiguous" in missingAddress)
-        throw new AppError("Zu deinem Namen gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.", 409);
+        throw new AppError(
+          "Zu deinem Namen gibt es mehrere vorbereitete Profile. Bitte lass das Team die Zuordnung prüfen.",
+          409,
+        );
       const target = prepared || missingAddress;
-      if (target && !("ambiguous" in target) && (missingAddress || target.hasReports || target.owner)) {
+      if (
+        target &&
+        !("ambiguous" in target) &&
+        (missingAddress || target.hasReports || target.owner)
+      ) {
         await tx.query(
           `UPDATE onboarding_requests SET status='superseded',updated_at=now()
            WHERE lower(email)=$1 AND status='awaiting_email' AND id<>$2`,
@@ -550,7 +664,7 @@ export async function bindConfirmedRequest(
     // Eingabe eine belegte Anfrage wird.
     await tx.query(
       `UPDATE onboarding_requests SET owner=$2,status=$3,updated_at=now() WHERE id=$1`,
-      [request.id, actor.userId, request.kind === "new" ? "approved" : "pending"],
+      [request.id, actor.userId, "pending"],
     );
     await tx.query(
       `INSERT INTO account_private(owner,email,phone) VALUES($1,$2,$3)
@@ -573,29 +687,31 @@ export async function bindConfirmedRequest(
     // einmal. Spätere Logins, Magic-Links oder Neuladen finden keine offene
     // awaiting_email-Anfrage mehr und lösen deshalb nichts aus.
     const [wanted] = request.participant
-      ? await tx.query("SELECT name FROM participants WHERE id=$1", [request.participant])
+      ? await tx.query("SELECT name FROM participants WHERE id=$1", [
+          request.participant,
+        ])
       : [];
     await teamEvent(tx, {
       dedupeKey: `registration:${request.id}`,
       kind: "registration",
       ref: request.id,
-      state: request.kind === "claim" ? "review_ready" : "confirmed",
+      state: "review_ready",
       // Eine bestätigte Registrierung braucht keine Entscheidung: nur zur Info.
-      done: request.kind !== "claim",
+      done: false,
       title:
         request.kind !== "claim"
-          ? `Neue Registrierung bestätigt: ${request.full_name}`
+          ? `Zugang angefragt: ${request.full_name}`
           : request.participant
             ? `Profilübernahme prüfbereit: ${request.full_name}`
             : `Zuordnung gesucht: ${request.full_name}`,
       body: via
         ? request.kind !== "claim"
-          ? "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Das eigene Profil kann jetzt angelegt werden."
+          ? "Adresse vom Team freigeschaltet. Die Zugangsanfrage wartet auf eure Prüfung."
           : request.participant
             ? "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Bitte die Übernahme besonders sorgfältig prüfen."
             : "Adresse vom Team freigeschaltet, nicht per Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte besonders sorgfältig prüfen."
         : request.kind !== "claim"
-          ? "E-Mail bestätigt. Das eigene Profil kann jetzt angelegt werden."
+          ? "E-Mail bestätigt. Die Zugangsanfrage wartet auf eure Freigabe."
           : request.participant
             ? "E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
             : "E-Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte das passende Profil auswählen und freigeben.",
@@ -608,7 +724,9 @@ export async function bindConfirmedRequest(
               push: teamPushText({
                 kind: "claim",
                 name: request.full_name,
-                profile: request.participant ? ((wanted?.name as string) ?? "") : null,
+                profile: request.participant
+                  ? ((wanted?.name as string) ?? "")
+                  : null,
                 request: request.id,
               }),
             }
@@ -638,7 +756,13 @@ export async function finishPreparedRegistration(db: Database, actor: Actor) {
   );
   if (!request) return null;
   const prepared = await preparedMemberForEmail(db, actor.email);
-  if (!prepared || "ambiguous" in prepared || prepared.owner || prepared.hasReports) return null;
+  if (
+    !prepared ||
+    "ambiguous" in prepared ||
+    prepared.owner ||
+    prepared.hasReports
+  )
+    return null;
   return createMember(db, actor, {
     name: String(request.full_name),
     company: prepared.company,
@@ -758,7 +882,10 @@ export const decisionSchema = z
 
 /** Bestätigte Anmeldeadresse eines Kontos, wie sie aus der Sitzung übernommen wurde. */
 async function verifiedAddress(db: Database, owner: string) {
-  const [row] = await db.query("SELECT email FROM account_private WHERE owner=$1", [owner]);
+  const [row] = await db.query(
+    "SELECT email FROM account_private WHERE owner=$1",
+    [owner],
+  );
   return (row?.email as string | null | undefined) ?? null;
 }
 
@@ -780,10 +907,14 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     throw new AppError("Nur das Team kann Anfragen entscheiden.", 403);
   const v = decisionSchema.parse(raw);
   if (v.decision === "info" && v.applicantMessage.length < 3)
-    throw new AppError("Bitte schreib die Rückfrage an die Person ins Nachrichtenfeld.");
+    throw new AppError(
+      "Bitte schreib die Rückfrage an die Person ins Nachrichtenfeld.",
+    );
   // Eine Ablehnung erklärt sich: Die Person liest den Grund auf ihrer Statusseite.
   if (v.decision === "reject" && v.applicantMessage.length < 3)
-    throw new AppError("Bitte schreib der Person kurz den Grund der Ablehnung ins Nachrichtenfeld.");
+    throw new AppError(
+      "Bitte schreib der Person kurz den Grund der Ablehnung ins Nachrichtenfeld.",
+    );
   let primary: ApplicantNotice | null = null;
   const others: ApplicantNotice[] = [];
   const result = await db.transaction(async (tx) => {
@@ -793,9 +924,13 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
       "SELECT participant FROM onboarding_requests WHERE id=$1",
       [v.id],
     );
-    const target = peek?.participant ?? (v.decision === "approve" ? v.participantId : undefined);
+    const target =
+      peek?.participant ??
+      (v.decision === "approve" ? v.participantId : undefined);
     if (target)
-      await tx.query("SELECT id FROM participants WHERE id=$1 FOR UPDATE", [target]);
+      await tx.query("SELECT id FROM participants WHERE id=$1 FOR UPDATE", [
+        target,
+      ]);
     const [request] = await tx.query(
       "SELECT * FROM onboarding_requests WHERE id=$1 FOR UPDATE",
       [v.id],
@@ -804,15 +939,24 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
     // Über die eigene Anfrage entscheidet jemand anderes im Team. Nur die feste
     // Grundverwaltung darf das selbst, damit sie sich nicht aussperrt.
     if (request.owner === actor.userId && !ownerIds().includes(actor.userId))
-      throw new AppError("Über deine eigene Anfrage entscheidet jemand anderes im Team.", 403);
+      throw new AppError(
+        "Über deine eigene Anfrage entscheidet jemand anderes im Team.",
+        403,
+      );
     if (!["pending", "info_needed"].includes(request.status))
       throw new AppError(
         "Diese Anfrage wurde bereits abschließend entschieden.",
         409,
       );
     // Adresse vor der Entscheidung: Die Freigabe schreibt sie unten neu.
-    const verifiedEmail = request.owner ? await verifiedAddress(tx, request.owner) : null;
-    const notice = (decision: ApplicantNotice["decision"], event: string, profile?: string) => {
+    const verifiedEmail = request.owner
+      ? await verifiedAddress(tx, request.owner)
+      : null;
+    const notice = (
+      decision: ApplicantNotice["decision"],
+      event: string,
+      profile?: string,
+    ) => {
       if (request.owner)
         primary = {
           request: request.id,
@@ -832,7 +976,13 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
          WHERE id=$1`,
         [request.id, v.internalNote, v.applicantMessage],
       );
-      const asked = await log(tx, request.id, actor.userId, "info_requested", v.internalNote);
+      const asked = await log(
+        tx,
+        request.id,
+        actor.userId,
+        "info_requested",
+        v.internalNote,
+      );
       // Ein Hinweis je Rückfrage-Runde: Schärft das Team die Frage nach, bevor
       // die Person geantwortet hat, kommt kein zweiter.
       const [round] = await tx.query(
@@ -854,10 +1004,60 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
          WHERE id=$1`,
         [request.id, v.internalNote, v.applicantMessage, actor.userId],
       );
-      notice("reject", await log(tx, request.id, actor.userId, "rejected", v.internalNote));
+      notice(
+        "reject",
+        await log(tx, request.id, actor.userId, "rejected", v.internalNote),
+      );
       return { ok: true, status: "rejected" };
     }
 
+    // New access requests need the same explicit team approval as takeovers.
+    if (request.kind === "new" && !v.participantId) {
+      if (!request.owner)
+        throw new AppError("Bitte zuerst die E-Mail bestätigen.", 409);
+      const prepared = await preparedMemberForEmail(tx, request.email);
+      const same = await tx.query(
+        "SELECT id FROM participants WHERE lower(trim(name))=lower(trim($1)) AND owner IS NULL AND kind='person'",
+        [request.full_name],
+      );
+      if (
+        same.some(
+          (p) => !prepared || "ambiguous" in prepared || p.id !== prepared.id,
+        )
+      )
+        throw new AppError(
+          "Zu diesem Namen gibt es bereits ein vorbereitetes Profil. Bitte wähle es zur Zuordnung aus.",
+          409,
+        );
+      await tx.query(
+        "UPDATE onboarding_requests SET status='approved',internal_note=$2,applicant_message=$3,decided_by=$4,decided_at=now(),updated_at=now() WHERE id=$1",
+        [request.id, v.internalNote, v.applicantMessage, actor.userId],
+      );
+      const created = await createMember(
+        tx,
+        { userId: request.owner, email: request.email, admin: false },
+        { name: String(request.full_name).slice(0, 60), company: "", role: "" },
+        true,
+      );
+      notice(
+        "approve",
+        await log(tx, request.id, actor.userId, "approved", v.internalNote),
+        request.full_name,
+      );
+      return {
+        ok: true,
+        status: "approved",
+        id: created.id,
+        name: request.full_name,
+      };
+    }
+    if (request.kind === "new" && v.participantId) {
+      await tx.query(
+        "UPDATE onboarding_requests SET kind='claim' WHERE id=$1",
+        [request.id],
+      );
+      request.kind = "claim";
+    }
     // approve
     if (request.kind !== "claim")
       throw new AppError(
@@ -876,10 +1076,10 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
           WHERE lower(email)=lower($1) AND participant=$2 AND id<>$3 AND status IN (${OPEN_LIST})`,
         [request.email, v.participantId, request.id],
       );
-      await tx.query("UPDATE onboarding_requests SET participant=$2 WHERE id=$1", [
-        request.id,
-        v.participantId,
-      ]);
+      await tx.query(
+        "UPDATE onboarding_requests SET participant=$2 WHERE id=$1",
+        [request.id, v.participantId],
+      );
     }
     if (!request.owner)
       throw new AppError(
@@ -925,7 +1125,11 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
        WHERE id=$1`,
       [request.id, v.internalNote, v.applicantMessage, actor.userId],
     );
-    notice("approve", await log(tx, request.id, actor.userId, "approved", v.internalNote), p.name);
+    notice(
+      "approve",
+      await log(tx, request.id, actor.userId, "approved", v.internalNote),
+      p.name,
+    );
     // Wer dasselbe Profil mit einem Konto angefragt hatte, erfährt, dass es
     // vergeben ist. Unbestätigte Anfragen ohne Konto bekommen nichts.
     for (const other of superseded)
@@ -941,7 +1145,10 @@ export async function decideRequest(db: Database, actor: Actor, raw: unknown) {
         });
     return { ok: true, status: "approved", name: p.name, role };
   });
-  return { ...result, notified: await notifyAfterDecision(db, primary, others) };
+  return {
+    ...result,
+    notified: await notifyAfterDecision(db, primary, others),
+  };
 }
 
 /**
@@ -959,8 +1166,13 @@ export async function assignProfile(
   requestId: string,
   actorId: string,
 ) {
-  await tx.query("UPDATE participants SET owner=$2,claimed_at=now() WHERE id=$1", [p.id, owner]);
-  const [oldProfile] = await tx.query("SELECT data FROM profiles WHERE id=$1", [owner]);
+  await tx.query(
+    "UPDATE participants SET owner=$2,claimed_at=now() WHERE id=$1",
+    [p.id, owner],
+  );
+  const [oldProfile] = await tx.query("SELECT data FROM profiles WHERE id=$1", [
+    owner,
+  ]);
   const base = oldProfile
     ? JSON.parse(oldProfile.data)
     : {
@@ -995,7 +1207,10 @@ export async function assignProfile(
     [p.id, requestId],
   );
   // Ein noch offener Einladungscode darf danach nichts mehr tun.
-  await tx.query("UPDATE claim_tokens SET used_at=now() WHERE participant=$1 AND used_at IS NULL", [p.id]);
+  await tx.query(
+    "UPDATE claim_tokens SET used_at=now() WHERE participant=$1 AND used_at IS NULL",
+    [p.id],
+  );
   await tx.query(
     "INSERT INTO sync_outbox(participant) VALUES($1) ON CONFLICT(participant) DO UPDATE SET revision=sync_outbox.revision+1,state='pending',attempts=0,next_attempt_at=now(),updated_at=now()",
     [p.id],
@@ -1022,7 +1237,10 @@ async function notifyAfterDecision(
       if (notice === primary) reach = channels;
     } catch (error) {
       // Nur die Meldung, keine Adressen oder Inhalte.
-      console.error("Hinweis zur Profilübernahme nicht angelegt:", (error as Error).message);
+      console.error(
+        "Hinweis zur Profilübernahme nicht angelegt:",
+        (error as Error).message,
+      );
     }
   }
   return reach;
@@ -1060,7 +1278,11 @@ export const claimSchema = z
  * Anfrage; es entsteht weder eine zweite Anfrage noch ein zweiter
  * Team-Hinweis.
  */
-export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unknown) {
+export async function requestClaimSignedIn(
+  db: Database,
+  actor: Actor,
+  raw: unknown,
+) {
   const v = claimSchema.parse(raw);
   const phone = normalisePhone(v.phone, v.phoneCountry);
   if (!phone.ok) throw new AppError(phone.reason, 400, undefined, "phone");
@@ -1081,10 +1303,13 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
       `owner:${actor.userId}`,
     ]);
-    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`email:${actor.email}`]);
-    const [owned] = await tx.query("SELECT id FROM participants WHERE owner=$1", [
-      actor.userId,
+    await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `email:${actor.email}`,
     ]);
+    const [owned] = await tx.query(
+      "SELECT id FROM participants WHERE owner=$1",
+      [actor.userId],
+    );
     if (owned)
       throw new AppError(
         "Dein Konto hat bereits ein eigenes Profil. Eine zweite Übernahme ist nicht möglich.",
@@ -1109,7 +1334,11 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
         [open.id, v.fullName, phone.value, v.phone, v.hint],
       );
       await log(tx, open.id, actor.userId, "resubmitted", "");
-      return { id: open.id as string, status: open.status as string, repeated: true };
+      return {
+        id: open.id as string,
+        status: open.status as string,
+        repeated: true,
+      };
     }
 
     let p: { id: string } | null = null;
@@ -1125,7 +1354,10 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
         ownDirectorySelection,
       );
       // Wartet auf eine gerade laufende Freigabe und sieht danach deren Ergebnis.
-      const [still] = await tx.query("SELECT owner FROM participants WHERE id=$1 FOR SHARE", [p.id]);
+      const [still] = await tx.query(
+        "SELECT owner FROM participants WHERE id=$1 FOR SHARE",
+        [p.id],
+      );
       if (still?.owner)
         throw new AppError(
           "Dieses Profil steht nicht mehr zur Übernahme bereit. Es wurde bereits einem Konto zugeordnet.",
@@ -1155,7 +1387,16 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       await tx.query(
         `INSERT INTO onboarding_requests(id,kind,participant,email,full_name,phone,phone_input,hint,status,owner)
          VALUES($1,'claim',$2,$3,$4,$5,$6,$7,'pending',$8)`,
-        [id, p?.id ?? null, actor.email, v.fullName, phone.value, v.phone, v.hint, actor.userId],
+        [
+          id,
+          p?.id ?? null,
+          actor.email,
+          v.fullName,
+          phone.value,
+          v.phone,
+          v.hint,
+          actor.userId,
+        ],
       );
     // Andere noch unbestätigte Anfragen dieser Adresse dürfen sich später nicht
     // mehr an das Konto hängen.
@@ -1177,7 +1418,9 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
       kind: "registration",
       ref: id,
       state: "review_ready",
-      title: p ? `Profilübernahme prüfbereit: ${v.fullName}` : `Zuordnung gesucht: ${v.fullName}`,
+      title: p
+        ? `Profilübernahme prüfbereit: ${v.fullName}`
+        : `Zuordnung gesucht: ${v.fullName}`,
       body: p
         ? "Angefragt mit einem angemeldeten Konto, E-Mail bestätigt. Die Übernahme wartet auf eure Prüfung."
         : "Angemeldetes Konto, E-Mail bestätigt. Die Person hat ihr Profil nicht gefunden. Bitte das passende Profil auswählen und freigeben.",
@@ -1189,7 +1432,11 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
           kind: "claim",
           name: v.fullName,
           profile: p
-            ? (((await tx.query("SELECT name FROM participants WHERE id=$1", [p.id]))[0]?.name as string) ?? "")
+            ? (((
+                await tx.query("SELECT name FROM participants WHERE id=$1", [
+                  p.id,
+                ])
+              )[0]?.name as string) ?? "")
             : null,
           request: id,
         }),
@@ -1200,7 +1447,13 @@ export async function requestClaimSignedIn(db: Database, actor: Actor, raw: unkn
 }
 
 const answerSchema = z
-  .object({ message: z.string().trim().min(3, "Bitte schreib kurz deine Antwort.").max(1000) })
+  .object({
+    message: z
+      .string()
+      .trim()
+      .min(3, "Bitte schreib kurz deine Antwort.")
+      .max(1000),
+  })
   .strict();
 
 /**
@@ -1208,7 +1461,11 @@ const answerSchema = z
  * Prüfung; das Team sieht die Antwort unter Übernahmen und bekommt einen
  * Hinweis.
  */
-export async function answerInfoRequest(db: Database, actor: Actor, raw: unknown) {
+export async function answerInfoRequest(
+  db: Database,
+  actor: Actor,
+  raw: unknown,
+) {
   const v = answerSchema.parse(raw);
   await rateLimit(
     db,
@@ -1224,7 +1481,10 @@ export async function answerInfoRequest(db: Database, actor: Actor, raw: unknown
       [actor.userId],
     );
     if (!request)
-      throw new AppError("Zu deiner Anfrage gibt es gerade keine offene Rückfrage.", 409);
+      throw new AppError(
+        "Zu deiner Anfrage gibt es gerade keine offene Rückfrage.",
+        409,
+      );
     const [event] = await tx.query(
       `INSERT INTO onboarding_events(request,actor,action,note)
        VALUES($1,$2,'applicant_answered',$3) RETURNING id`,

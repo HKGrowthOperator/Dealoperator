@@ -105,7 +105,7 @@ test("a split share is never invented and never rounded", async () => {
   assert.equal(new Set(keys).size, keys.length);
 });
 
-test("history endpoint rejects malformed, future and mismatched date selections", async () => {
+test("history endpoint requires membership before revealing any result", async () => {
   for (const query of [
     "month=2026-13",
     "month=2099-01",
@@ -116,7 +116,7 @@ test("history endpoint rejects malformed, future and mismatched date selections"
     const response = await GET(
       new Request(`http://localhost/api/ranking/month?${query}`),
     );
-    assert.equal(response.status, 400, query);
+    assert.equal(response.status, 401, query);
     assert.equal(response.headers.get("cache-control"), "private, no-store");
   }
 });

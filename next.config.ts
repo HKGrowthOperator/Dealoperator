@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 const config: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
+  // Private profile photos must never enter the public image-optimizer cache.
+  images: {
+    localPatterns: [
+      { pathname: "/icon-192.png", search: "" },
+      { pathname: "/icon-512.png", search: "" },
+      { pathname: "/operator-mark-source.png", search: "" },
+      { pathname: "/apple-icon.png", search: "" },
+    ],
+  },
   // web-push bringt eigene Krypto- und HTTP-Abhängigkeiten mit und läuft nur
   // serverseitig; nicht bündeln.
   serverExternalPackages: ["pg", "web-push"],

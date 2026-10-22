@@ -160,7 +160,7 @@ test("Freischalten: nur Admins, nur wartende Registrierungen; neu wird freigegeb
   const r = await confirmRegistrationByTeam(db, admin, { id: request });
   assert.deepEqual(r, { ok: true, kind: "new", name: "Lena Beispiel", bound: true });
   const [row] = await db.query("SELECT status,owner FROM onboarding_requests WHERE id=$1", [request]);
-  assert.deepEqual({ ...row }, { status: "approved", owner: user });
+  assert.deepEqual({ ...row }, { status: "pending", owner: user });
   assert.equal((await db.query("SELECT email FROM account_private WHERE owner=$1", [user]))[0].email, email);
   assert.ok((await userRow(user)).email_confirmed_at);
   const [event] = await db.query("SELECT actor FROM onboarding_events WHERE request=$1 AND action='team_confirmed'", [request]);

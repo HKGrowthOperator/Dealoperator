@@ -10,7 +10,7 @@ const env = {
   HOSTNAME: "127.0.0.1",
   NODE_ENV: "production",
 };
-for (const name of [
+for (const k of [
   "APP_URL",
   "SUPABASE_URL",
   "SUPABASE_PUBLISHABLE_KEY",
@@ -21,119 +21,96 @@ for (const name of [
   "CRON_SECRET",
   "DISCORD_PUBLIC_KEY",
 ])
-  delete env[name];
+  delete env[k];
 const child = spawn(process.execPath, [".next/standalone/server.js"], {
   env,
   stdio: "pipe",
 });
 let log = "";
-child.stdout.on("data", (x) => (log += x));
-child.stderr.on("data", (x) => (log += x));
+child.stdout.on("data", (v) => (log += v));
+child.stderr.on("data", (v) => (log += v));
 const base = "http://127.0.0.1:5175";
 try {
-  let alive = false;
-  for (let attempt = 0; attempt < 40; attempt++) {
-    if (child.exitCode !== null)
-      throw Error("Standalone process exited before becoming ready.");
+  let ready = false;
+  for (let i = 0; i < 40; i++) {
+    if (child.exitCode !== null) throw Error("Standalone exited.");
     try {
-      alive = (await fetch(base + "/api/health")).ok;
+      ready = (await fetch(base + "/api/health")).ok;
     } catch {}
-    if (alive) break;
+    if (ready) break;
     await delay(250);
   }
-  assert.ok(alive, "Standalone process did not become ready");
-  for (const path of [
-    "/",
-    "/ranking",
+  assert.ok(ready, "Standalone becomes healthy");
+  for (const p of [
     "/starten",
     "/anmelden",
-    "/verwaltung",
-    "/heute?modus=demo",
-    "/partner?modus=demo",
-    "/reflexion?modus=demo",
-    "/sessions?modus=demo",
-    "/wissen?modus=demo",
-    "/profil?modus=demo",
-    "/so-funktionierts?modus=demo",
+    "/impressum",
+    "/datenschutz",
     "/fonts/manrope-400.ttf",
     "/operator-mark-source.png",
     "/favicon.svg",
     "/manifest.webmanifest",
     "/sw.js",
     "/icon-192.png",
-  ]) {
-    const response = await fetch(base + path);
-    assert.equal(response.status, 200, path);
-  }
-  // Mitgliederbereiche führen zur Anmeldung, nicht durch die Profilauswahl.
-  for (const path of [
-    "/heute",
-    "/zahlen?modus=eigen",
-    "/start",
-    "/status",
+  ])
+    assert.equal((await fetch(base + p)).status, 200, p);
+  // Missing configuration fails closed, including old demo/snapshot and image-extension paths.
+  for (const p of [
+    "/",
+    "/ranking",
+    "/mitglieder",
+    "/mitglieder/mein-profil",
+    "/mitglieder/unknown",
+    "/calls",
+    "/partner?modus=demo",
+    "/sessions?modus=eigen",
+    "/reflexionen",
     "/tagesabschluss",
+    "/so-funktionierts",
+    "/fuer-wen",
+    "/llms.txt",
+    "/llms-full.txt",
+    "/api/ranking",
+    "/api/ranking/week",
+    "/api/ranking/month",
+    "/api/ranking/dranbleiben",
+    "/api/community",
+    "/api/reflections",
+    "/api/events",
+    "/api/members",
+    "/api/members/avatar?id=unknown",
+    "/api/members/avatar.png",
+    "/_next/image?url=%2Fapi%2Fmembers%2Favatar%3Fid%3Dunknown&w=128&q=75",
   ]) {
-    const response = await fetch(base + path, { redirect: "manual" });
-    assert.equal(response.status, 307, path);
+    const r = await fetch(base + p, { redirect: "manual" });
+    assert.equal(r.status, 503, p);
+    assert.match(r.headers.get("cache-control") || "", /no-store/, p);
+    const body = await r.json();
     assert.ok(
-      response.headers.get("location")?.includes("/anmelden"),
-      `${path} -> ${response.headers.get("location")}`,
+      !("rows" in body) && !("members" in body) && !("events" in body),
+      p,
     );
   }
-  // Frühere Bereichsadressen leiten auf die neuen Pfade um, mit Modus.
-  for (const [from, to] of [
-    ["/crew?modus=demo", "/partner?modus=demo"],
-    ["/crew", "/partner"],
-    ["/community?modus=eigen", "/so-funktionierts?modus=eigen"],
-    ["/community", "/so-funktionierts"],
-    ["/partnerregister?modus=eigen", "/partner?modus=eigen"],
-    ["/beitreten", "/starten"],
-    ["/beitreten?profil=abc&einladung=x&next=%2Fheute", "/starten?profil=abc&einladung=x&next=%2Fheute"],
-  ]) {
-    const response = await fetch(base + from, { redirect: "manual" });
-    assert.equal(response.status, 307, from);
-    const location = new URL(response.headers.get("location") || "", base);
-    assert.equal(location.pathname + location.search + location.hash, to, from);
-  }
-  // Profilübernahme ohne Anmeldung führt in den Start, Profil und Einladung
-  // bleiben erhalten.
-  const retired = await fetch(base + "/profil-uebernehmen?profil=abc&einladung=xyz", {
-    redirect: "manual",
-  });
-  assert.equal(retired.status, 307);
-  assert.ok(
-    retired.headers.get("location")?.includes("/starten?profil=abc&einladung=xyz"),
-    retired.headers.get("location") || "",
-  );
-  // Statusseite und Übernahme-Anfrage verlangen eine Anmeldung.
-  const status = await fetch(base + "/status", { redirect: "manual" });
-  assert.equal(status.status, 307);
-  assert.ok(status.headers.get("location")?.includes("/anmelden"));
-  const claim = await fetch(base + "/api/onboarding", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "claim", value: {} }),
-  });
-  assert.ok([401, 403, 503].includes(claim.status), `claim without login -> ${claim.status}`);
-  // Öffentliche Profilsuche ohne Konfiguration: ehrlich leer statt Fehler.
-  const search = await (await fetch(base + "/api/onboarding?q=test")).json();
-  assert.equal(search.ready, false);
-  assert.deepEqual(search.profiles, []);
-  for (const path of [
+  for (const p of [
     "/api/operator",
-    "/api/community",
-    "/api/closing",
     "/api/push",
-    "/api/reflections",
-    "/api/admin",
-    "/api/discord/connect",
+    "/api/onboarding?status=eigen",
   ])
-    assert.equal((await fetch(base + path)).status, 401, path);
-  // Service Worker nur vom eigenen Ursprung, ohne Cache.
+    assert.equal((await fetch(base + p)).status, 401, p);
+  for (const p of ["/start", "/status"]) {
+    const r = await fetch(base + p, { redirect: "manual" });
+    assert.equal(r.status, 307, p);
+    assert.ok(r.headers.get("location")?.includes("/anmelden"));
+  }
+  const claim = await fetch(
+    base + "/profil-uebernehmen?profil=abc&einladung=xyz",
+    { redirect: "manual" },
+  );
+  assert.equal(claim.status, 307);
+  assert.ok(claim.headers.get("location")?.includes("/starten"));
   const sw = await fetch(base + "/sw.js");
   assert.equal(sw.headers.get("service-worker-allowed"), "/");
   assert.match(sw.headers.get("cache-control") || "", /no-cache/);
-  // Ohne gesetzte Geheimnisse gibt es Cron- und Discord-Eingänge nicht.
   assert.equal(
     (await fetch(base + "/api/cron/tick", { method: "POST" })).status,
     404,
@@ -147,63 +124,26 @@ try {
     ).status,
     404,
   );
-  // Öffentlich: Event-Tage und Dranbleiben-Rangliste ehrlich leer ohne Datenbank.
-  assert.deepEqual((await (await fetch(base + "/api/events")).json()).events, []);
-  assert.deepEqual(
-    (await (await fetch(base + "/api/ranking/dranbleiben")).json()).rows,
-    [],
-  );
-  assert.equal(
-    (await fetch(base + "/api/onboarding?status=eigen")).status,
-    401,
-  );
-  const ready = await fetch(base + "/api/ready");
-  assert.equal(ready.status, 503);
-  assert.equal((await ready.json()).ready, false);
-  // Ohne Datenbank trägt die freigegebene Momentaufnahme die öffentliche
-  // Ansicht: echte gemeldete Zahlen, klar gekennzeichnet, ohne private Felder.
-  // Fester Tag der Momentaufnahme, damit der Test nicht vom Datum abhängt.
-  const ranking = await (
-    await fetch(base + "/api/ranking?from=2026-09-22&to=2026-09-22")
-  ).json();
-  assert.equal(ranking.ready, true);
-  assert.equal(ranking.snapshot, true);
-  assert.match(ranking.label, /Gemeldeter Stand/);
-  assert.equal(ranking.rows.length, 23);
-  const totals = (key) =>
-    ranking.rows
-      .map((r) => r.counts[key])
-      .filter((v) => v !== null)
-      .reduce((a, b) => a + b, 0);
-  assert.equal(totals("attempts"), 1416);
-  assert.equal(totals("settingsBooked"), 34);
-  assert.equal(totals("closingsBooked"), 2);
-  assert.equal(totals("legacyMeetings"), 4);
-  assert.ok(ranking.rows.every((r) => r.counts.dealsWon === null));
-  assert.ok(ranking.rows.every((r) => r.claimed === false));
-  for (const field of ["email", "phone", "import_key", "source_url", "note"])
-    assert.ok(
-      !JSON.stringify(ranking.rows).includes(field),
-      `Rangliste darf ${field} nicht ausliefern`,
-    );
-  const html = await (await fetch(base + "/")).text();
+  const health = await fetch(base + "/api/ready");
+  assert.equal(health.status, 503);
+  assert.equal((await health.json()).ready, false);
+  const login = await (await fetch(base + "/starten")).text();
+  assert.match(login, /Vor- und Nachname/);
   assert.ok(
-    !/kostenlos|Beispieldaten|fiktiv|whatsapp|partnerregister/i.test(html),
-    "Unexpected public copy",
+    !/Sales.Community|Nummer bleibt privat|E-Mail und Nummer sind nur/.test(
+      login,
+    ),
   );
-  assert.ok(!/href="https:\/\/(?:discord.gg|discord.com)/.test(html), "Public navigation must not lead to Discord");
-  assert.match(html, /Call-Partner/);
-  assert.match(html, /Zusammen callen/);
-  assert.match(html, /Gemeinsam dranbleiben/);
-  // /reflexionen ohne Anmeldung: Erklärung statt fremder Reflexionen.
-  const feedPage = await fetch(base + "/reflexionen", { redirect: "manual" });
-  assert.ok([200, 307].includes(feedPage.status), "/reflexionen");
+  assert.match(
+    await (await fetch(base + "/robots.txt")).text(),
+    /Disallow: \//,
+  );
   console.log(
-    "Standalone smoke passed: routes, assets, login gates, private API protection and honest readiness. No external services were contacted.",
+    "Standalone smoke passed: entry, assets, approval boundaries, private data/photo APIs, no anonymous snapshot or extension bypass. No external service contacted.",
   );
-} catch (error) {
+} catch (e) {
   console.error(log);
-  throw error;
+  throw e;
 } finally {
   child.kill("SIGTERM");
 }

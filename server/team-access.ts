@@ -67,8 +67,8 @@ const NO_PASSWORD =
 /**
  * Hängende Registrierung freischalten. Nur Admins, nur für Anfragen, die auf
  * die Bestätigung warten, und nur, wenn es ein Konto mit Passwort gibt. Danach
- * wird die Anfrage wie nach dem Klick auf den Link gebunden: „neu“ ist sofort
- * freigegeben, eine Übernahme geht in die Teamprüfung.
+ * wird die Anfrage wie nach dem Klick auf den Link gebunden: neue Zugänge und Übernahmen
+ * gehen beide in die Teamprüfung.
  */
 export async function confirmRegistrationByTeam(db: Database, actor: Actor, raw: unknown) {
   await requireAdminReady(db, actor, "Freischalten können nur Admins.");
