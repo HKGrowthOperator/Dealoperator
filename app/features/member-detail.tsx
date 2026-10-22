@@ -70,8 +70,8 @@ export default function MemberDetail({
           </section>
           {m.projects && (
             <section className="mn-section">
-              <p className="mn-eyebrow">In Arbeit</p>
-              <h2>Aktuelle Projekte</h2>
+              <p className="mn-eyebrow">Erfahrung aus der Praxis</p>
+              <h2>Projekte & Erfahrungen</h2>
               <p className="mn-lines">{m.projects}</p>
             </section>
           )}

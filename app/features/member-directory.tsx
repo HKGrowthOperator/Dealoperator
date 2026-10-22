@@ -5,7 +5,6 @@ import {
   Search,
   Phone,
   Mail,
-  MapPin,
   SlidersHorizontal,
   UsersRound,
 } from "lucide-react";
@@ -43,74 +42,64 @@ export function MemberPhoto({
     </span>
   );
 }
+export function NetworkTabs({
+  active = "members",
+}: {
+  active?: "members" | "offers";
+}) {
+  return (
+    <nav className="nw-tabs" aria-label="Mitgliederbereich">
+      <Link
+        href="/mitglieder"
+        aria-current={active === "members" ? "page" : undefined}
+      >
+        Mitglieder
+      </Link>
+      <Link
+        href="/mitglieder/angebote"
+        aria-current={active === "offers" ? "page" : undefined}
+      >
+        Angebote
+      </Link>
+    </nav>
+  );
+}
 export default function MemberDirectory({
   members,
 }: {
   members: DirectoryMember[];
 }) {
-  const [query, setQuery] = useState(""),
-    [available, setAvailable] = useState(false);
-  const [scope, setScope] = useState<"angebote" | "gesuche" | "projekte">(
-    "angebote",
-  );
-  const [limit, setLimit] = useState(24);
+  const [query, setQuery] = useState("");
+  const [available, setAvailable] = useState(false),
+    [limit, setLimit] = useState(24);
   const shown = useMemo(
     () =>
       members.filter(
-        (v) =>
-          v.listed &&
-          (scope !== "gesuche" || !!v.lookingFor) &&
-          (scope !== "projekte" || !!v.projects) &&
-          (!available || v.availability === "offen") &&
-          matchesMember(v, query, scope),
+        (m) =>
+          m.listed &&
+          (!available || m.availability === "offen") &&
+          matchesMember(m, query),
       ),
-    [members, query, available, scope],
+    [members, query, available],
   );
-  const tags = [
-    ...new Set(members.filter((m) => m.listed).flatMap((m) => m.services)),
-  ]
-    .sort((a, b) => a.localeCompare(b, "de"))
-    .slice(0, 7);
   return (
-    <main id="inhalt" className="mn-page">
+    <main id="inhalt" className="mn-page nw-directory nw-members">
+      <NetworkTabs />
       <header className="mn-heading">
         <div>
-          <p className="mn-eyebrow">Zusammenarbeit</p>
+          <p className="mn-eyebrow">Know-how & Kontakte</p>
           <h1>
-            Finde das passende
-            <br />
-            <span>Know-how.</span>
+            Mitglieder<span>.</span>
           </h1>
-          <p>Angebote, Gesuche und Projekte an einem Ort.</p>
         </div>
         <Link className="btn secondary" href="/mitglieder/mein-profil">
-          Mein Profil bearbeiten
+          Mein Profil
         </Link>
       </header>
-      <section className="mn-search-panel" aria-label="Mitglieder suchen">
-        <nav className="mn-search-scopes" aria-label="Was suchst du?">
-          {(["angebote", "gesuche", "projekte"] as const).map((value) => (
-            <button
-              type="button"
-              className={scope === value ? "active" : ""}
-              key={value}
-              aria-pressed={scope === value}
-              onClick={() => {
-                setScope(value);
-                setLimit(24);
-              }}
-            >
-              {value === "angebote"
-                ? "Angebote"
-                : value === "gesuche"
-                  ? "Gesuche"
-                  : "Projekte"}
-            </button>
-          ))}
-        </nav>
+      <div className="nw-searchbar">
         <label className="mn-search">
-          <Search size={22} aria-hidden="true" />
-          <span className="sr-only">Name, Angebot oder Branche suchen</span>
+          <Search size={21} aria-hidden="true" />
+          <span className="sr-only">Mitglieder suchen</span>
           <input
             type="search"
             value={query}
@@ -118,7 +107,7 @@ export default function MemberDirectory({
               setQuery(e.target.value);
               setLimit(24);
             }}
-            placeholder="Zum Beispiel Recruiting Handwerk"
+            placeholder="Name, Tätigkeit oder Branche"
             autoComplete="off"
           />
           {query && (
@@ -131,72 +120,54 @@ export default function MemberDirectory({
             </button>
           )}
         </label>
-        <div className="mn-filters">
-          {!query && (
-            <div className="mn-tags">
-              {tags.map((tag) => (
-                <button
-                  key={tag}
-                  className={query === tag ? "active" : ""}
-                  onClick={() => setQuery(query === tag ? "" : tag)}
-                  aria-pressed={query === tag}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          )}
-          <button
-            className={`mn-filter ${available ? "active" : ""}`}
-            onClick={() => setAvailable(!available)}
-            aria-pressed={available}
-          >
-            <SlidersHorizontal size={16} />
-            Offen für Zusammenarbeit
-          </button>
-        </div>
-      </section>
+        <button
+          className={`mn-filter ${available ? "active" : ""}`}
+          aria-pressed={available}
+          onClick={() => setAvailable(!available)}
+        >
+          <SlidersHorizontal size={16} />
+          Offen für Zusammenarbeit
+        </button>
+      </div>
       <p className="mn-results" role="status">
-        {shown.length}{" "}
-        {shown.length === 1 ? "passendes Profil" : "passende Profile"}
+        {shown.length} {shown.length === 1 ? "Mitglied" : "Mitglieder"}
+        {query && <> für „{query}“</>}
       </p>
-      <div className="mn-grid">
+      <div className="nw-people">
         {shown.slice(0, limit).map((m) => (
-          <article className="mn-card" key={m.id}>
-            <div className="mn-person">
+          <article className="nw-person" key={m.id}>
+            <Link
+              className="nw-person-identity"
+              href={`/mitglieder/${encodeURIComponent(m.id)}`}
+            >
               <MemberPhoto member={m} />
               <div>
-                <h2>
-                  <Link href={`/mitglieder/${encodeURIComponent(m.id)}`}>
-                    {m.name}
-                  </Link>
-                </h2>
-                {m.company && <p>{m.company}</p>}
-                {m.location && (
-                  <p className="mn-location">
-                    <MapPin size={13} />
-                    {m.location}
-                  </p>
+                <h2>{m.name}</h2>
+                <p>{m.headline}</p>
+                {(m.company || m.location) && (
+                  <small>
+                    {[m.company, m.location].filter(Boolean).join(" · ")}
+                  </small>
                 )}
               </div>
+            </Link>
+            <div className="nw-expertise">
+              <p>{m.services.slice(0, 3).join(" · ")}</p>
+              <span>{m.industries.slice(0, 3).join(" · ")}</span>
+              {m.references.length > 0 && (
+                <small>
+                  {m.references.length}{" "}
+                  {m.references.length === 1
+                    ? "Projekteinblick"
+                    : "Projekteinblicke"}
+                </small>
+              )}
             </div>
-            <p className="mn-headline">{m.headline}</p>
-            <div className="mn-tags">
-              {[...m.services, ...m.industries].slice(0, 5).map((v, i) => (
-                <span key={`${v}-${i}`}>{v}</span>
-              ))}
-            </div>
-            {m.lookingFor && (
-              <div className="mn-seeking">
-                <span>Ich suche gerade</span>
-                <p>{m.lookingFor}</p>
-              </div>
-            )}
-            <div className="mn-card-foot">
+            <div className="nw-person-contact">
               <span className={`mn-status ${m.availability}`}>
                 {AVAILABILITY[m.availability]}
               </span>
-              <div className="mn-actions">
+              <div>
                 <Link
                   className="btn secondary"
                   href={`/mitglieder/${encodeURIComponent(m.id)}`}
@@ -225,32 +196,34 @@ export default function MemberDirectory({
           </article>
         ))}
       </div>
+      {!shown.length && (
+        <div className="mn-empty">
+          <UsersRound size={28} />
+          <h2>
+            {query
+              ? "Noch kein passender Treffer."
+              : "Hier entsteht das Verzeichnis."}
+          </h2>
+          <p>
+            {query
+              ? "Versuche eine andere Tätigkeit oder Branche. Unter Angebote kannst du einen Auftrag zur Weitergabe einstellen."
+              : "Mitglieder ergänzen ihre Tätigkeit, Erfahrungen und Kontaktmöglichkeiten im Profil."}
+          </p>
+          <Link
+            className="btn secondary"
+            href={query ? "/mitglieder/angebote" : "/mitglieder/mein-profil"}
+          >
+            {query ? "Zu den Angeboten" : "Mein Profil ergänzen"}
+          </Link>
+        </div>
+      )}
       {shown.length > limit && (
         <button
-          type="button"
           className="btn secondary mn-more"
           onClick={() => setLimit(limit + 24)}
         >
-          Weitere Profile anzeigen
+          Weitere Mitglieder
         </button>
-      )}
-      {!shown.length && (
-        <section className="mn-empty">
-          <UsersRound size={32} />
-          <h2>
-            {members.some((m) => m.listed)
-              ? "Noch kein passender Treffer."
-              : "Hier beginnt die Zusammenarbeit."}
-          </h2>
-          <p>
-            {members.some((m) => m.listed)
-              ? "Probiere ein Angebot, eine Branche oder einen Namen."
-              : "Zeig, was du machst und wobei du Unterstützung suchst."}
-          </p>
-          <Link className="btn primary" href="/mitglieder/mein-profil">
-            Eigenes Profil ergänzen
-          </Link>
-        </section>
       )}
     </main>
   );

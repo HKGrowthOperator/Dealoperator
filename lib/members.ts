@@ -119,3 +119,37 @@ export function matchesMember(
     (word) => haystack.includes(word) || concepts.includes(word),
   );
 }
+
+/** Minimal useful directory profile; projects/references remain optional. */
+export function profileMissing(profile: MemberProfile): string[] {
+  return [
+    ...(profile.headline.trim().length < 3 ? ["Tätigkeit"] : []),
+    ...(!profile.services.length ? ["Leistungen"] : []),
+    ...(!profile.industries.length ? ["Branchen"] : []),
+    ...(profile.about.trim().length < 20 ? ["Kurzvorstellung"] : []),
+    ...(!profile.contactEmail && !profile.contactPhone ? ["Kontakt"] : []),
+  ];
+}
+export const memberOfferSchema = z
+  .object({
+    id: z.string().uuid().optional(),
+    title: text(100).min(3, "Gib deinem Angebot einen Titel."),
+    description: text(1600).min(
+      20,
+      "Beschreibe kurz, worum es geht (mindestens 20 Zeichen).",
+    ),
+    category: z.enum([
+      "Auftrag weitergeben",
+      "Zusammenarbeit",
+      "Freie Kapazitäten",
+    ]),
+    industry: text(100),
+  })
+  .strict();
+export type MemberOfferInput = z.infer<typeof memberOfferSchema>;
+export type MemberOffer = Omit<MemberOfferInput, "id"> & {
+  id: string;
+  createdAt: string;
+  closed: boolean;
+  member: DirectoryMember;
+};

@@ -24,7 +24,12 @@ import "../flow.css";
  * gleich aussehen und sich gleich verhalten.
  */
 
-export type Profile = { id: string; name: string; company: string; role: string };
+export type Profile = {
+  id: string;
+  name: string;
+  company: string;
+  role: string;
+};
 
 /** Gemeinsame Teamprofile tragen ihre Kennzeichnung in der Rolle. */
 export const isTeamProfile = (p: Profile | null | undefined) =>
@@ -44,7 +49,11 @@ export class RequestError extends Error {
 }
 
 /** GET ohne body, POST mit body. Fehler kommen mit Feld und Wartezeit zurück. */
-export async function call<T>(url: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+export async function call<T>(
+  url: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   let response: Response;
   try {
     response = await fetch(
@@ -111,7 +120,13 @@ export function useCountdown(initial = 0): [number, (seconds: number) => void] {
 const clock = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-export function FlowProgress({ steps, current }: { steps: string[]; current: number }) {
+export function FlowProgress({
+  steps,
+  current,
+}: {
+  steps: string[];
+  current: number;
+}) {
   return (
     <div className="flow-progress">
       <p>
@@ -124,7 +139,9 @@ export function FlowProgress({ steps, current }: { steps: string[]; current: num
         {steps.map((label, index) => (
           <li
             key={label}
-            data-state={index < current ? "done" : index === current ? "current" : "open"}
+            data-state={
+              index < current ? "done" : index === current ? "current" : "open"
+            }
           />
         ))}
       </ol>
@@ -255,7 +272,9 @@ export function ProfileSearch({
             aria-describedby={`${id}-status`}
             placeholder="Vor- oder Nachname"
           />
-          {state === "loading" && <LoaderCircle className="spin" size={18} aria-hidden="true" />}
+          {state === "loading" && (
+            <LoaderCircle className="spin" size={18} aria-hidden="true" />
+          )}
         </div>
         <p id={`${id}-status`} className="flow-note" aria-live="polite">
           {status}
@@ -287,7 +306,9 @@ export function ProfileSearch({
                   <span>
                     <strong>{p.name}</strong>
                     <small>
-                      {isTeamProfile(p) ? "Gemeinsames Teamprofil" : profileMeta(p) || "Vorbereitetes Profil"}
+                      {isTeamProfile(p)
+                        ? "Gemeinsames Teamprofil"
+                        : profileMeta(p) || "Vorbereitetes Profil"}
                     </small>
                   </span>
                   <ChevronRight size={18} aria-hidden="true" />
@@ -296,7 +317,11 @@ export function ProfileSearch({
             ))}
           </ul>
           {!showMissing ? (
-            <button type="button" className="flow-link" onClick={() => setShowMissing(true)}>
+            <button
+              type="button"
+              className="flow-link"
+              onClick={() => setShowMissing(true)}
+            >
               Mein Profil ist nicht dabei
             </button>
           ) : (
@@ -305,7 +330,10 @@ export function ProfileSearch({
         </>
       )}
 
-      {state === "done" && results.length === 0 && searchedFor === trimmed && notFound(trimmed, false)}
+      {state === "done" &&
+        results.length === 0 &&
+        searchedFor === trimmed &&
+        notFound(trimmed, false)}
     </div>
   );
 }
@@ -376,6 +404,8 @@ export function ContactFields({
   fields,
   email = "edit",
   hint = "none",
+  hintLabel = "Hinweis für das Team (optional)",
+  hintPlaceholder = "Zum Beispiel dein Name im Gruppenchat oder dein Unternehmen",
   nameSuggested = false,
   afterEmail,
 }: {
@@ -388,20 +418,32 @@ export function ContactFields({
   email?: "edit" | "hidden";
   /** none: kein Hinweisfeld; toggle: hinter einem Knopf; open: direkt sichtbar. */
   hint?: "none" | "toggle" | "open";
+  hintLabel?: string;
+  hintPlaceholder?: string;
   nameSuggested?: boolean;
 }) {
   const id = useId();
-  const [hintOpen, setHintOpen] = useState(hint === "open" || Boolean(value.hint));
+  const [hintOpen, setHintOpen] = useState(
+    hint === "open" || Boolean(value.hint),
+  );
   const register = (field: ContactField) => (el: HTMLElement | null) => {
     if (fields.current) fields.current[field] = el;
   };
   const described = (field: ContactField, note?: boolean) =>
-    errors[field] ? `${id}-${field}-error` : note ? `${id}-${field}-note` : undefined;
-  const oneWord = value.fullName.trim() !== "" && !/\S\s+\S/.test(value.fullName.trim());
+    errors[field]
+      ? `${id}-${field}-error`
+      : note
+        ? `${id}-${field}-note`
+        : undefined;
+  const oneWord =
+    value.fullName.trim() !== "" && !/\S\s+\S/.test(value.fullName.trim());
 
   return (
     <>
-      <div className="flow-field" data-invalid={errors.fullName ? "" : undefined}>
+      <div
+        className="flow-field"
+        data-invalid={errors.fullName ? "" : undefined}
+      >
         <label htmlFor={`${id}-name`}>Vor- und Nachname</label>
         <input
           id={`${id}-name`}
@@ -433,7 +475,10 @@ export function ContactFields({
       </div>
 
       {email === "edit" && (
-        <div className="flow-field" data-invalid={errors.email ? "" : undefined}>
+        <div
+          className="flow-field"
+          data-invalid={errors.email ? "" : undefined}
+        >
           <label htmlFor={`${id}-email`}>E-Mail</label>
           <input
             id={`${id}-email`}
@@ -501,7 +546,7 @@ export function ContactFields({
       {hint !== "none" &&
         (hintOpen ? (
           <div className="flow-field">
-            <label htmlFor={`${id}-hint`}>Hinweis für das Team (optional)</label>
+            <label htmlFor={`${id}-hint`}>{hintLabel}</label>
             <textarea
               id={`${id}-hint`}
               ref={register("hint")}
@@ -509,12 +554,17 @@ export function ContactFields({
               maxLength={300}
               value={value.hint}
               onChange={(e) => onChange({ hint: e.target.value })}
-              placeholder="Zum Beispiel dein Name im Gruppenchat oder dein Unternehmen"
+              placeholder={hintPlaceholder}
             />
           </div>
         ) : (
-          <button type="button" className="flow-link flow-add" onClick={() => setHintOpen(true)}>
-            <Plus size={16} aria-hidden="true" /> Hinweis für das Team hinzufügen
+          <button
+            type="button"
+            className="flow-link flow-add"
+            onClick={() => setHintOpen(true)}
+          >
+            <Plus size={16} aria-hidden="true" /> Hinweis für das Team
+            hinzufügen
           </button>
         ))}
     </>
@@ -572,7 +622,11 @@ export function PasswordField({
           aria-pressed={show}
           onClick={() => setShow((v) => !v)}
         >
-          {show ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+          {show ? (
+            <EyeOff size={18} aria-hidden="true" />
+          ) : (
+            <Eye size={18} aria-hidden="true" />
+          )}
         </button>
       </div>
       {error ? (
@@ -592,7 +646,8 @@ export function PasswordField({
 export function checkPassword(value: string) {
   if (!value) return "Bitte lege ein Passwort fest.";
   if (value.length < 8) return "Bitte nimm mindestens 8 Zeichen.";
-  if (new TextEncoder().encode(value).length > 72) return "Bitte nimm höchstens 72 Zeichen.";
+  if (new TextEncoder().encode(value).length > 72)
+    return "Bitte nimm höchstens 72 Zeichen.";
   return "";
 }
 
@@ -637,7 +692,13 @@ export function InAppHint({ codeEnabled }: { codeEnabled: boolean }) {
   );
 }
 
-export type SentPurpose = "new" | "claim" | "assign" | "signin" | "reset" | "newPassword";
+export type SentPurpose =
+  | "new"
+  | "claim"
+  | "assign"
+  | "signin"
+  | "reset"
+  | "newPassword";
 
 const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
   new: () => "Danach legst du dein Profil an und trägst deinen ersten Tag ein.",
@@ -645,7 +706,8 @@ const NEXT_STEP: Record<SentPurpose, (profile?: string) => string> = {
     `Danach prüft das Team deine Übernahme${profile ? ` von „${profile}“` : ""}. Freigeben kann nur das Team.`,
   assign: () =>
     "Danach sucht das Team dein Profil heraus und ordnet es dir zu. Den Stand siehst du nach der Bestätigung.",
-  signin: () => "Danach bist du angemeldet und landest direkt dort, wo du hinwolltest.",
+  signin: () =>
+    "Danach bist du angemeldet und landest direkt dort, wo du hinwolltest.",
   reset: () =>
     "Danach legst du ein Passwort fest. Ab dann meldest du dich mit E-Mail und Passwort an, ganz ohne Mail.",
   newPassword: () =>
@@ -719,7 +781,11 @@ export function EmailSent({
       return;
     }
     if (newPassword && password.length < 8) {
-      setPasswordError(password ? "Bitte nimm mindestens 8 Zeichen." : "Bitte lege ein neues Passwort fest.");
+      setPasswordError(
+        password
+          ? "Bitte nimm mindestens 8 Zeichen."
+          : "Bitte lege ein neues Passwort fest.",
+      );
       passwordRef.current?.focus();
       return;
     }
@@ -761,8 +827,8 @@ export function EmailSent({
         Bestätige deine E-Mail.
       </h1>
       <p className="flow-lead">
-        Wir haben dir eine Mail an <strong className="flow-address">{email}</strong>{" "}
-        geschickt.
+        Wir haben dir eine Mail an{" "}
+        <strong className="flow-address">{email}</strong> geschickt.
       </p>
 
       {error && (
@@ -799,14 +865,24 @@ export function EmailSent({
               aria-describedby={codeError ? `${id}-code-error` : undefined}
             />
             {codeError && (
-              <p id={`${id}-code-error`} className="flow-field-error" role="alert">
+              <p
+                id={`${id}-code-error`}
+                className="flow-field-error"
+                role="alert"
+              >
                 {codeError}
               </p>
             )}
           </div>
           {newPassword && (
             <>
-              <input type="hidden" name="email" autoComplete="username" value={email} readOnly />
+              <input
+                type="hidden"
+                name="email"
+                autoComplete="username"
+                value={email}
+                readOnly
+              />
               <PasswordField
                 value={password}
                 onChange={(value) => {
@@ -823,7 +899,9 @@ export function EmailSent({
           )}
           <button className="btn primary full" disabled={checking}>
             {checking && <LoaderCircle className="spin" size={18} />}
-            {newPassword ? "Passwort speichern und anmelden" : "Code bestätigen"}
+            {newPassword
+              ? "Passwort speichern und anmelden"
+              : "Code bestätigen"}
           </button>
         </form>
       )}
@@ -832,12 +910,16 @@ export function EmailSent({
         <strong>Wie es weitergeht</strong>
         <p>{NEXT_STEP[purpose](profileName)}</p>
         {saved && (
-          <p>Deine Angaben sind gespeichert. Du musst sie nicht erneut eingeben.</p>
+          <p>
+            Deine Angaben sind gespeichert. Du musst sie nicht erneut eingeben.
+          </p>
         )}
       </div>
 
       <p className="flow-status" aria-live="polite">
-        {resent ? "Wir haben dir eine neue Mail geschickt. Nur die neueste Mail gilt." : ""}
+        {resent
+          ? "Wir haben dir eine neue Mail geschickt. Nur die neueste Mail gilt."
+          : ""}
       </p>
 
       <div className="flow-actions">
@@ -848,9 +930,15 @@ export function EmailSent({
           disabled={resendIn > 0 || resending}
           aria-describedby={resendIn > 0 ? `${id}-wait` : undefined}
         >
-          {resending ? <LoaderCircle className="spin" size={18} /> : <RefreshCw size={16} />}
+          {resending ? (
+            <LoaderCircle className="spin" size={18} />
+          ) : (
+            <RefreshCw size={16} />
+          )}
           Erneut senden
-          {resendIn > 0 && <span className="flow-wait"> ({clock(resendIn)})</span>}
+          {resendIn > 0 && (
+            <span className="flow-wait"> ({clock(resendIn)})</span>
+          )}
         </button>
         {resendIn > 0 && (
           <span id={`${id}-wait`} className="sr-only">
@@ -871,7 +959,9 @@ export function EmailSent({
         {purpose === "new" || purpose === "claim" || purpose === "assign"
           ? "Kommt nichts an, melde dich beim Team. Es kann dich freischalten; danach meldest du dich mit E-Mail und Passwort an. "
           : ""}
-        {codeEnabled ? "Link und Code gelten nur einmal." : "Der Link gilt nur einmal."}
+        {codeEnabled
+          ? "Link und Code gelten nur einmal."
+          : "Der Link gilt nur einmal."}
       </p>
     </>
   );
@@ -882,7 +972,9 @@ export function SignInLine({ next }: { next?: string }) {
   return (
     <p className="flow-signin">
       Schon registriert?{" "}
-      <Link href={next ? `/anmelden?next=${encodeURIComponent(next)}` : "/anmelden"}>
+      <Link
+        href={next ? `/anmelden?next=${encodeURIComponent(next)}` : "/anmelden"}
+      >
         Anmelden
       </Link>
     </p>

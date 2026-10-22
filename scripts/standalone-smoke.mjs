@@ -42,6 +42,12 @@ try {
   }
   assert.ok(ready, "Standalone becomes healthy");
   for (const p of [
+    "/",
+    "/ranking",
+    "/api/ranking",
+    "/api/ranking/month",
+    "/api/ranking/dranbleiben",
+    "/api/events",
     "/starten",
     "/anmelden",
     "/impressum",
@@ -56,9 +62,9 @@ try {
     assert.equal((await fetch(base + p)).status, 200, p);
   // Missing configuration fails closed, including old demo/snapshot and image-extension paths.
   for (const p of [
-    "/",
-    "/ranking",
     "/mitglieder",
+    "/mitglieder/einrichten",
+    "/mitglieder/angebote",
     "/mitglieder/mein-profil",
     "/mitglieder/unknown",
     "/calls",
@@ -70,13 +76,8 @@ try {
     "/fuer-wen",
     "/llms.txt",
     "/llms-full.txt",
-    "/api/ranking",
-    "/api/ranking/week",
-    "/api/ranking/month",
-    "/api/ranking/dranbleiben",
     "/api/community",
     "/api/reflections",
-    "/api/events",
     "/api/members",
     "/api/members/avatar?id=unknown",
     "/api/members/avatar.png",
@@ -139,7 +140,7 @@ try {
     /Disallow: \//,
   );
   console.log(
-    "Standalone smoke passed: entry, assets, approval boundaries, private data/photo APIs, no anonymous snapshot or extension bypass. No external service contacted.",
+    "Standalone smoke passed: entry, assets, approval boundaries, public figures, private member/offers/photo APIs, no extension bypass. No external service contacted.",
   );
 } catch (e) {
   console.error(log);

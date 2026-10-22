@@ -1,4 +1,3 @@
-import { requireCurrentMember } from "@/server/member-session";
 import { database, databaseReady } from "@/server/database";
 import { latestPublicDay, publicRankingMonth } from "@/server/ranking-history";
 import { berlinDate, daySchema } from "@/lib/kpis";
@@ -12,7 +11,6 @@ import { errorResponse, json } from "@/server/http";
 
 export async function GET(request: Request) {
   try {
-    await requireCurrentMember();
     const params = new URL(request.url).searchParams;
     // Startansicht ohne gewählten Zeitraum: heute, oder der letzte Tag mit
     // Meldungen, wenn heute noch nichts gemeldet ist. Gewählte Tage und

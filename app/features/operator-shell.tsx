@@ -91,7 +91,7 @@ function areaOf(path: string): Area {
 const MAIN = [
   { area: "results", href: "/", label: "Ergebnisse" },
   { area: "day", href: "/tagesabschluss", label: "Mein Tag", only: "in" },
-  { area: "members", href: "/mitglieder", label: "Mitglieder", only: "in" },
+  { area: "members", href: "/mitglieder", label: "Mitglieder" },
   { area: "partner", href: "/calls", label: "Calls", only: "in" },
   {
     area: "how",
@@ -147,15 +147,11 @@ export function OperatorHeader({
   // Abgemeldet entfallen die eigenen Bereiche; „Anmelden“ steht rechts im
   // Kopf, außer wo das Formular oder die Zeile „Schon registriert?“ schon
   // steht. Solange der Anmeldestand noch lädt, bleibt die angemeldete Leiste.
-  const areas = (
-    signedIn && (viewer?.hasProfile !== false || viewer?.team) ? MAIN : []
-  ).filter((item) =>
-    !("only" in item)
-      ? true
-      : viewer
-        ? (item.only === "in") === signedIn
-        : item.only === "in",
-  );
+  const areas = MAIN.filter((item) => {
+    if (!("only" in item)) return true;
+    if (item.only === "out") return false;
+    return signedIn && (viewer?.hasProfile !== false || !!viewer?.team);
+  });
   const links = (
     <>
       {areas.map((item) => (
@@ -199,7 +195,9 @@ export function OperatorHeader({
           <div className="do-header-actions">
             {viewer && !signedIn && (
               <>
-                {path !== "/" && (
+                {!["/", "/starten", "/anmelden", "/beitreten"].includes(
+                  path,
+                ) && (
                   <Link
                     className="do-button do-button-quiet do-hide-mobile"
                     href="/starten"

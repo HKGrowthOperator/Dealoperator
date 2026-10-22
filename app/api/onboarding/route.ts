@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { cookies } from "next/headers";
-import { authClient, authReady, getCurrentUser } from "@/server/auth";
+import { authClient, authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { body, errorResponse, json } from "@/server/http";
 import { AppError, clearRateLimit, rateLimit } from "@/server/operator";
@@ -230,6 +230,9 @@ export async function POST(request: Request) {
     // Angaben wieder an, aber nur diesem Browser (Geheimnis im Cookie, Beleg
     // am Absenden). Schon vor dem Versand gesetzt, damit die Angaben auch nach
     // einem abgelehnten Versand nicht verloren sind.
+    const next = safeNext(
+      typeof raw.next === "string" ? raw.next : "/tagesabschluss",
+    );
     const browser = browserSecret();
     const created = await startRequest(db, value, browser.proof);
     (await cookies()).set(
@@ -254,11 +257,7 @@ export async function POST(request: Request) {
       options: {
         // Neue Profile landen nach der Einrichtung beim ersten Tagesabschluss;
         // Übernahmen führt /start zum Prüfstatus.
-        emailRedirectTo: emailRedirect(
-          "/tagesabschluss",
-          "starten",
-          created.id,
-        ),
+        emailRedirectTo: emailRedirect(next, "starten", created.id),
         // Wird in der Vorlage nur angezeigt, nie für Zugriffsentscheidungen
         // verwendet. Die Berechtigung entsteht ausschließlich serverseitig.
         data: { onboarding_kind: created.kind, has_password: true },
@@ -283,7 +282,7 @@ export async function POST(request: Request) {
       return json({
         ok: true,
         signedIn: true,
-        next: "/start?next=%2Ftagesabschluss",
+        next: `/start?next=${encodeURIComponent(next)}`,
       });
     // Beleg für „Mail geschickt“ (Übergabe an Supabase), und ein neuer Code
     // hebt die Sperre für Codeversuche auf.

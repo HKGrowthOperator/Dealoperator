@@ -10,6 +10,10 @@ import {
   saveAvatar,
   memberAvatar,
   validateAvatar,
+  networkReady,
+  changeMemberOffer,
+  listMemberOffers,
+  saveNetworkDraft,
 } from "../server/members";
 import { memberAccess, requireMember } from "../server/member-access";
 import {
@@ -18,6 +22,7 @@ import {
   memberProfileSchema,
   type DirectoryMember,
 } from "../lib/members";
+import { safeNext } from "../lib/navigation";
 import { isPublicEntry } from "../lib/member-access";
 import {
   startRequest,
@@ -63,11 +68,21 @@ async function member(owner: string, name: string) {
       goal: 100,
       days: [1, 2],
       listed: true,
+      network: {
+        ...emptyMemberProfile,
+        listed: true,
+        headline: "Beratung für B2B",
+        services: ["Beratung"],
+        industries: ["B2B"],
+        about: "Ich helfe Unternehmen bei der Umsetzung ihrer Projekte.",
+        contactEmail: owner + "@example.invalid",
+      },
     }),
   ]);
 }
 const profile = {
   ...emptyMemberProfile,
+  about: "Ich unterstütze Betriebe bei der Gewinnung passender Mitarbeiter.",
   listed: true,
   headline: "Recruiting für Handwerker",
   services: ["Recruiting"],
@@ -127,13 +142,13 @@ test("directory publishes only member-written contact fields, never imported or 
   await saveMemberProfile(db, b, {
     ...profile,
     contactPhone: "",
-    contactEmail: "",
+    contactEmail: "public@example.invalid",
   });
-  const rows = await directory(db, a);
+  const rows = (await directory(db, a)).filter((m) => m.id === "p-b");
   assert.equal(rows.length, 1);
   assert.equal(rows[0].name, "Ben Beispiel");
   assert.equal(rows[0].contactPhone, "");
-  assert.equal(rows[0].contactEmail, "");
+  assert.equal(rows[0].contactEmail, "public@example.invalid");
   assert.ok(!JSON.stringify(rows).includes("secret@example"));
   assert.ok(!("owner" in rows[0]));
 });
@@ -168,8 +183,11 @@ test("unpublished profiles are invisible to others and remain editable by their 
   await member("a", "Anna Beispiel");
   await member("b", "Ben Beispiel");
   await saveMemberProfile(db, b, { ...profile, listed: false });
-  assert.equal((await directory(db, a)).length, 0);
-  assert.equal((await directory(db, b)).length, 1);
+  assert.equal(
+    (await directory(db, a)).some((m) => m.id === "p-b"),
+    false,
+  );
+  assert.equal((await ownMemberProfile(db, b)).profile.listed, false);
   await assert.rejects(memberAvatar(db, a, "p-b"), /gibt es nicht/);
 });
 test("search combines offer and industry; Handwerker and Handwerksbetriebe match Handwerk", () => {
@@ -230,10 +248,10 @@ test("entry lookup shows names only and never offers claimed accounts", async ()
   assert.equal(found.length, 1);
 });
 test("private routes have no image-extension, API, roster or content-summary exception", () => {
+  assert.equal(safeNext("/mitglieder/p-existing-123"), "/mitglieder/p-existing-123");
+  assert.equal(safeNext("//example.invalid/mitglieder"), "/");
+  assert.equal(safeNext("/mitglieder/../verwaltung"), "/");
   for (const p of [
-    "/",
-    "/ranking",
-    "/api/ranking",
     "/api/community",
     "/mitglieder",
     "/api/members/avatar",
@@ -244,6 +262,10 @@ test("private routes have no image-extension, API, roster or content-summary exc
   ])
     assert.equal(isPublicEntry(p), false, p);
   for (const p of [
+    "/",
+    "/ranking",
+    "/api/ranking",
+    "/api/ranking/month",
     "/anmelden",
     "/starten",
     "/api/auth",
@@ -279,4 +301,113 @@ test("removed avatars disappear from directory links", async () => {
   await saveMemberProfile(db, a, profile);
   await saveAvatar(db, a, { data: "" });
   assert.equal((await directory(db, a))[0].avatarUrl, "");
+});
+
+const offer = {
+  title: "Recruiting-Auftrag weitergeben",
+  description: "Ein Handwerksbetrieb sucht Unterstützung beim Recruiting.",
+  category: "Auftrag weitergeben" as const,
+  industry: "Handwerk",
+};
+test("members finish their profile once before browsing; call preferences and identity survive", async () => {
+  await member("a", "Anna Beispiel");
+  await db.query("UPDATE profiles SET data=$2 WHERE id=$1", [
+    "a",
+    JSON.stringify({ goal: 90, network: { ...emptyMemberProfile } }),
+  ]);
+  assert.equal(await networkReady(db, a), false);
+  await assert.rejects(directory(db, a), /Vervollständige/);
+  await saveMemberProfile(db, a, profile);
+  assert.equal(await networkReady(db, a), true);
+  assert.equal((await directory(db, a))[0].id, "p-a");
+  assert.equal(
+    JSON.parse(
+      (await db.query("SELECT data FROM profiles WHERE id='a'"))[0].data,
+    ).goal,
+    90,
+  );
+});
+test("a new access request retains the referral message for team review", async () => {
+  const r = await startRequest(db, {
+    kind: "new",
+    fullName: "Anna Beispiel",
+    email: a.email,
+    phone: "+491701234567",
+    hint: "Ich komme über einen bestehenden Teilnehmer.",
+  });
+  const [row] = await db.query(
+    "SELECT hint,status FROM onboarding_requests WHERE id=$1",
+    [r.id],
+  );
+  assert.match(row.hint, /bestehenden Teilnehmer/);
+  assert.equal(row.status, "awaiting_email");
+});
+test("offers stay private, use the real author and can only be changed by their owner", async () => {
+  await member("a", "Anna Beispiel");
+  await member("b", "Ben Beispiel");
+  const created = await changeMemberOffer(db, a, "save", offer);
+  const read = await listMemberOffers(db, b);
+  assert.equal(read[0].id, created.id);
+  assert.equal(read[0].member.id, "p-a");
+  await assert.rejects(
+    changeMemberOffer(db, b, "delete", { id: created.id }),
+    /gehört nicht/,
+  );
+  await assert.rejects(
+    changeMemberOffer(db, a, "save", { ...offer, owner: "b" }),
+    /Unrecognized/,
+  );
+  await assert.rejects(
+    listMemberOffers(db, { ...a, userId: "stranger" }),
+    /freigegeben/,
+  );
+  await changeMemberOffer(db, a, "close", { id: created.id });
+  assert.equal((await listMemberOffers(db, b)).length, 0);
+  assert.equal((await listMemberOffers(db, a))[0].closed, true);
+  await changeMemberOffer(db, a, "delete", { id: created.id });
+  assert.equal((await listMemberOffers(db, a)).length, 0);
+});
+test("offer updates and profile updates preserve one another; unlisted authors disappear", async () => {
+  await member("a", "Anna Beispiel");
+  await member("b", "Ben Beispiel");
+  const created = await changeMemberOffer(db, a, "save", offer);
+  await saveMemberProfile(db, a, {
+    ...profile,
+    headline: "Recruiting mit Erfahrung",
+  });
+  assert.equal((await listMemberOffers(db, b))[0].id, created.id);
+  await changeMemberOffer(db, a, "save", {
+    ...offer,
+    id: created.id,
+    title: "Korrigierter Auftrag",
+  });
+  assert.equal(
+    (await ownMemberProfile(db, a)).profile.headline,
+    "Recruiting mit Erfahrung",
+  );
+  await saveMemberProfile(db, a, { ...profile, listed: false });
+  assert.equal((await listMemberOffers(db, b)).length, 0);
+});
+
+test("a saved onboarding draft restores the step and text but never grants directory access", async () => {
+  await member("a", "Anna Beispiel");
+  await db.query("UPDATE profiles SET data=$2 WHERE id=$1", [
+    "a",
+    JSON.stringify({ goal: 140 }),
+  ]);
+  await saveNetworkDraft(db, a, { profile, step: 2 });
+  const restored = await ownMemberProfile(db, a);
+  assert.equal(restored.setupStep, 2);
+  assert.equal(restored.profile.headline, profile.headline);
+  assert.equal(await networkReady(db, a), false);
+  await assert.rejects(directory(db, a), /Vervollständige/);
+  await saveMemberProfile(db, a, profile);
+  const final = await ownMemberProfile(db, a);
+  assert.equal(final.hasCompleteProfile, true);
+  assert.equal(final.setupStep, 0);
+  const raw = JSON.parse(
+    (await db.query("SELECT data FROM profiles WHERE id='a'"))[0].data,
+  );
+  assert.equal(raw.goal, 140);
+  assert.equal(raw.memberNetworkDraft, undefined);
 });

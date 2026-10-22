@@ -1,4 +1,3 @@
-import { requireCurrentMember } from "@/server/member-session";
 import { database, databaseReady } from "@/server/database";
 import { publicRanking } from "@/server/operator";
 import { berlinDate, daySchema } from "@/lib/kpis";
@@ -11,7 +10,6 @@ import {
 
 export async function GET(request: Request) {
   try {
-    await requireCurrentMember();
     const search = new URL(request.url).searchParams;
     const from = daySchema.parse(search.get("from") || berlinDate());
     const to = daySchema.parse(search.get("to") || berlinDate());

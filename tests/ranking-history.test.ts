@@ -45,9 +45,7 @@ test("appointment total includes verified booked types once, excludes legacy/hel
   });
 });
 test("splitting a joint report leaves the crew performance unchanged", async () => {
-  const { jointReports, splitProblems } = await import(
-    "../lib/joint-reports"
-  );
+  const { jointReports, splitProblems } = await import("../lib/joint-reports");
   const { aggregate, metrics } = await import("../lib/kpis");
   assert.ok(jointReports.length > 0);
   for (const joint of jointReports) {
@@ -105,7 +103,7 @@ test("a split share is never invented and never rounded", async () => {
   assert.equal(new Set(keys).size, keys.length);
 });
 
-test("history endpoint requires membership before revealing any result", async () => {
+test("history endpoint rejects malformed, future and mismatched date selections", async () => {
   for (const query of [
     "month=2026-13",
     "month=2099-01",
@@ -116,7 +114,7 @@ test("history endpoint requires membership before revealing any result", async (
     const response = await GET(
       new Request(`http://localhost/api/ranking/month?${query}`),
     );
-    assert.equal(response.status, 401, query);
+    assert.equal(response.status, 400, query);
     assert.equal(response.headers.get("cache-control"), "private, no-store");
   }
 });

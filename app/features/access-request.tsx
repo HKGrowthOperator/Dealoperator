@@ -58,8 +58,9 @@ export default function AccessRequest({
           />
         </label>
         <label>
-          Was möchtest du machen?
+          Woher kennst du uns / wer hat dich empfohlen?
           <textarea
+            placeholder="Zum Beispiel: Ich komme über …"
             maxLength={300}
             value={hint}
             onChange={(e) => setHint(e.target.value)}

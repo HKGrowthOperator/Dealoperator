@@ -1,9 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Camera, Check, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import type { MemberProfile } from "@/lib/members";
-import { AVAILABILITY } from "@/lib/members";
+import {
+  AVAILABILITY,
+  profileMissing,
+  memberProfileSchema,
+} from "@/lib/members";
 import { call } from "./flow-parts";
 import { MemberPhoto } from "./member-directory";
 
@@ -45,11 +50,20 @@ export default function MemberEditor({
   initial,
   name,
   avatarUrl,
+  onboarding = false,
+  destination = "/mitglieder",
+  initialStep = 0,
 }: {
   initial: MemberProfile;
   name: string;
   avatarUrl: string;
+  onboarding?: boolean;
+  destination?: string;
+  initialStep?: number;
 }) {
+  const router = useRouter();
+  const [step, setStep] = useState(initialStep);
+  const heading = useRef<HTMLHeadingElement>(null);
   const [v, setV] = useState(initial),
     [avatar, setAvatar] = useState(avatarUrl),
     [busy, setBusy] = useState(false),
@@ -76,15 +90,69 @@ export default function MemberEditor({
       setUpload(false);
     }
   }
+  function move(next: number) {
+    setStep(next);
+    setMessage("");
+    requestAnimationFrame(() => heading.current?.focus());
+  }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (onboarding && step < 2) {
+      if (step === 0) {
+        const missing = profileMissing(v).filter((v) => v !== "Kontakt");
+        if (missing.length) {
+          setMessage(`Bitte ergänze: ${missing.join(", ")}.`);
+          return;
+        }
+      }
+      if (step === 1 && v.references.some((r) => r.title.trim().length < 2)) {
+        setMessage(
+          "Gib deiner Referenz einen Titel oder entferne den leeren Eintrag.",
+        );
+        return;
+      }
+      const draft = memberProfileSchema.safeParse(v);
+      if (!draft.success) {
+        setMessage(
+          draft.error.issues[0]?.message || "Bitte prüfe die Angaben.",
+        );
+        return;
+      }
+      setBusy(true);
+      setMessage("");
+      try {
+        await call("/api/members", {
+          action: "draft",
+          value: { profile: v, step: step + 1 },
+        });
+        move(step + 1);
+      } catch (e) {
+        setMessage((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (onboarding && profileMissing(v).length) {
+      setMessage(`Bitte ergänze: ${profileMissing(v).join(", ")}.`);
+      return;
+    }
+    const parsed = memberProfileSchema.safeParse(v);
+    if (!parsed.success) {
+      setMessage(parsed.error.issues[0]?.message || "Bitte prüfe die Angaben.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     setSaved(false);
     try {
       await call("/api/members", { action: "save", value: v });
       setSaved(true);
+      if (onboarding) {
+        router.push(destination);
+        router.refresh();
+      }
     } catch (e) {
       setMessage((e as Error).message);
     } finally {
@@ -93,20 +161,50 @@ export default function MemberEditor({
   }
   return (
     <main id="inhalt" className="mn-page mn-editor">
-      <Link className="mn-back" href="/mitglieder">
-        Alle Mitglieder
+      <Link className="mn-back" href={onboarding ? "/" : "/mitglieder"}>
+        {onboarding ? "Zu den Ergebnissen" : "Alle Mitglieder"}
       </Link>
       <header className="mn-heading">
         <div>
-          <p className="mn-eyebrow">Dein Profil</p>
-          <h1>Zeig, was du machst.</h1>
-          <p>Und wobei ihr euch ergänzen könnt.</p>
+          <p className="mn-eyebrow">
+            {onboarding
+              ? `Dein Mitgliederprofil · ${step + 1} von 3`
+              : "Dein Profil"}
+          </p>
+          <h1 ref={heading} tabIndex={-1}>
+            {onboarding
+              ? [
+                  "Was machst du?",
+                  "Was bringst du mit?",
+                  "Wie erreicht man dich?",
+                ][step]
+              : "Zeig, was du machst."}
+          </h1>
+          <p>
+            {onboarding
+              ? [
+                  "Tätigkeit, Leistungen und die Branchen, in denen du dich auskennst.",
+                  "Projekte und Erfahrungen machen deine Arbeit greifbar. Ergänze, was schon da ist.",
+                  "So können dich die anderen direkt kontaktieren.",
+                ][step]
+              : "Tätigkeit, Projekte und Kontakt an einem Ort."}
+          </p>
         </div>
         <Link className="btn secondary" href="/profil?modus=eigen">
           Konto & Erinnerungen
         </Link>
       </header>
-      <div className="mn-photo-edit">
+      {onboarding && (
+        <div className="nw-progress" aria-label={`Schritt ${step + 1} von 3`}>
+          {["Tätigkeit", "Erfahrung", "Kontakt"].map((label, i) => (
+            <span className={i <= step ? "active" : ""} key={label}>
+              {i + 1}
+              <small>{label}</small>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="mn-photo-edit" hidden={onboarding && step !== 0}>
         <MemberPhoto member={{ name, avatarUrl: avatar }} size="large" />
         <div>
           <strong>{name}</strong>
@@ -148,8 +246,8 @@ export default function MemberEditor({
           )}
         </div>
       </div>
-      <form onSubmit={submit} className="mn-edit-form">
-        <section className="mn-section">
+      <form onSubmit={submit} className="mn-edit-form" noValidate>
+        <section className="mn-section" hidden={onboarding && step !== 0}>
           <h2>Auf einen Blick</h2>
           <label>
             Was machst du?
@@ -180,7 +278,7 @@ export default function MemberEditor({
             </label>
           </div>
           <label>
-            Deine Angebote
+            Deine Leistungen
             <input
               value={v.services.join(", ")}
               onChange={(e) =>
@@ -221,22 +319,24 @@ export default function MemberEditor({
             Über dich und deine Arbeit
             <textarea
               rows={4}
+              minLength={20}
+              placeholder="Was setzt du um, für wen und worauf kommt es dir bei der Zusammenarbeit an?"
               maxLength={1000}
               value={v.about}
               onChange={(e) => patch("about", e.target.value)}
             />
           </label>
         </section>
-        <section className="mn-section">
-          <h2>Was gerade bei dir ansteht</h2>
+        <section className="mn-section" hidden={onboarding && step !== 1}>
+          <h2>Projekte & Zusammenarbeit</h2>
           <label>
-            Aktuelle Projekte
+            Deine Projekte & Erfahrungen
             <textarea
               rows={3}
               maxLength={1400}
               value={v.projects}
               onChange={(e) => patch("projects", e.target.value)}
-              placeholder="Woran arbeitest du gerade?"
+              placeholder="Was habt ihr schon umgesetzt? Für wen, mit welcher Aufgabe und welchem Ergebnis?"
             />
           </label>
           <label>
@@ -268,7 +368,7 @@ export default function MemberEditor({
             </select>
           </label>
         </section>
-        <section className="mn-section">
+        <section className="mn-section" hidden={onboarding && step !== 2}>
           <h2>Kontakt im Mitgliederprofil</h2>
           <div className="mn-field-row">
             <label>
@@ -304,8 +404,8 @@ export default function MemberEditor({
             />
           </label>
         </section>
-        <section className="mn-section">
-          <h2>Referenzen & Einblicke</h2>
+        <section className="mn-section" hidden={onboarding && step !== 1}>
+          <h2>Projekte & Referenzen</h2>
           {v.references.map((r, i) => (
             <div className="mn-reference-edit" key={i}>
               <label>
@@ -389,7 +489,7 @@ export default function MemberEditor({
           )}
         </section>
         <footer className="mn-save">
-          <label className="mn-publish">
+          <label className="mn-publish" hidden={onboarding && step !== 2}>
             <input
               type="checkbox"
               checked={v.listed}
@@ -408,9 +508,23 @@ export default function MemberEditor({
               Profil gespeichert.
             </p>
           )}
+          {onboarding && step > 0 && (
+            <button
+              type="button"
+              className="btn secondary"
+              disabled={busy || upload}
+              onClick={() => move(step - 1)}
+            >
+              Zurück
+            </button>
+          )}
           <button className="btn primary" disabled={busy || upload}>
-            {busy && <LoaderCircle className="spin" size={18} />}Änderungen
-            speichern
+            {busy && <LoaderCircle className="spin" size={18} />}
+            {onboarding
+              ? step < 2
+                ? "Weiter"
+                : "Profil speichern & Mitglieder entdecken"
+              : "Änderungen speichern"}
           </button>
         </footer>
       </form>

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isTeam, safeNext, viewerOf } from "@/server/auth";
 import { database } from "@/server/database";
+import { networkReady } from "@/server/members";
 import { ownState } from "@/server/operator";
 import { homeState } from "@/server/home";
 import {
@@ -70,6 +71,12 @@ export default async function Page({
   // Calling-Tag mit offenem Abschluss direkt zum Eintragen, sonst zu den
   // Ergebnissen. Ausdrückliche Ziele bleiben erhalten.
   if (state.participant) {
+    const request = state.request as { kind?: string } | null;
+    if (
+      (target.pathname.startsWith("/mitglieder") || request?.kind === "new") &&
+      !(await networkReady(db, actor))
+    )
+      redirect("/mitglieder/einrichten");
     if (next === "/") {
       const home = await homeState(db, actor);
       if (

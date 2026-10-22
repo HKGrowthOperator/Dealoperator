@@ -2,6 +2,13 @@
 export function isPublicEntry(path: string) {
   return (
     new Set([
+      "/",
+      "/ranking",
+      "/api/ranking",
+      "/api/ranking/week",
+      "/api/ranking/month",
+      "/api/ranking/dranbleiben",
+      "/api/events",
       "/anmelden",
       "/starten",
       "/beitreten",

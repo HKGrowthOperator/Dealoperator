@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
-import OnboardingStart, { type PendingStart } from "../features/onboarding-start";
+import OnboardingStart, {
+  type PendingStart,
+} from "../features/onboarding-start";
 import { authReady, getCurrentUser, safeNext } from "@/server/auth";
 import { database, databaseReady } from "@/server/database";
 import { emailCodeEnabled, RESEND_SECONDS } from "@/server/email-auth";
@@ -16,7 +18,8 @@ import { AppError } from "@/server/operator";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Mitmachen · Deal Operator",
-  description: "Kostenfrei deine Zahlen festhalten: Konto anlegen oder vorbereitetes Profil übernehmen und deine Calling-Routine fortsetzen.",
+  description:
+    "Kostenfrei deine Zahlen festhalten: Konto anlegen oder vorbereitetes Profil übernehmen und deine Calling-Routine fortsetzen.",
   alternates: { canonical: "/starten" },
 };
 
@@ -42,7 +45,9 @@ export default async function Page({
       if (invite) params.set("einladung", invite);
       redirect(`/profil-uebernehmen?${params}`);
     }
-    redirect(`/start?next=${encodeURIComponent(safeNext(search.next || null))}`);
+    redirect(
+      `/start?next=${encodeURIComponent(safeNext(search.next || null))}`,
+    );
   }
 
   // Direktlink aus dem Ranking oder einer Einladung: Profil vorauswählen,
@@ -57,7 +62,11 @@ export default async function Page({
     const db = database();
     if (profil) {
       try {
-        preselected = await profileForSelection(db, profil, invite || undefined);
+        preselected = await profileForSelection(
+          db,
+          profil,
+          invite || undefined,
+        );
       } catch (e) {
         if (e instanceof AppError && e.status === 409) {
           const [p] = await db.query(
@@ -91,18 +100,22 @@ export default async function Page({
         fullName: found.fullName,
         phone: found.phone,
         hint: found.hint,
-        resendIn: found.mailSent ? Math.max(0, Math.ceil(RESEND_SECONDS - found.secondsAgo)) : 0,
+        resendIn: found.mailSent
+          ? Math.max(0, Math.ceil(RESEND_SECONDS - found.secondsAgo))
+          : 0,
       };
     }
   }
 
   // Eigene Mail mit Code (server/email-code.ts): Codefeld immer zeigen.
-  const ownMail = databaseReady() && (await ownMailReady(database()).catch(() => false));
+  const ownMail =
+    databaseReady() && (await ownMailReady(database()).catch(() => false));
   return (
     <div className="operator-site">
       <OperatorHeader />
       <main className="auth-layout">
         <OnboardingStart
+          next={safeNext(search.next || "/tagesabschluss")}
           ready={authReady() && databaseReady()}
           codeEnabled={emailCodeEnabled() || ownMail}
           preselected={preselected}

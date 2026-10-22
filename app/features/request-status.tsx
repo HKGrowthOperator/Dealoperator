@@ -25,9 +25,19 @@ function steps(status: string, assign: boolean, fresh = false) {
   const decided = ["approved", "rejected", "superseded"].includes(status);
   return [
     { label: "Angemeldet", state: "done" },
-    { label: fresh ? "Zugang angefragt" : assign ? "Zuordnung angefragt" : "Übernahme angefragt", state: "done" },
     {
-      label: status === "info_needed" ? "Rückfrage an dich" : "Prüfung durch das Team",
+      label: fresh
+        ? "Zugang angefragt"
+        : assign
+          ? "Zuordnung angefragt"
+          : "Übernahme angefragt",
+      state: "done",
+    },
+    {
+      label:
+        status === "info_needed"
+          ? "Rückfrage an dich"
+          : "Prüfung durch das Team",
       state: decided ? "done" : "current",
     },
     {
@@ -109,11 +119,18 @@ export default function RequestStatus({
           <p className="flow-lead">
             {request.participantName
               ? `„${request.participantName}“ gehört jetzt zu deinem Konto. Deine bisherigen Zahlen sind da.`
-              : request.kind === "new" ? "Dein Zugang ist freigegeben. Du kannst jetzt dein Profil ergänzen." : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
+              : request.kind === "new"
+                ? "Dein Zugang ist freigegeben. Du kannst jetzt dein Profil ergänzen."
+                : "Das Team hat dir dein Profil zugeordnet. Deine bisherigen Zahlen sind da."}
           </p>
           <div className="flow-actions">
-            <Link className="btn primary full" href="/tagesabschluss">
-              Zahlen für heute eintragen
+            <Link
+              className="btn primary full"
+              href={request.kind === "new" ? "/mitglieder" : "/tagesabschluss"}
+            >
+              {request.kind === "new"
+                ? "Mitgliederprofil ergänzen"
+                : "Zahlen für heute eintragen"}
             </Link>
             <Link className="flow-link" href="/">
               Zu den Ergebnissen
@@ -142,7 +159,9 @@ export default function RequestStatus({
                 ? "Dieses Profil ist bereits zugeordnet."
                 : assign
                   ? "Das Team sucht dein Profil heraus."
-                  : request.kind === "new" ? "Deine Zugangsanfrage wird geprüft." : "Deine Profilübernahme wird geprüft."}
+                  : request.kind === "new"
+                    ? "Deine Zugangsanfrage wird geprüft."
+                    : "Deine Profilübernahme wird geprüft."}
         </h1>
         <p className="flow-lead">
           {status === "info_needed"
@@ -166,7 +185,9 @@ export default function RequestStatus({
               data-state={s.state}
               aria-current={s.state === "current" ? "step" : undefined}
             >
-              <span aria-hidden="true">{s.state === "done" ? <Check size={14} /> : null}</span>
+              <span aria-hidden="true">
+                {s.state === "done" ? <Check size={14} /> : null}
+              </span>
               {s.label}
             </li>
           ))}
@@ -194,7 +215,9 @@ export default function RequestStatus({
               <Search aria-hidden="true" />
               <span>
                 <strong>Anderes Profil suchen</strong>
-                <small>Vielleicht stehen deine Zahlen unter einem anderen Namen.</small>
+                <small>
+                  Vielleicht stehen deine Zahlen unter einem anderen Namen.
+                </small>
               </span>
               <ChevronRight size={18} aria-hidden="true" />
             </Link>

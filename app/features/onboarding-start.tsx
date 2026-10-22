@@ -56,8 +56,18 @@ export type PendingStart = {
 };
 
 const STEPS: Record<Mode, string[]> = {
-  claim: ["Profil finden", "Deine Angaben", "E-Mail bestätigen", "Prüfung durch das Team"],
-  assign: ["Profil suchen", "Deine Angaben", "E-Mail bestätigen", "Zuordnung durch das Team"],
+  claim: [
+    "Profil finden",
+    "Deine Angaben",
+    "E-Mail bestätigen",
+    "Prüfung durch das Team",
+  ],
+  assign: [
+    "Profil suchen",
+    "Deine Angaben",
+    "E-Mail bestätigen",
+    "Zuordnung durch das Team",
+  ],
   new: ["Deine Angaben", "E-Mail bestätigen", "Freigabe"],
 };
 // Der Weg „neu“ hat keinen Suchschritt; seine Zählung beginnt bei den Angaben.
@@ -66,8 +76,16 @@ const STEP_INDEX: Record<Mode, Partial<Record<Step, number>>> = {
   assign: { search: 0, contact: 1, sent: 2 },
   new: { contact: 0, sent: 1 },
 };
-const WEG: Record<Mode, string> = { new: "neu", claim: "profil", assign: "team" };
-const MODE_OF: Record<string, Mode> = { neu: "new", profil: "claim", team: "assign" };
+const WEG: Record<Mode, string> = {
+  new: "neu",
+  claim: "profil",
+  assign: "team",
+};
+const MODE_OF: Record<string, Mode> = {
+  neu: "new",
+  profil: "claim",
+  team: "assign",
+};
 const SCHRITT: Partial<Record<Step, string>> = {
   search: "suche",
   contact: "angaben",
@@ -113,9 +131,11 @@ export default function OnboardingStart({
   initialWeg = "",
   initialSchritt = "",
   confirmedElsewhere = false,
+  next = "/tagesabschluss",
 }: {
   /** Bestätigungslink auf einem anderen Gerät geöffnet (?bestaetigt=1). */
   confirmedElsewhere?: boolean;
+  next?: string;
   ready: boolean;
   codeEnabled: boolean;
   preselected: Profile | null;
@@ -130,7 +150,9 @@ export default function OnboardingStart({
   /** schritt=angaben: Neuladen nach „E-Mail-Adresse ändern“ bleibt im Formular. */
   initialSchritt?: string;
 }) {
-  const fromPending = pending && (linkError || !preselected || pending.profile?.id === preselected.id);
+  const fromPending =
+    pending &&
+    (linkError || !preselected || pending.profile?.id === preselected.id);
   const urlMode = MODE_OF[initialWeg];
   const initialMode: Mode | null = fromPending
     ? pending.kind === "new"
@@ -143,23 +165,24 @@ export default function OnboardingStart({
       : (urlMode ?? null);
   // Ohne belegten Versand keine Bestätigungsansicht: dann steht das Formular
   // mit den gespeicherten Angaben da.
-  const initialStep: Step = confirmedElsewhere && !pending
-    ? "confirmed"
-    : fromPending
-    ? pending.profileTaken
-      ? "choice"
-      : pending.mailSent && initialSchritt !== "angaben"
-        ? "sent"
-        : "contact"
-    : preselected
-      ? "contact"
-      : taken
-        ? "taken"
-        : initialMode === "claim"
-          ? "search"
-          : initialMode
-            ? "contact"
-            : "search";
+  const initialStep: Step =
+    confirmedElsewhere && !pending
+      ? "confirmed"
+      : fromPending
+        ? pending.profileTaken
+          ? "choice"
+          : pending.mailSent && initialSchritt !== "angaben"
+            ? "sent"
+            : "contact"
+        : preselected
+          ? "contact"
+          : taken
+            ? "taken"
+            : initialMode === "claim"
+              ? "search"
+              : initialMode
+                ? "contact"
+                : "search";
 
   const [mode, setMode] = useState<Mode | null>(initialMode);
   const [step, setStep] = useState<Step>(initialStep);
@@ -174,7 +197,9 @@ export default function OnboardingStart({
         ? { ...EMPTY_CONTACT, fullName: preselected.name }
         : EMPTY_CONTACT,
   );
-  const [suggested, setSuggested] = useState(Boolean(!fromPending && preselected));
+  const [suggested, setSuggested] = useState(
+    Boolean(!fromPending && preselected),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState(
     fromPending
@@ -211,7 +236,8 @@ export default function OnboardingStart({
   const [loggingIn, setLoggingIn] = useState(false);
   const [resending, setResending] = useState(false);
   const [resent, setResent] = useState(false);
-  const sentBefore = fromPending && pending.mailSent && !pending.profileTaken ? pending : null;
+  const sentBefore =
+    fromPending && pending.mailSent && !pending.profileTaken ? pending : null;
   const [sentTo, setSentTo] = useState(sentBefore ? sentBefore.email : "");
   // Angaben, mit denen zuletzt wirklich versendet wurde. „Erneut senden“ nimmt
   // genau diese, auch wenn im Formular inzwischen etwas anderes steht.
@@ -221,7 +247,11 @@ export default function OnboardingStart({
     contact: Contact;
   } | null>(
     sentBefore && initialMode
-      ? { mode: initialMode, profile: sentBefore.profile, contact: contactFrom(sentBefore) }
+      ? {
+          mode: initialMode,
+          profile: sentBefore.profile,
+          contact: contactFrom(sentBefore),
+        }
       : null,
   );
   const [saved, setSaved] = useState(Boolean(fromPending));
@@ -265,7 +295,11 @@ export default function OnboardingStart({
           contact: Contact;
           suggested: boolean;
         } | null;
-        if (draft && draft.mode === mode && draft.profileId === (selected?.id ?? null)) {
+        if (
+          draft &&
+          draft.mode === mode &&
+          draft.profileId === (selected?.id ?? null)
+        ) {
           setContact(draft.contact);
           setSuggested(draft.suggested);
         }
@@ -286,8 +320,13 @@ export default function OnboardingStart({
       const profile = known.current[params.get("profil") || ""] ?? null;
       let nextStep: Step =
         STEP_OF[params.get("schritt") || ""] ??
-        (nextMode ? "search" : taken && params.get("profil") === taken.id ? "taken" : "choice");
-      if (nextMode === "claim" && nextStep !== "search" && !profile) nextStep = "search";
+        (nextMode
+          ? "search"
+          : taken && params.get("profil") === taken.id
+            ? "taken"
+            : "choice");
+      if (nextMode === "claim" && nextStep !== "search" && !profile)
+        nextStep = "search";
       if (nextStep === "sent" && !sentTo) nextStep = "contact";
       setMode(nextMode);
       setSelected(profile);
@@ -306,21 +345,32 @@ export default function OnboardingStart({
     try {
       sessionStorage.setItem(
         DRAFT,
-        JSON.stringify({ mode, profileId: selected?.id ?? null, contact, suggested }),
+        JSON.stringify({
+          mode,
+          profileId: selected?.id ?? null,
+          contact,
+          suggested,
+        }),
       );
     } catch {
       /* kein Speicher verfügbar */
     }
   }, [step, mode, selected, contact, suggested]);
 
-  function urlFor(nextStep: Step, nextMode: Mode | null, profile: Profile | null) {
+  function urlFor(
+    nextStep: Step,
+    nextMode: Mode | null,
+    profile: Profile | null,
+  ) {
     const params = new URLSearchParams();
+    params.set("next", next);
     if (nextMode && nextStep !== "choice" && nextStep !== "taken") {
       params.set("weg", WEG[nextMode]);
       params.set("schritt", SCHRITT[nextStep] || "");
       if (nextMode === "claim" && profile && nextStep !== "search") {
         params.set("profil", profile.id);
-        if (invite && profile.id === preselected?.id) params.set("einladung", invite);
+        if (invite && profile.id === preselected?.id)
+          params.set("einladung", invite);
       }
     } else if (nextStep === "taken" && taken) {
       params.set("profil", taken.id);
@@ -329,7 +379,11 @@ export default function OnboardingStart({
     return `/starten${query ? `?${query}` : ""}`;
   }
 
-  function go(nextStep: Step, nextMode: Mode | null = mode, profile: Profile | null = selected) {
+  function go(
+    nextStep: Step,
+    nextMode: Mode | null = mode,
+    profile: Profile | null = selected,
+  ) {
     if (profile) known.current[profile.id] = profile;
     setStep(nextStep);
     setMode(nextMode);
@@ -364,7 +418,12 @@ export default function OnboardingStart({
     setMessage("");
     setContact((c) => ({
       ...c,
-      fullName: c.fullName.trim() && !suggested ? c.fullName : twoWords(searched) ? searched : "",
+      fullName:
+        c.fullName.trim() && !suggested
+          ? c.fullName
+          : twoWords(searched)
+            ? searched
+            : "",
       hint:
         nextMode === "assign" && !c.hint
           ? hint || (searched ? `Gesucht nach „${searched}“` : "")
@@ -381,7 +440,7 @@ export default function OnboardingStart({
       phone: c.phone.trim(),
       phoneCountry: c.phoneCountry,
     };
-    if (m === "new") return { kind: "new", ...base, hint: "" };
+    if (m === "new") return { kind: "new", ...base, hint: c.hint.trim() };
     if (m === "assign") return { kind: "claim", ...base, hint: c.hint.trim() };
     return {
       kind: "claim",
@@ -401,16 +460,27 @@ export default function OnboardingStart({
     setSendError("");
     setResent(false);
     const using =
-      resend && sentWith ? sentWith : { mode: mode as Mode, profile: selected, contact };
+      resend && sentWith
+        ? sentWith
+        : { mode: mode as Mode, profile: selected, contact };
     const email = using.contact.email.trim().toLowerCase();
     try {
-      const data = await call<{ resendAfter?: number; signedIn?: boolean; next?: string; code?: boolean }>(
+      const data = await call<{
+        resendAfter?: number;
+        signedIn?: boolean;
+        next?: string;
+        code?: boolean;
+      }>(
         "/api/onboarding",
         resend
           ? { action: "resend" }
           : {
               action: "start",
-              value: { ...payload(using.mode, using.profile, using.contact), password },
+              next,
+              value: {
+                ...payload(using.mode, using.profile, using.contact),
+                password,
+              },
             },
       );
       if (data.signedIn && data.next) {
@@ -466,7 +536,7 @@ export default function OnboardingStart({
         action: "signin",
         email: sentTo,
         password: secret,
-        next: "/tagesabschluss",
+        next,
       });
       window.location.assign(data.next);
       return true;
@@ -490,7 +560,9 @@ export default function OnboardingStart({
       if (stopped || running || document.visibilityState !== "visible") return;
       running = true;
       try {
-        const { state } = await call<{ state: string }>("/api/onboarding?status=bestaetigung");
+        const { state } = await call<{ state: string }>(
+          "/api/onboarding?status=bestaetigung",
+        );
         if (!stopped && state === "confirmed") {
           setConfirmed(true);
           if (passwordRef.current) await signIn(passwordRef.current);
@@ -547,9 +619,17 @@ export default function OnboardingStart({
       </strong>
       <p>
         Versuch eine andere Schreibweise oder nur deinen Vornamen. Hast du dein
-        Profil schon übernommen? Dann <Link href="/anmelden">melde dich an</Link>.
+        Profil schon übernommen? Dann{" "}
+        <Link href={`/anmelden?next=${encodeURIComponent(next)}`}>
+          melde dich an
+        </Link>
+        .
       </p>
-      <button type="button" className="flow-option" onClick={() => switchTo("assign", searched)}>
+      <button
+        type="button"
+        className="flow-option"
+        onClick={() => switchTo("assign", searched)}
+      >
         <UsersRound aria-hidden="true" />
         <span>
           <strong>Meine Zahlen müssten schon hier sein</strong>
@@ -557,7 +637,11 @@ export default function OnboardingStart({
         </span>
         <ChevronRight size={18} aria-hidden="true" />
       </button>
-      <button type="button" className="flow-option" onClick={() => switchTo("new", searched)}>
+      <button
+        type="button"
+        className="flow-option"
+        onClick={() => switchTo("new", searched)}
+      >
         <UserPlus aria-hidden="true" />
         <span>
           <strong>Zugang anfragen</strong>
@@ -571,14 +655,14 @@ export default function OnboardingStart({
   return (
     <section className="auth-card card flow">
       <div className="flow-step" key={`${step}:${mode}`}>
-        {mode && index !== undefined && <FlowProgress steps={STEPS[mode]} current={index} />}
+        {mode && index !== undefined && (
+          <FlowProgress steps={STEPS[mode]} current={index} />
+        )}
 
         {!ready && (
           <div className="flow-notice">
             <strong>Die Anmeldung öffnet in Kürze.</strong>
-            <p>
-              Bitte versuche es später erneut.
-            </p>
+            <p>Bitte versuche es später erneut.</p>
           </div>
         )}
 
@@ -588,7 +672,7 @@ export default function OnboardingStart({
             purpose={sentWith?.mode ?? mode}
             profileName={(sentWith?.profile ?? selected)?.name}
             codeEnabled={codeEnabled || ownCode}
-            next="/tagesabschluss"
+            next={next}
             saved={saved}
             onConfirmed={async () => {
               // Adresse per Code bestätigt: mit dem Passwort aus diesem Tab
@@ -618,16 +702,27 @@ export default function OnboardingStart({
                 >
                   <p className="flow-waiting">
                     <CircleCheck size={18} aria-hidden="true" />
-                    <span>E-Mail bestätigt. Melde dich jetzt mit deinem Passwort an.</span>
+                    <span>
+                      E-Mail bestätigt. Melde dich jetzt mit deinem Passwort an.
+                    </span>
                   </p>
-                  <input type="hidden" name="email" autoComplete="username" value={sentTo} readOnly />
+                  <input
+                    type="hidden"
+                    name="email"
+                    autoComplete="username"
+                    value={sentTo}
+                    readOnly
+                  />
                   <PasswordField
                     value={password}
                     onChange={setPassword}
                     error={loginError}
                     autoComplete="current-password"
                   />
-                  <button className="btn primary full" disabled={loggingIn || !password}>
+                  <button
+                    className="btn primary full"
+                    disabled={loggingIn || !password}
+                  >
                     {loggingIn && <LoaderCircle className="spin" size={18} />}
                     Anmelden
                   </button>
@@ -635,7 +730,11 @@ export default function OnboardingStart({
               ) : (
                 <>
                   <p className="flow-waiting" aria-live="polite">
-                    <LoaderCircle className="spin" size={18} aria-hidden="true" />
+                    <LoaderCircle
+                      className="spin"
+                      size={18}
+                      aria-hidden="true"
+                    />
                     <span>
                       {confirmed
                         ? "E-Mail bestätigt. Du wirst angemeldet …"
@@ -666,7 +765,10 @@ export default function OnboardingStart({
               auch von selbst weiter.
             </p>
             <div className="flow-actions">
-              <Link className="btn primary full" href="/anmelden?next=%2Ftagesabschluss">
+              <Link
+                className="btn primary full"
+                href={`/anmelden?next=${encodeURIComponent(next)}`}
+              >
                 Anmelden
               </Link>
             </div>
@@ -680,7 +782,12 @@ export default function OnboardingStart({
             </h1>
             <p className="flow-lead">Wie möchtest du starten?</p>
             {message && (
-              <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
+              <p
+                className="form-error"
+                role="alert"
+                ref={alertRef}
+                tabIndex={-1}
+              >
                 {message}
               </p>
             )}
@@ -689,9 +796,17 @@ export default function OnboardingStart({
                 <input type="hidden" name="profil" value={needsInvite} />
                 <div className="flow-field">
                   <label htmlFor="flow-invite">Code aus deiner Einladung</label>
-                  <input id="flow-invite" name="einladung" required maxLength={200} autoComplete="off" />
+                  <input
+                    id="flow-invite"
+                    name="einladung"
+                    required
+                    maxLength={200}
+                    autoComplete="off"
+                  />
                 </div>
-                <button className="btn primary full">Profil mit Einladung öffnen</button>
+                <button className="btn primary full">
+                  Profil mit Einladung öffnen
+                </button>
               </form>
             )}
             <div className="flow-choices">
@@ -700,8 +815,8 @@ export default function OnboardingStart({
                 <span>
                   <strong>Meine Zahlen sind schon hier</strong>
                   <small>
-                    Du stehst schon in der Rangliste? Übernimm dein Profil mit allen
-                    bisherigen Tagen.
+                    Du stehst schon in der Rangliste? Übernimm dein Profil mit
+                    allen bisherigen Tagen.
                   </small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
@@ -710,12 +825,14 @@ export default function OnboardingStart({
                 <UserPlus aria-hidden="true" />
                 <span>
                   <strong>Ich starte neu</strong>
-                  <small>Neues Profil anlegen und den ersten Tag eintragen.</small>
+                  <small>
+                    Neues Profil anlegen und den ersten Tag eintragen.
+                  </small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
             </div>
-            <SignInLine />
+            <SignInLine next={next} />
           </>
         )}
 
@@ -732,7 +849,9 @@ export default function OnboardingStart({
                 <LogIn aria-hidden="true" />
                 <span>
                   <strong>Das ist mein Profil</strong>
-                  <small>Du hast es schon übernommen? Dann melde dich einfach an.</small>
+                  <small>
+                    Du hast es schon übernommen? Dann melde dich einfach an.
+                  </small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </Link>
@@ -740,18 +859,29 @@ export default function OnboardingStart({
                 type="button"
                 className="flow-option"
                 onClick={() =>
-                  switchTo("assign", "", `Betrifft das bereits vergebene Profil „${taken.name}“.`)
+                  switchTo(
+                    "assign",
+                    "",
+                    `Betrifft das bereits vergebene Profil „${taken.name}“.`,
+                  )
                 }
               >
                 <UsersRound aria-hidden="true" />
                 <span>
                   <strong>Es ist meins, aber ich habe kein Konto</strong>
-                  <small>Das Team klärt die Zuordnung. Es entsteht kein zweites Profil.</small>
+                  <small>
+                    Das Team klärt die Zuordnung. Es entsteht kein zweites
+                    Profil.
+                  </small>
                 </span>
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
             </div>
-            <button type="button" className="flow-link" onClick={() => go("search", "claim", null)}>
+            <button
+              type="button"
+              className="flow-link"
+              onClick={() => go("search", "claim", null)}
+            >
               Anderes Profil suchen
             </button>
           </>
@@ -766,12 +896,22 @@ export default function OnboardingStart({
               Wähle dein vorhandenes Profil oder frage einen neuen Zugang an.
             </p>
             {message && (
-              <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
+              <p
+                className="form-error"
+                role="alert"
+                ref={alertRef}
+                tabIndex={-1}
+              >
                 {message}
               </p>
             )}
-            <ProfileSearch query={query} onQuery={setQuery} onPick={pick} notFound={missing} />
-            <SignInLine />
+            <ProfileSearch
+              query={query}
+              onQuery={setQuery}
+              onPick={pick}
+              notFound={missing}
+            />
+            <SignInLine next={next} />
           </>
         )}
 
@@ -785,7 +925,10 @@ export default function OnboardingStart({
                   : "Zugang anfragen."}
             </h1>
             {mode === "claim" && selected && (
-              <ProfileCard profile={selected} onChange={() => go("search", "claim", null)} />
+              <ProfileCard
+                profile={selected}
+                onChange={() => go("search", "claim", null)}
+              />
             )}
             <p className="flow-lead">
               {mode === "claim"
@@ -798,13 +941,19 @@ export default function OnboardingStart({
               <div className="flow-notice">
                 <strong>Das ist ein gemeinsames Teamprofil.</strong>
                 <p>
-                  Die Zahlen darin sind ein gemeinsames Ergebnis. Wer es übernimmt,
-                  verwaltet den gemeinsamen Stand. Klärt vorher im Team, wer das tut.
+                  Die Zahlen darin sind ein gemeinsames Ergebnis. Wer es
+                  übernimmt, verwaltet den gemeinsamen Stand. Klärt vorher im
+                  Team, wer das tut.
                 </p>
               </div>
             )}
             {message && (
-              <p className="form-error" role="alert" ref={alertRef} tabIndex={-1}>
+              <p
+                className="form-error"
+                role="alert"
+                ref={alertRef}
+                tabIndex={-1}
+              >
                 {message}
               </p>
             )}
@@ -828,7 +977,15 @@ export default function OnboardingStart({
                 onChange={patch}
                 errors={errors}
                 fields={fields}
-                hint={mode === "new" ? "none" : mode === "assign" ? "open" : "toggle"}
+                hint={mode === "new" || mode === "assign" ? "open" : "toggle"}
+                hintLabel={
+                  mode === "new"
+                    ? "Woher kennst du uns / wer hat dich empfohlen?"
+                    : undefined
+                }
+                hintPlaceholder={
+                  mode === "new" ? "Zum Beispiel: Ich komme über …" : undefined
+                }
                 nameSuggested={suggested && mode === "claim"}
               />
               {mode !== "new" && (
@@ -837,13 +994,21 @@ export default function OnboardingStart({
                   bekannten Person ab.
                 </p>
               )}
-              <button className="btn primary full" disabled={!ready || busy || blocked}>
-                {busy ? <LoaderCircle className="spin" size={18} /> : <Mail size={18} />}
+              <button
+                className="btn primary full"
+                disabled={!ready || busy || blocked}
+              >
+                {busy ? (
+                  <LoaderCircle className="spin" size={18} />
+                ) : (
+                  <Mail size={18} />
+                )}
                 {mode === "new" ? "Zugang anfragen" : "Übernahme anfragen"}
                 {blocked && (
                   <span className="flow-wait">
                     {" "}
-                    ({Math.floor(wait / 60)}:{String(wait % 60).padStart(2, "0")})
+                    ({Math.floor(wait / 60)}:
+                    {String(wait % 60).padStart(2, "0")})
                   </span>
                 )}
               </button>
@@ -852,7 +1017,9 @@ export default function OnboardingStart({
               type="button"
               className="flow-link"
               onClick={() =>
-                mode === "new" ? go("choice", null, null) : go("search", "claim", null)
+                mode === "new"
+                  ? go("choice", null, null)
+                  : go("search", "claim", null)
               }
             >
               Zurück

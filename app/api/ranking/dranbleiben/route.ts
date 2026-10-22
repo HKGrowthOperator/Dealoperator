@@ -1,4 +1,3 @@
-import { requireCurrentMember } from "@/server/member-session";
 import { database, databaseReady } from "@/server/database";
 import { berlinDate, daySchema } from "@/lib/kpis";
 import { errorResponse, json } from "@/server/http";
@@ -14,7 +13,6 @@ const cache = new Map<string, { at: number; rows: unknown[] }>();
 /** Öffentlich: Dranbleiben-Rangliste (Serien, aktive Tage) ohne private Status. */
 export async function GET(request: Request) {
   try {
-    await requireCurrentMember();
     const search = new URL(request.url).searchParams;
     const to = daySchema.parse(search.get("to") || berlinDate());
     const from = daySchema.parse(search.get("from") || `${to.slice(0, 7)}-01`);

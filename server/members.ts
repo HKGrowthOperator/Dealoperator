@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 import type { Database } from "./database";
 import type { Actor } from "./auth";
 import { AppError } from "./operator";
@@ -7,6 +8,9 @@ import {
   emptyMemberProfile,
   memberProfileSchema,
   type DirectoryMember,
+  profileMissing,
+  memberOfferSchema,
+  type MemberOffer,
 } from "../lib/members";
 import { normalisePhone } from "../lib/phone";
 import { aggregate, progress } from "../lib/kpis";
@@ -21,7 +25,7 @@ function stored(data: unknown): Record<string, unknown> {
 }
 /** Do not fall back to signup/import contacts: these are separate fields set by the member. */
 export async function directory(db: Database, actor: Actor) {
-  await requireMember(db, actor);
+  await requireNetworkProfile(db, actor);
   const rows =
     await db.query(`SELECT p.id,p.owner,p.name,p.role,p.company,(pr.data::jsonb - 'memberAvatar') AS data,
     coalesce(pr.data::jsonb->>'memberAvatar','')<>'' AS has_avatar
@@ -78,13 +82,27 @@ export async function ownMemberProfile(db: Database, actor: Actor) {
     actor.userId,
   ]);
   const raw = stored(row?.data),
-    parsed = memberProfileSchema.safeParse(raw.network);
+    published = memberProfileSchema.safeParse(raw.network),
+    draft = networkDraftSchema.safeParse(raw.memberNetworkDraft),
+    parsed = draft.success
+      ? { success: true as const, data: draft.data.profile }
+      : published;
+  const [contact] = !parsed.success
+    ? await db.query("SELECT phone FROM account_private WHERE owner=$1", [
+        actor.userId,
+      ])
+    : [];
   return {
+    setupStep: draft.success ? draft.data.step : 0,
+    hasCompleteProfile:
+      published.success && profileMissing(published.data).length === 0,
     profile: parsed.success
       ? parsed.data
       : {
           ...emptyMemberProfile,
           company: String(access.participant?.company || ""),
+          contactEmail: actor.email,
+          contactPhone: String(contact?.phone || ""),
         },
     name: String(access.participant?.name || ""),
     avatarUrl:
@@ -105,8 +123,8 @@ export async function saveMemberProfile(
       throw new AppError(phone.reason, 400, undefined, "contactPhone");
     value.contactPhone = phone.value;
   }
-  if (value.listed && (!value.headline || !value.services.length))
-    throw new AppError("Gib eine Tätigkeit und mindestens ein Angebot an.");
+  if (value.listed && profileMissing(value).length)
+    throw new AppError(`Bitte ergänze: ${profileMissing(value).join(", ")}.`);
   await db.transaction(async (tx) => {
     await requireMember(tx, actor);
     await tx.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
@@ -126,6 +144,7 @@ export async function saveMemberProfile(
       [actor.userId],
     );
     const old = stored(row?.data);
+    delete old.memberNetworkDraft;
     const next = {
       niche: "",
       time: "Flexibel",
@@ -230,10 +249,149 @@ export async function memberAvatar(db: Database, actor: Actor, id: string) {
   );
   const raw = stored(row?.data),
     p = memberProfileSchema.safeParse(raw.network);
+  if (row && row.owner !== actor.userId) await requireNetworkProfile(db, actor);
   if (!row || ((!p.success || !p.data.listed) && row.owner !== actor.userId))
     throw new AppError("Dieses Foto gibt es nicht.", 404);
   if (typeof raw.memberAvatar !== "string" || !raw.memberAvatar)
     throw new AppError("Kein Foto hinterlegt.", 404);
   validateAvatar(raw.memberAvatar);
   return Buffer.from(raw.memberAvatar.split(",")[1], "base64");
+}
+
+export async function networkReady(db: Database, actor: Actor) {
+  const access = await requireMember(db, actor);
+  if (!access.participant && (actor.admin || actor.moderator)) return true;
+  const own = await ownMemberProfile(db, actor);
+  return own.hasCompleteProfile;
+}
+export async function requireNetworkProfile(db: Database, actor: Actor) {
+  if (!(await networkReady(db, actor)))
+    throw new AppError("Vervollständige zuerst dein Mitgliederprofil.", 403);
+}
+const savedOffer = memberOfferSchema.extend({
+  id: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  closed: z.boolean(),
+});
+function offerRows(raw: unknown) {
+  const list = stored(raw).memberOffers;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((item) => {
+    const parsed = savedOffer.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+export async function listMemberOffers(
+  db: Database,
+  actor: Actor,
+): Promise<MemberOffer[]> {
+  const people = await directory(db, actor);
+  const rows = await db.query(
+    "SELECT p.id, (pr.data::jsonb - 'memberAvatar' - 'network') AS data FROM participants p JOIN profiles pr ON pr.id=p.owner WHERE p.kind='person' AND p.owner IS NOT NULL",
+  );
+  const byId = new Map(people.map((m) => [m.id, m]));
+  return rows
+    .flatMap((r) => {
+      const member = byId.get(String(r.id));
+      if (!member || !member.listed) return [];
+      return offerRows(r.data)
+        .filter((o) => !o.closed || member.mine)
+        .map((o) => ({ ...o, member }));
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+/** Lock only the acting owner's JSON row; client IDs never choose the author. */
+export async function changeMemberOffer(
+  db: Database,
+  actor: Actor,
+  action: "save" | "close" | "delete",
+  input: unknown,
+) {
+  await requireNetworkProfile(db, actor);
+  const value =
+    action === "save"
+      ? memberOfferSchema.parse(input)
+      : z.object({ id: z.string().uuid() }).strict().parse(input);
+  return db.transaction(async (tx) => {
+    const access = await requireMember(tx, actor);
+    if (!access.participant)
+      throw new AppError("Bitte zuerst ein persönliches Profil zuordnen.", 409);
+    const [row] = await tx.query(
+      "SELECT data FROM profiles WHERE id=$1 FOR UPDATE",
+      [actor.userId],
+    );
+    const raw = stored(row?.data),
+      profile = memberProfileSchema.safeParse(raw.network);
+    if (
+      !profile.success ||
+      !profile.data.listed ||
+      profileMissing(profile.data).length
+    )
+      throw new AppError(
+        "Veröffentliche zuerst dein vollständiges Mitgliederprofil.",
+        403,
+      );
+    let offers = offerRows(raw);
+    const index = value.id ? offers.findIndex((o) => o.id === value.id) : -1;
+    if (value.id && index < 0)
+      throw new AppError(
+        "Dieses Angebot gehört nicht zu deinem Profil oder wurde entfernt.",
+        404,
+      );
+    const id = value.id || randomUUID();
+    if (action === "save") {
+      if (index < 0 && offers.length >= 20)
+        throw new AppError(
+          "Du kannst bis zu 20 Angebote hinterlegen. Entferne zuerst ein erledigtes Angebot.",
+        );
+      const fields = memberOfferSchema.parse(value);
+      const entry = {
+        ...fields,
+        id,
+        createdAt:
+          index < 0 ? new Date().toISOString() : offers[index].createdAt,
+        closed: index < 0 ? false : offers[index].closed,
+      };
+      if (index < 0) offers.push(entry);
+      else offers[index] = entry;
+    } else if (action === "close")
+      offers[index] = { ...offers[index], closed: true };
+    else offers = offers.filter((o) => o.id !== id);
+    await tx.query("UPDATE profiles SET data=$2 WHERE id=$1", [
+      actor.userId,
+      JSON.stringify({ ...raw, memberOffers: offers }),
+    ]);
+    return { ok: true, id };
+  });
+}
+
+const networkDraftSchema = z
+  .object({
+    profile: memberProfileSchema,
+    step: z.number().int().min(0).max(2),
+  })
+  .strict();
+export async function saveNetworkDraft(
+  db: Database,
+  actor: Actor,
+  input: unknown,
+) {
+  const draft = networkDraftSchema.parse(input);
+  await db.transaction(async (tx) => {
+    await requireMember(tx, actor);
+    const [row] = await tx.query(
+      "SELECT data FROM profiles WHERE id=$1 FOR UPDATE",
+      [actor.userId],
+    );
+    if (!row)
+      throw new AppError(
+        "Bitte zuerst dein persönliches Profil zuordnen.",
+        409,
+      );
+    await tx.query("UPDATE profiles SET data=$2 WHERE id=$1", [
+      actor.userId,
+      JSON.stringify({ ...stored(row.data), memberNetworkDraft: draft }),
+    ]);
+  });
+  return { ok: true };
 }

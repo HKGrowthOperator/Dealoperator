@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, viewerOf } from "@/server/auth";
 import { database } from "@/server/database";
 import { memberAccess } from "@/server/member-access";
-import { directory } from "@/server/members";
+import { directory, networkReady } from "@/server/members";
 import { OperatorHeader, OperatorFooter } from "../features/operator-shell";
 import MemberDirectory from "../features/member-directory";
 export const dynamic = "force-dynamic";
@@ -12,6 +12,7 @@ export default async function Page() {
   const db = database(),
     access = await memberAccess(db, actor);
   if (!access.allowed) redirect(access.next);
+  if (!(await networkReady(db, actor))) redirect("/mitglieder/einrichten");
   return (
     <div className="operator-site">
       <OperatorHeader viewer={viewerOf(actor)} />
